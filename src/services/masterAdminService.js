@@ -36,32 +36,34 @@ export const masterAdminService = {
       () => DUMMY_MA_STATS,
     ),
 
-  // ─── Schools ──────────────────────────────────────────────
+  // ─── Lookup tables (for dropdowns) ───────────────────────
+  getInstituteTypes: () =>
+    api.get('/master-admin/institute-types').then((r) => r.data),
+
+  getPlatformRoles: () =>
+    api.get('/master-admin/platform-roles').then((r) => r.data),
+
+  // ─── Institutes (formerly Schools) ───────────────────────
   getSchools: (filters = {}) =>
-    withFallback(
-      () => api.get(`/master-admin/schools${buildQuery(filters)}`).then((r) => r.data),
-      () => paginate(DUMMY_MA_SCHOOLS, filters.page, filters.limit),
-    ),
+    api.get(`/master-admin/institutes${buildQuery(filters)}`).then((r) => r.data),
 
   getSchoolById: (id) =>
-    withFallback(
-      () => api.get(`/master-admin/schools/${id}`).then((r) => r.data?.data ?? r.data),
-      () => DUMMY_MA_SCHOOLS.find((s) => s.id === id) ?? null,
-    ),
+    api.get(`/master-admin/institutes/${id}`).then((r) => r.data),
 
-  // body: { institute_type, name, code, address?, admin_email, admin_password, has_branches?, subscription_template_id?,
-  //         affiliation_board?, grade_range?, subject_focus?, target_exams?, specialization?, degree_programs?, hec_charter?, faculties? }
   createSchool: (body) =>
-    api.post('/master-admin/schools', body).then((r) => r.data),
+    api.post('/master-admin/institutes', body).then((r) => r.data),
 
   updateSchool: (id, body) =>
-    api.put(`/master-admin/schools/${id}`, body).then((r) => r.data),
+    api.put(`/master-admin/institutes/${id}`, body).then((r) => r.data),
 
   toggleSchoolStatus: (id, is_active) =>
-    api.patch(`/master-admin/schools/${id}/status`, { is_active }).then((r) => r.data),
+    api.patch(`/master-admin/institutes/${id}/status`, { is_active }).then((r) => r.data),
+
+  updateInstituteSubscriptionStatus: (id, subscription_status) =>
+    api.patch(`/master-admin/institutes/${id}/subscription-status`, { subscription_status }).then((r) => r.data),
 
   deleteSchool: (id) =>
-    api.delete(`/master-admin/schools/${id}`).then((r) => r.data),
+    api.delete(`/master-admin/institutes/${id}`).then((r) => r.data),
 
   // ─── Subscriptions ────────────────────────────────────────
   // filters: { school_id?, status? }
@@ -94,25 +96,28 @@ export const masterAdminService = {
   getUserById: (id) =>
     api.get(`/master-admin/users/${id}`).then((r) => r.data),
 
-  // ─── Subscription Templates ────────────────────────────────────
+  // ─── Subscription Plans (new /subscription-plans API) ────────────
   getSubscriptionTemplates: (filters = {}) =>
-    withFallback(
-      () => api.get(`/master-admin/subscription-templates${buildQuery(filters)}`).then((r) => r.data),
-      () => paginate(DUMMY_MA_SUBSCRIPTION_TEMPLATES, filters.page, filters.limit),
-    ),
+    api.get(`/subscription-plans${buildQuery(filters)}`).then((r) => r.data),
 
   getSubscriptionTemplateById: (id) =>
-    withFallback(
-      () => api.get(`/master-admin/subscription-templates/${id}`).then((r) => r.data),
-      () => DUMMY_MA_SUBSCRIPTION_TEMPLATES.find((t) => t.id === id) ?? null,
-    ),
+    api.get(`/subscription-plans/${id}`).then((r) => r.data),
 
   createSubscriptionTemplate: (body) =>
-    api.post('/master-admin/subscription-templates', body).then((r) => r.data),
+    api.post('/subscription-plans', body).then((r) => r.data),
 
   updateSubscriptionTemplate: (id, body) =>
-    api.put(`/master-admin/subscription-templates/${id}`, body).then((r) => r.data),
+    api.put(`/subscription-plans/${id}`, body).then((r) => r.data),
 
   deleteSubscriptionTemplate: (id) =>
-    api.delete(`/master-admin/subscription-templates/${id}`).then((r) => r.data),
+    api.delete(`/subscription-plans/${id}`).then((r) => r.data),
+
+  toggleSubscriptionPublish: (id) =>
+    api.patch(`/subscription-plans/${id}/toggle-publish`).then((r) => r.data),
+
+  toggleSubscriptionPopular: (id) =>
+    api.patch(`/subscription-plans/${id}/toggle-popular`).then((r) => r.data),
+
+  toggleSubscriptionActive: (id) =>
+    api.patch(`/subscription-plans/${id}/toggle-active`).then((r) => r.data),
 };

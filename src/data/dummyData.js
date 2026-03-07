@@ -2051,17 +2051,17 @@ export const DUMMY_ROLES = [
 // 8 ▸ USERS (Demo accounts for all institute types)
 // ──────────────────────────────────────────────────────────────────────────────
 export const DUMMY_USERS = [
-  // Master Admin
+  // Master Admin — credentials match backend DB (.env SUPER_ADMIN_*)
   {
     id: 'user-master-001',
-    first_name: 'Zahid',
-    last_name: 'Ali Khan',
-    email: 'master@cloudsacademy.com',
-    password: 'master@123',
+    first_name: 'Master',
+    last_name: 'Admin',
+    email: 'admin@thecloudsacademy.com',
+    password: 'Admin@TCA2026!',
     role_code: 'MASTER_ADMIN',
     role: DUMMY_ROLES[0],
     institute_id: null,
-    institute_code: 'MASTER',
+    institute_code: null,
     is_active: true,
     permissions: ALL_PERMISSIONS
   },

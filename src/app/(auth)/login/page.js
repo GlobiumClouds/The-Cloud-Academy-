@@ -104,7 +104,7 @@ export default function LoginPage() {
         res.user.institute?.institute_type;
       if (instType) Cookies.set('institute_type', instType, { expires: 7 });
 
-      toast.success(`Welcome back, ${res.user.first_name}!`);
+      toast.success(`Welcome back, ${res.user.first_name}! (${res.user.permissions?.length ?? 0} permissions loaded)`);
 
       // Redirect to the correct institute-type dashboard
       const DASHBOARD_PATHS = {
@@ -120,7 +120,14 @@ export default function LoginPage() {
         router.replace(DASHBOARD_PATHS[instType] ?? '/dashboard');
       }
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.message || 'Login failed');
+      const status = err?.response?.status;
+      const msg    = err?.response?.data?.message ?? err?.message ?? 'Login failed';
+      if (!status) {
+        // Network error — backend is NOT reachable
+        toast.error('Cannot reach server. Make sure the backend is running on port 5000.');
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }

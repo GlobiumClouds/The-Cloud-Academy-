@@ -1,57 +1,50 @@
 /**
- * Role API Service  (Dynamic Role System)
- * GET    /roles
- * POST   /roles
- * GET    /roles/:id
- * PUT    /roles/:id
- * DELETE /roles/:id
- * GET    /roles/permissions          (all available permission codes grouped)
- * POST   /roles/:id/permissions      (set permissions for a role)
- * POST   /roles/:id/assign           (assign role to users)
+ * Role API Service
+ *
+ * Two contexts:
+ *  ▸ Master Admin  → /master-admin/roles  (platform template roles, no school context)
+ *  ▸ School Admin  → /roles               (school-level custom roles)
  */
 
 import api from '@/lib/api';
-import { withFallback } from '@/lib/withFallback';
-import { DUMMY_ROLES, ALL_PERMISSIONS } from '@/data/dummyData';
 
+// ─── Master Admin — Platform Template Roles ───────────────────────────────────
 export const roleService = {
-  getAll: () =>
-    withFallback(
-      () => api.get('/roles').then((r) => r.data),
-      () => ({ data: DUMMY_ROLES }),
-    ),
+  // List all platform template roles
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') qs.append(k, v); });
+    const query = qs.toString() ? `?${qs}` : '';
+    return api.get(`/master-admin/roles${query}`).then((r) => r.data);
+  },
 
-  getById: (id) => api.get(`/roles/${id}`).then((r) => r.data),
+  getById: (id) => api.get(`/master-admin/roles/${id}`).then((r) => r.data),
 
-  // body: { name, code, description? }
-  create: (body) =>
-    withFallback(
-      () => api.post('/roles', body).then((r) => r.data),
-      () => ({ data: { ...body, id: `role-${Date.now()}`, is_system: false, permissions: body.permissions ?? [] } }),
-    ),
+  /**
+   * body: { name, code, description?, is_active?, permissions: string[] }
+   * permissions is a flat array — backend wraps as { instituteAdmin: [...] }
+   */
+  create: (body) => api.post('/master-admin/roles', body).then((r) => r.data),
 
-  update: (id, body) =>
-    withFallback(
-      () => api.put(`/roles/${id}`, body).then((r) => r.data),
-      () => ({ data: { id, ...body } }),
-    ),
+  update: (id, body) => api.put(`/master-admin/roles/${id}`, body).then((r) => r.data),
 
-  delete: (id) =>
-    withFallback(
-      () => api.delete(`/roles/${id}`).then((r) => r.data),
-      () => ({ data: { id } }),
-    ),
+  delete: (id) => api.delete(`/master-admin/roles/${id}`).then((r) => r.data),
 
-  // Get ALL available system permissions (for the permission selector UI)
-  getAllPermissions: () => api.get('/roles/permissions').then((r) => r.data),
+  /** Returns grouped permission catalogue from backend */
+  getPermissionGroups: () => api.get('/master-admin/roles/permissions').then((r) => r.data),
 
-  // Replace the full permission set for a role
-  // permissionIds: string[] (UUIDs)
-  setPermissions: (roleId, permissionIds) =>
-    api.post(`/roles/${roleId}/permissions`, { permission_ids: permissionIds }).then((r) => r.data),
+  // ─── School-level role methods (used inside school portal) ─────────────────
+  getSchoolRoles: (schoolId, params = {}) => {
+    const qs = new URLSearchParams({ ...params });
+    return api.get(`/roles?${qs}`).then((r) => r.data);
+  },
 
-  // Assign a role to one or more users
-  // body: { user_ids: [...], role_id }
-  assignToUsers: (roleId, userIds) =>
-    api.post(`/roles/${roleId}/assign`, { user_ids: userIds }).then((r) => r.data),
+  createSchoolRole: (body) => api.post('/roles', body).then((r) => r.data),
+
+  updateSchoolRole: (id, body) => api.put(`/roles/${id}`, body).then((r) => r.data),
+
+  deleteSchoolRole: (id) => api.delete(`/roles/${id}`).then((r) => r.data),
+
+  assignToUser: (userId, roleId) =>
+    api.post('/roles/assign', { userId, roleId }).then((r) => r.data),
 };

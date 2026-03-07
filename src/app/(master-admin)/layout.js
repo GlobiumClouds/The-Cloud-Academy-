@@ -3,7 +3,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -23,15 +23,16 @@ import {
 import { cn } from '@/lib/utils';
 
 const NAV = [
-  { href: '/master-admin',                        label: 'Dashboard',       icon: LayoutDashboard },
-  { href: '/master-admin/schools',                label: 'Institutes',      icon: Building2       },
-  { href: '/master-admin/subscriptions',          label: 'Subscriptions',   icon: CreditCard      },
-  { href: '/master-admin/subscription-templates', label: 'Sub. Templates',  icon: FileText        },
-  { href: '/master-admin/roles',                  label: 'Roles',           icon: ShieldCheck     },
-  { href: '/master-admin/users',                  label: 'Users',           icon: Users           },
-  { href: '/master-admin/emails',                 label: 'Bulk Emails',     icon: Mail            },
-  { href: '/master-admin/reports',                label: 'Reports',         icon: BarChart3       }, 
-   { href: '/master-admin/notifications',           label: 'Notifications',   icon: BellRing        },];
+  { href: '/master-admin',                        label: 'Dashboard',       icon: LayoutDashboard, perm: null                    },
+  { href: '/master-admin/roles',                  label: 'Roles',           icon: ShieldCheck,     perm: 'platform_role.read'     },
+  { href: '/master-admin/subscription-templates', label: 'Sub. Templates',  icon: FileText,        perm: 'sub_template.read'      },
+  { href: '/master-admin/schools',                label: 'Institutes',      icon: Building2,       perm: 'institute.read'         },
+  { href: '/master-admin/users',                  label: 'Users',           icon: Users,           perm: 'platform_user.read'     },
+  { href: '/master-admin/subscriptions',          label: 'Subscriptions',   icon: CreditCard,      perm: 'subscription.read'      },
+  { href: '/master-admin/emails',                 label: 'Bulk Emails',     icon: Mail,            perm: 'email.view_history'     },
+  { href: '/master-admin/reports',                label: 'Reports',         icon: BarChart3,       perm: 'report.platform_overview'},
+  { href: '/master-admin/notifications',          label: 'Notifications',   icon: BellRing,        perm: 'notification.broadcast' },
+];
 
 // ── Notification recipient options ──────────────────────────────────────────
 const NOTIF_RECIPIENT_OPTIONS = [
@@ -55,9 +56,20 @@ const NOTIF_TYPE_OPTIONS = [
 export default function MasterAdminLayout({ children }) {
   const pathname     = usePathname();
   const router       = useRouter();
+  const user         = useAuthStore((s) => s.user);
+  const canDo        = useAuthStore((s) => s.canDo);
   const logout       = useAuthStore((s) => s.logout);
   const [open,       setOpen]      = useState(false);
   const [notifOpen,  setNotifOpen] = useState(false);
+  const [mounted,    setMounted]   = useState(false);
+
+  // Delay permission-filtering until after hydration so server HTML matches
+  // first client render (Zustand reads localStorage only on client).
+  useEffect(() => { setMounted(true); }, []);
+
+  const visibleNav = mounted
+    ? NAV.filter(({ perm }) => !perm || canDo(perm))
+    : NAV.filter(({ perm }) => !perm);
 
   const handleLogout = async () => {
     try { await authService.logout(); } catch (_) {}
@@ -100,7 +112,7 @@ export default function MasterAdminLayout({ children }) {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {visibleNav.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== '/master-admin' && pathname.startsWith(href));
             return (
               <Link
@@ -119,6 +131,14 @@ export default function MasterAdminLayout({ children }) {
             );
           })}
         </nav>
+
+        {/* User info */}
+        {user && (
+          <div className="border-t border-white/10 px-5 py-3">
+            <p className="text-sm font-semibold text-white truncate">{user.first_name} {user.last_name}</p>
+            <p className="text-xs text-white/50 truncate">{user.email}</p>
+          </div>
+        )}
 
         {/* Logout */}
         <button

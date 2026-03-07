@@ -88,8 +88,9 @@ export function middleware(request) {
   }
 
   // Already authenticated → don't allow login page
-  // Redirect to institute-type dashboard
+  // Redirect to master-admin dashboard or institute-type dashboard
   if (token && (pathname === '/login')) {
+    const roleCode      = request.cookies.get('role_code')?.value;
     const instituteType = request.cookies.get('institute_type')?.value;
     const PATHS = {
       school:     '/school/dashboard',
@@ -99,7 +100,11 @@ export function middleware(request) {
       university: '/university/dashboard',
     };
     const url = request.nextUrl.clone();
-    url.pathname = PATHS[instituteType] ?? '/dashboard';
+    if (roleCode === 'MASTER_ADMIN') {
+      url.pathname = '/master-admin';
+    } else {
+      url.pathname = PATHS[instituteType] ?? '/dashboard';
+    }
     return NextResponse.redirect(url);
   }
 

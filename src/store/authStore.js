@@ -49,14 +49,18 @@ export const useAuthStore = create(
         const u = get().user;
         if (!u) return false;
         if (u.role_code === 'MASTER_ADMIN') return true;
-        return (u.permissions || []).includes(permissionCode);
+        const perms = u.permissions || [];
+        if (perms.includes('ALL')) return true;
+        return perms.includes(permissionCode);
       },
 
       canDoAny: (codes = []) => {
         const u = get().user;
         if (!u) return false;
         if (u.role_code === 'MASTER_ADMIN') return true;
-        return codes.some((code) => (u.permissions || []).includes(code));
+        const perms = u.permissions || [];
+        if (perms.includes('ALL')) return true;
+        return codes.some((code) => perms.includes(code));
       },
 
       schoolHasBranches: () => {
