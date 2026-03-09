@@ -278,7 +278,7 @@ export const NAV = {
   school: [
     { group: 'Main',       label: 'Dashboard',        href: '/school/dashboard',        icon: 'LayoutDashboard',   permission: 'dashboard.view' },
     { group: 'Academic',   label: 'Classes',          href: '/school/classes',          icon: 'BookOpen',          permission: 'classes.read' },
-    { group: 'Academic',   label: 'Sections',         href: '/school/sections',         icon: 'Layers',            permission: 'sections.read' },
+    // { group: 'Academic',   label: 'Sections',         href: '/school/sections',         icon: 'Layers',            permission: 'sections.read' },
     { group: 'Academic',   label: 'Subjects',         href: '/school/subjects',         icon: 'FileText',          permission: 'subjects.read' },
     { group: 'Academic',   label: 'Timetable',        href: '/school/timetable',        icon: 'Calendar',          permission: 'timetable.read' },
     { group: 'Academic',   label: 'Academic Years',   href: '/school/academic-years',   icon: 'CalendarDays',      permission: 'academic_years.read' },
