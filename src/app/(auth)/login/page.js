@@ -39,7 +39,7 @@ const QUICK_LOGINS = [
   {
     label:    'School Admin',
     email:    'hafizshoaibraza180@gmail.com',
-    password: '123456',
+    password: 'Shoaib0320',
     badge:    'ADMIN',
     color:    'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
   },
@@ -58,8 +58,8 @@ const QUICK_LOGINS = [
     color:    'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
   },
   {
-    label:    'College Admin',
-    email:    'hafizshoaibraza170@gmail.com',
+    label:    'Academy Admin',
+    email:    'sajoodali486@gmail.com',
     password: '123456',
     badge:    'ADMIN',
     color:    'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
@@ -241,4 +241,10 @@ export default function LoginPage() {
     </div>
   );
 }
+
+
+
+
+
+
 

@@ -12,7 +12,7 @@ export default function AuthLayout({ children }) {
           <h1 className="text-3xl font-bold tracking-tight">
             ☁ The Clouds Academy
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">School Management System</p>
+          <p className="mt-1 text-sm text-muted-foreground">Institute Management System</p>
         </div>
         {children}
       </div>

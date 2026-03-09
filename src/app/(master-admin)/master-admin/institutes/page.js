@@ -62,7 +62,7 @@ function buildColumns(onEdit, onDelete, onToggle, onStatusChange, router) {
       cell: ({ row }) => {
         const s = row.original;
         return (
-          <div className="cursor-pointer flex items-center gap-2.5" onClick={() => router.push(`/master-admin/schools/${s.id}`)}
+          <div className="cursor-pointer flex items-center gap-2.5" onClick={() => router.push(`/master-admin/institutes/${s.id}`)}
           >
             {s.institute_logo_url
               ? <img src={s.institute_logo_url} alt={s.institute_name} className="h-8 w-8 rounded-full object-cover border border-slate-200 flex-shrink-0" />
