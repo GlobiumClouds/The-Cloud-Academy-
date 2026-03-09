@@ -36,6 +36,12 @@ api.interceptors.request.use(
     const branchId = localStorage.getItem('active_branch_id');
     if (branchId) config.headers['X-Branch-ID'] = branchId;
 
+    // For FormData uploads, remove the default JSON Content-Type so the browser
+    // can set multipart/form-data with the correct boundary automatically.
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

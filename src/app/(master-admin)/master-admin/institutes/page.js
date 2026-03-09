@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import {
   Plus, Building2, CheckCircle2, Clock, XCircle, Loader2, RefreshCw,
 } from 'lucide-react';
-import { FileUpload } from '@/components/forms/FileUpload';
 import { toast } from 'sonner';
 
 import { masterAdminService } from '@/services';
@@ -23,6 +22,7 @@ import {
   ConfirmDialog, AppModal, InputField, SelectField,
   SwitchField, StatsCard, DatePickerField,
 } from '@/components/common';
+import { FileUpload } from '@/components/forms/FileUpload';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -62,12 +62,15 @@ function buildColumns(onEdit, onDelete, onToggle, onStatusChange, router) {
       cell: ({ row }) => {
         const s = row.original;
         return (
-          <div className="cursor-pointer flex items-center gap-2 max-w-[220px]" onClick={() => router.push(`/master-admin/schools/${s.id}`)}>
+          <div className="cursor-pointer flex items-center gap-2.5" onClick={() => router.push(`/master-admin/schools/${s.id}`)}
+          >
             {s.institute_logo_url
-              ? <img src={s.institute_logo_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border border-gray-100" />
-              : <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0"><Building2 size={13} className="text-emerald-600" /></div>
+              ? <img src={s.institute_logo_url} alt={s.institute_name} className="h-8 w-8 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+              : <div className="h-8 w-8 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+                  <span className="text-emerald-700 text-xs font-bold">{s.institute_name?.[0]?.toUpperCase() ?? '?'}</span>
+                </div>
             }
-            <div className="min-w-0">
+            <div className="max-w-[160px] min-w-0">
               <p className="font-semibold text-slate-800 hover:text-emerald-700 transition-colors truncate">{s.institute_name}</p>
               <p className="text-[11px] text-muted-foreground font-mono">{s.institute_code}</p>
               <p className="text-[11px] text-muted-foreground truncate">{s.institute_email}</p>
@@ -152,7 +155,7 @@ function buildColumns(onEdit, onDelete, onToggle, onStatusChange, router) {
         const s = row.original;
         return (
           <TableRowActions
-            onView={() => router.push(`/master-admin/schools/${s.id}`)}
+            onView={() => router.push(`/master-admin/institutes/${s.id}`)}
             onEdit={() => onEdit(s)}
             onDelete={() => onDelete(s)}
             extra={[
@@ -186,9 +189,9 @@ function StatusChangeDialog({ open, target, onClose, onConfirm, loading }) {
       onClose={onClose}
       title="Update Institute Status"
       description={
-        <p className="pt-2">
+        <span className="pt-2 block">
           Change subscription status of <strong>{target?.institute_name}</strong>
-        </p>
+        </span>
       }
       footer={
         <div className="flex justify-end gap-2 w-full">
@@ -457,18 +460,19 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
     has_branches:         inst?.settings?.has_branches ?? false,
   });
 
+  const [logoFile,    setLogoFile]    = useState(null);
+  const [logoPreview, setLogoPreview] = useState('');
+
   const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: toDefaults(null),
   });
 
-  const [logoFile, setLogoFile] = useState(null);
-  const [logoPreview, setLogoPreview] = useState(null);
-
   useEffect(() => {
     if (open) {
-      reset(toDefaults(institute ?? null));
+      if (logoPreview?.startsWith('blob:')) URL.revokeObjectURL(logoPreview);
       setLogoFile(null);
-      setLogoPreview(institute?.institute_logo_url ?? null);
+      setLogoPreview(institute?.institute_logo_url ?? '');
+      reset(toDefaults(institute ?? null));
     }
   }, [institute, open]);
 
@@ -521,18 +525,20 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
   }, [trialDays]);
 
   const handleLogoChange = (files) => {
-    const file = files?.[0] ?? null;
+    if (!files?.length) return;
+    if (logoPreview?.startsWith('blob:')) URL.revokeObjectURL(logoPreview);
+    const file = files[0];
     setLogoFile(file);
-    setLogoPreview(file ? URL.createObjectURL(file) : (institute?.institute_logo_url ?? null));
+    setLogoPreview(URL.createObjectURL(file));
   };
 
   const handleInternalSubmit = (data) => {
     if (logoFile) {
       const fd = new FormData();
-      Object.entries(data).forEach(([k, v]) => {
-        if (v !== null && v !== undefined && v !== '') fd.append(k, String(v));
-      });
       fd.append('institute_logo', logoFile);
+      Object.entries(data).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') fd.append(k, String(v));
+      });
       onSubmit(fd);
     } else {
       onSubmit(data);
@@ -542,7 +548,7 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
   const handleClose = () => {
     if (logoPreview?.startsWith('blob:')) URL.revokeObjectURL(logoPreview);
     setLogoFile(null);
-    setLogoPreview(null);
+    setLogoPreview('');
     reset(toDefaults(null));
     onClose();
   };
@@ -585,27 +591,22 @@ function InstituteFormModal({ open, onClose, institute, onSubmit, loading, typeO
             options={typeOptions} placeholder="Select type" required
             rules={{ required: 'Type is required' }}
           />
-        </div>
-
-        {/* ── Institute Logo ── */}
-        <SectionLabel>Institute Logo</SectionLabel>
-        {logoPreview && !logoFile && (
-          <div className="flex items-center gap-3 mb-2 p-2 rounded-lg bg-muted/40 border">
-            <img src={logoPreview} alt="current logo" className="w-12 h-12 rounded-md object-cover border bg-white" />
-            <div>
-              <p className="text-xs font-medium text-slate-700">Current Logo</p>
-              <p className="text-[11px] text-muted-foreground">Upload a new file to replace it</p>
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-700">Institute Logo</label>
+            {logoPreview && (
+              <img
+                src={logoPreview}
+                alt="Institute logo"
+                className="h-14 w-14 rounded-lg object-cover border border-slate-200"
+              />
+            )}
+            <FileUpload
+              accept="image/*"
+              maxSize={2 * 1024 * 1024}
+              onChange={handleLogoChange}
+              onError={(msg) => toast.error(msg)}
+            />
           </div>
-        )}
-        <FileUpload
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          multiple={false}
-          maxSize={2 * 1024 * 1024}
-          onChange={handleLogoChange}
-          onError={(msg) => toast.error(msg)}
-        />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         </div>
 
         {/* ── Contact & Address ── */}

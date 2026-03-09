@@ -19,6 +19,9 @@ export const PERM = {
   STUDENTS_READ:            'students.read',
   STUDENTS_UPDATE:          'students.update',
   STUDENTS_DELETE:          'students.delete',
+  STUDENTS_DEACTIVATE:      'students.deactivate',
+  STUDENTS_TRANSFER:        'students.transfer',
+  STUDENTS_PROMOTE:         'students.promote',
   STUDENTS_EXPORT:          'students.export',
 
   // Teachers
@@ -26,36 +29,42 @@ export const PERM = {
   TEACHERS_READ:            'teachers.read',
   TEACHERS_UPDATE:          'teachers.update',
   TEACHERS_DELETE:          'teachers.delete',
+  TEACHERS_DEACTIVATE:      'teachers.deactivate',
 
   // Parents
   PARENTS_CREATE:           'parents.create',
   PARENTS_READ:             'parents.read',
   PARENTS_UPDATE:           'parents.update',
   PARENTS_DELETE:           'parents.delete',
+  PARENTS_DEACTIVATE:       'parents.deactivate',
 
   // Staff
   STAFF_CREATE:             'staff.create',
   STAFF_READ:               'staff.read',
   STAFF_UPDATE:             'staff.update',
   STAFF_DELETE:             'staff.delete',
+  STAFF_DEACTIVATE:         'staff.deactivate',
 
   // Classes
   CLASSES_CREATE:           'classes.create',
   CLASSES_READ:             'classes.read',
   CLASSES_UPDATE:           'classes.update',
   CLASSES_DELETE:           'classes.delete',
+  CLASSES_DEACTIVATE:       'classes.deactivate',
 
   // Sections
   SECTIONS_CREATE:          'sections.create',
   SECTIONS_READ:            'sections.read',
   SECTIONS_UPDATE:          'sections.update',
   SECTIONS_DELETE:          'sections.delete',
+  SECTIONS_DEACTIVATE:      'sections.deactivate',
 
   // Subjects
   SUBJECTS_CREATE:          'subjects.create',
   SUBJECTS_READ:            'subjects.read',
   SUBJECTS_UPDATE:          'subjects.update',
   SUBJECTS_DELETE:          'subjects.delete',
+  SUBJECTS_DEACTIVATE:      'subjects.deactivate',
 
   // Academic Years
   ACADEMIC_YEARS_CREATE:    'academic_years.create',
@@ -85,6 +94,7 @@ export const PERM = {
   EXAMS_READ:               'exams.read',
   EXAMS_UPDATE:             'exams.update',
   EXAMS_DELETE:             'exams.delete',
+  EXAMS_DEACTIVATE:         'exams.deactivate',
 
   // Exam Results (special action names from seed)
   EXAM_RESULTS_ENTER:       'exam_results.enter',
@@ -97,6 +107,7 @@ export const PERM = {
   FEE_TEMPLATES_READ:       'fee_templates.read',
   FEE_TEMPLATES_UPDATE:     'fee_templates.update',
   FEE_TEMPLATES_DELETE:     'fee_templates.delete',
+  FEE_TEMPLATES_DEACTIVATE: 'fee_templates.deactivate',
 
   // Fees & Finance (special action names from seed)
   FEES_CREATE:              'fees.create',
@@ -119,6 +130,7 @@ export const PERM = {
   NOTICES_READ:             'notices.read',
   NOTICES_UPDATE:           'notices.update',
   NOTICES_DELETE:           'notices.delete',
+  NOTICES_DEACTIVATE:       'notices.deactivate',
 
   // Notifications
   NOTIFICATIONS_SEND:       'notifications.send',
@@ -137,11 +149,14 @@ export const PERM = {
   ROLES_READ:               'roles.read',
   ROLES_CREATE:             'roles.create',
   ROLES_UPDATE:             'roles.update',
+  ROLES_DELETE:             'roles.delete',
+  ROLES_DEACTIVATE:         'roles.deactivate',
   ROLES_ASSIGN:             'roles.assign',
   USERS_CREATE:             'users.create',
   USERS_READ:               'users.read',
   USERS_UPDATE:             'users.update',
   USERS_DELETE:             'users.delete',
+  USERS_DEACTIVATE:         'users.deactivate',
 
   // Settings & Library
   SETTINGS_VIEW:            'settings.view',
@@ -159,37 +174,37 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: 'Students',
     icon: '🎓',
-    perms: ['students.create', 'students.read', 'students.update', 'students.delete', 'students.export'],
+    perms: ['students.create', 'students.read', 'students.update', 'students.delete', 'students.deactivate', 'students.transfer', 'students.promote', 'students.export'],
   },
   {
     label: 'Teachers',
     icon: '👩‍🏫',
-    perms: ['teachers.create', 'teachers.read', 'teachers.update', 'teachers.delete'],
+    perms: ['teachers.create', 'teachers.read', 'teachers.update', 'teachers.delete', 'teachers.deactivate'],
   },
   {
     label: 'Parents',
     icon: '👨‍👩‍👧',
-    perms: ['parents.create', 'parents.read', 'parents.update', 'parents.delete'],
+    perms: ['parents.create', 'parents.read', 'parents.update', 'parents.delete', 'parents.deactivate'],
   },
   {
     label: 'Staff',
     icon: '💼',
-    perms: ['staff.create', 'staff.read', 'staff.update', 'staff.delete'],
+    perms: ['staff.create', 'staff.read', 'staff.update', 'staff.delete', 'staff.deactivate'],
   },
   {
     label: 'Classes',
     icon: '🏫',
-    perms: ['classes.create', 'classes.read', 'classes.update', 'classes.delete'],
+    perms: ['classes.create', 'classes.read', 'classes.update', 'classes.delete', 'classes.deactivate'],
   },
   {
     label: 'Sections',
     icon: '📋',
-    perms: ['sections.create', 'sections.read', 'sections.update', 'sections.delete'],
+    perms: ['sections.create', 'sections.read', 'sections.update', 'sections.delete', 'sections.deactivate'],
   },
   {
     label: 'Subjects',
     icon: '📗',
-    perms: ['subjects.create', 'subjects.read', 'subjects.update', 'subjects.delete'],
+    perms: ['subjects.create', 'subjects.read', 'subjects.update', 'subjects.delete', 'subjects.deactivate'],
   },
   {
     label: 'Timetable',
@@ -214,7 +229,7 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: 'Exams',
     icon: '🧪',
-    perms: ['exams.create', 'exams.read', 'exams.update', 'exams.delete'],
+    perms: ['exams.create', 'exams.read', 'exams.update', 'exams.delete', 'exams.deactivate'],
   },
   {
     label: 'Exam Results',
@@ -224,7 +239,7 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: 'Fee Templates',
     icon: '🧾',
-    perms: ['fee_templates.create', 'fee_templates.read', 'fee_templates.update', 'fee_templates.delete'],
+    perms: ['fee_templates.create', 'fee_templates.read', 'fee_templates.update', 'fee_templates.delete', 'fee_templates.deactivate'],
   },
   {
     label: 'Fees & Finance',
@@ -239,7 +254,7 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: 'Notices',
     icon: '📣',
-    perms: ['notices.create', 'notices.read', 'notices.update', 'notices.delete'],
+    perms: ['notices.create', 'notices.read', 'notices.update', 'notices.delete', 'notices.deactivate'],
   },
   {
     label: 'Notifications',
@@ -254,12 +269,17 @@ export const ADMIN_PERMISSION_GROUPS = [
   {
     label: 'Roles',
     icon: '🛡',
-    perms: ['roles.read', 'roles.create', 'roles.update', 'roles.assign'],
+    perms: ['roles.create', 'roles.read', 'roles.update', 'roles.delete', 'roles.deactivate', 'roles.assign'],
+  },
+  {
+    label: 'Branches',
+    icon: '🛡',
+    perms: ['branches.create', 'branches.read', 'branches.update', 'branches.delete', 'branches.deactivate', 'branches.assign_role'],
   },
   {
     label: 'Users',
     icon: '👥',
-    perms: ['users.create', 'users.read', 'users.update', 'users.delete'],
+    perms: ['users.create', 'users.read', 'users.update', 'users.delete', 'users.deactivate'],
   },
   {
     label: 'Settings',

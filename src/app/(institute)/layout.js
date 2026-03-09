@@ -16,5 +16,6 @@ export default async function InstituteGroupLayout({ children }) {
   const token = cookieStore.get('access_token')?.value;
   if (!token) redirect('/login');
 
+
   return <InstituteLayoutWrapper>{children}</InstituteLayoutWrapper>;
 }

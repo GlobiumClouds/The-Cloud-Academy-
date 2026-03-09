@@ -7,114 +7,112 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import Cookies from 'js-cookie';
-import { Sparkles, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, Zap } from 'lucide-react';
 
 import { authService } from '@/services';
 import useAuthStore from '@/store/authStore';
-import { DUMMY_USERS, INSTITUTE_TYPES } from '@/data/dummyData';
 
-// Institute login — school_code required
-const instituteSchema = z.object({
-  school_code: z.string().min(2, 'Institute code is required'),
-  email:       z.string().email('Invalid email'),
-  password:    z.string().min(6, 'Minimum 6 characters'),
+// Single login schema — works for all roles
+const loginSchema = z.object({
+  email:    z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Minimum 6 characters'),
 });
 
-// Master admin login — no school_code needed
-const masterSchema = z.object({
-  school_code: z.string().optional(),
-  email:       z.string().email('Invalid email'),
-  password:    z.string().min(6, 'Minimum 6 characters'),
-});
-
-// Role colour mapping
-const ROLE_COLORS = {
-  MASTER_ADMIN:  { bg: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300', dot: 'bg-purple-500' },
-  SCHOOL_ADMIN:  { bg: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',         dot: 'bg-blue-500'   },
-  FEE_MANAGER:   { bg: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500' },
-  CLASS_TEACHER: { bg: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',     dot: 'bg-amber-500'  },
-  RECEPTIONIST:  { bg: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',         dot: 'bg-rose-500'   },
-  BRANCH_ADMIN:  { bg: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300',         dot: 'bg-teal-500'   },
+// Redirect map: institute_type → dashboard path
+const DASHBOARD_PATHS = {
+  school:     '/school/dashboard',
+  coaching:   '/coaching/dashboard',
+  academy:    '/academy/dashboard',
+  college:    '/college/dashboard',
+  university: '/university/dashboard',
 };
 
-// Institute-type colour override for SCHOOL_ADMIN users
-const INST_TYPE_COLORS = {
-  school:     { bg: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',         dot: 'bg-blue-500'   },
-  coaching:   { bg: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300', dot: 'bg-orange-500' },
-  academy:    { bg: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300', dot: 'bg-indigo-500' },
-  college:    { bg: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',         dot: 'bg-cyan-500'   },
-  university: { bg: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300', dot: 'bg-violet-500' },
-};
-
-const ACCESS_LABELS = {
-  MASTER_ADMIN:  'All Institutes',
-  SCHOOL_ADMIN:  'Full Access',
-  FEE_MANAGER:   'Fees only',
-  CLASS_TEACHER: 'Class + Exams',
-  RECEPTIONIST:  'Limited',
-  BRANCH_ADMIN:  'Branch Mgmt',
-};
-
-// Resolve the best label + type name for a user card
-function resolveUserMeta(user) {
-  const instType = user.school?.institute_type;
-  const typeDef  = instType ? INSTITUTE_TYPES.find((t) => t.value === instType) : null;
-  const colors   = (user.role_code === 'SCHOOL_ADMIN' && instType && INST_TYPE_COLORS[instType])
-    ? INST_TYPE_COLORS[instType]
-    : (ROLE_COLORS[user.role_code] ?? { bg: 'bg-gray-100 text-gray-700', dot: 'bg-gray-400' });
-  const badge    = typeDef ? `${typeDef.icon} ${typeDef.label} Admin` : (user.role?.name ?? user.role_code);
-  return { colors, badge, typeDef };
-}
+// Quick-login credentials for demo / development
+const QUICK_LOGINS = [
+  {
+    label:    'Master Admin',
+    email:    'admin@thecloudsacademy.com',
+    password: 'Admin@TCA2026!',
+    badge:    'MASTER',
+    color:    'bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-200',
+  },
+  {
+    label:    'School Admin',
+    email:    'hafizshoaibraza180@gmail.com',
+    password: '123456',
+    badge:    'ADMIN',
+    color:    'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
+  },
+  {
+    label:    'Academy Admin',
+    email:    'hafizshoaibraza190@gmail.com',
+    password: '123456',
+    badge:    'ADMIN',
+    color:    'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
+  },
+  {
+    label:    'University Admin',
+    email:    'shoaibrazamemon170@gmail.com',
+    password: '123456',
+    badge:    'ADMIN',
+    color:    'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
+  },
+  {
+    label:    'College Admin',
+    email:    'hafizshoaibraza170@gmail.com',
+    password: '123456',
+    badge:    'ADMIN',
+    color:    'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
+  },
+];
 
 export default function LoginPage() {
-  const router      = useRouter();
-  const setUser     = useAuthStore((s) => s.setUser);
+  const router   = useRouter();
+  const setUser  = useAuthStore((s) => s.setUser);
   const [loading,  setLoading]  = useState(false);
   const [showPass, setShowPass] = useState(false);
-  const [loginMode, setLoginMode] = useState('institute'); // 'institute' | 'master'
-
-  const isMaster = loginMode === 'master';
 
   const {
     register,
     handleSubmit,
     setValue,
-    reset,
     formState: { errors },
-  } = useForm({
-    resolver: zodResolver(isMaster ? masterSchema : instituteSchema),
-  });
+  } = useForm({ resolver: zodResolver(loginSchema) });
 
-  const switchMode = (mode) => {
-    setLoginMode(mode);
-    reset();
+  const fillCredentials = (cred) => {
+    setValue('email',    cred.email,    { shouldValidate: true });
+    setValue('password', cred.password, { shouldValidate: true });
   };
 
   const onSubmit = async (data) => {
     try {
       setLoading(true);
       const res = await authService.login(data);
-      setUser(res.user, res.access_token);
-      Cookies.set('role_code', res.user.role_code, { expires: 7 });
+      const user = res.user;
 
-      // Store institute_type in cookie so middleware can use it for route guards
+      // Clear any stale cookies from a previous session first
+      Cookies.remove('access_token');
+      Cookies.remove('role_code');
+      Cookies.remove('institute_type');
+
+      // Persist in store (also sets access_token cookie via setAccessToken)
+      setUser(user, res.access_token);
+
+      // Set cookies for Next.js middleware route-guards
+      Cookies.set('access_token',  res.access_token,                        { expires: 7 });
+      Cookies.set('role_code',     user.role_code ?? user.user_type ?? '',   { expires: 7 });
+
       const instType =
-        res.user.institute_type ||
-        res.user.school?.institute_type ||
-        res.user.institute?.institute_type;
+        user.institute_type ||
+        user.institute?.institute_type ||
+        user.school?.institute_type ||
+        null;
       if (instType) Cookies.set('institute_type', instType, { expires: 7 });
 
-      toast.success(`Welcome back, ${res.user.first_name}! (${res.user.permissions?.length ?? 0} permissions loaded)`);
+      toast.success(`Welcome back, ${user.first_name}!`);
 
-      // Redirect to the correct institute-type dashboard
-      const DASHBOARD_PATHS = {
-        school:     '/school/dashboard',
-        coaching:   '/coaching/dashboard',
-        academy:    '/academy/dashboard',
-        college:    '/college/dashboard',
-        university: '/university/dashboard',
-      };
-      if (res.user.role_code === 'MASTER_ADMIN') {
+      // Redirect based on role
+      if (user.role_code === 'MASTER_ADMIN' || user.user_type === 'MASTER_ADMIN') {
         router.replace('/master-admin');
       } else {
         router.replace(DASHBOARD_PATHS[instType] ?? '/dashboard');
@@ -123,7 +121,6 @@ export default function LoginPage() {
       const status = err?.response?.status;
       const msg    = err?.response?.data?.message ?? err?.message ?? 'Login failed';
       if (!status) {
-        // Network error — backend is NOT reachable
         toast.error('Cannot reach server. Make sure the backend is running on port 5000.');
       } else {
         toast.error(msg);
@@ -133,206 +130,115 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemo = (user) => {
-    const isMasterUser = user.role_code === 'MASTER_ADMIN';
-    // Switch mode to match demo user type
-    if (isMasterUser && loginMode !== 'master')   switchMode('master');
-    if (!isMasterUser && loginMode !== 'institute') switchMode('institute');
-    // Use setTimeout so reset() finishes before setValue
-    setTimeout(() => {
-      // DUMMY_USERS store institute_code (not school_code) — map it correctly
-      if (!isMasterUser) setValue('school_code', user.institute_code ?? '');
-      setValue('email',    user.email);
-      setValue('password', user.password);
-      toast.info(`Filled: ${user.first_name} (${user.role?.name})`);
-    }, 0);
-  };
-
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+    <div className="flex min-h-[420px] items-center justify-center">
+      <div className="w-full max-w-sm">
 
-      {/* ════════════════════════ LOGIN FORM ════════════════════════ */}
-      <div className="lg:col-span-2">
-        <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">
-          <h2 className="mb-1 text-xl font-semibold">Sign in</h2>
-          <p className="mb-6 text-sm text-muted-foreground">Enter your credentials to continue</p>
-
-          {/* ── Login mode toggle ── */}
-          <div className="mb-5 flex rounded-lg border bg-muted/40 p-1">
-            <button
-              type="button"
-              onClick={() => switchMode('institute')}
-              className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-all ${
-                !isMaster
-                  ? 'bg-background shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Institute Login
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('master')}
-              className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-all ${
-                isMaster
-                  ? 'bg-background shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Master Admin
-            </button>
+        {/* Logo / Brand */}
+        <div className="mb-8 flex flex-col items-center gap-2 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+            <GraduationCap size={26} className="text-primary" />
           </div>
+          <h1 className="text-2xl font-bold tracking-tight">The Clouds Academy</h1>
+          <p className="text-sm text-muted-foreground">Sign in to your account</p>
+        </div>
 
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Institute Code — hidden for Master Admin */}
-            {!isMaster && (
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Institute Code <span className="text-destructive">*</span>
-                </label>
-                <input
-                  {...register('school_code')}
-                  placeholder="e.g. TCA-LHR"
-                  autoComplete="organization"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring"
-                />
-                {errors.school_code && (
-                  <p className="mt-1 text-xs text-destructive">{errors.school_code.message}</p>
-                )}
-              </div>
-            )}
 
             {/* Email */}
-            <div>
-              <label className="mb-1 block text-sm font-medium">Email</label>
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium">Email</label>
               <input
                 {...register('email')}
                 type="email"
-                placeholder="you@school.com"
+                placeholder="you@institute.com"
                 autoComplete="email"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                autoFocus
+                className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-ring"
               />
               {errors.email && (
-                <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>
+                <p className="text-xs text-destructive">{errors.email.message}</p>
               )}
             </div>
 
             {/* Password */}
-            <div>
-              <label className="mb-1 block text-sm font-medium">Password</label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium">Password</label>
+                <a
+                  href="/forgot-password"
+                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  Forgot password?
+                </a>
+              </div>
               <div className="relative">
                 <input
                   {...register('password')}
                   type={showPass ? 'text' : 'password'}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full rounded-md border bg-background px-3 py-2 pr-10 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full rounded-lg border bg-background px-3 py-2.5 pr-10 text-sm outline-none transition focus:ring-2 focus:ring-ring"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   tabIndex={-1}
+                  aria-label={showPass ? 'Hide password' : 'Show password'}
                 >
                   {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>
+                <p className="text-xs text-destructive">{errors.password.message}</p>
               )}
-            </div>
-
-            <div className="flex items-center justify-end">
-              <a href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
-                Forgot password?
-              </a>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-md bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
             >
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
         </div>
-      </div>
 
-      {/* ════════════════════════ DEMO CREDENTIALS ════════════════════════ */}
-      <div className="lg:col-span-3">
-        <div className="rounded-xl border border-dashed bg-muted/40 p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Sparkles size={15} className="text-primary" />
-            <span className="text-sm font-semibold">Demo Accounts</span>
-            <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-              Click to auto-fill
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          All users — Master Admin, Institute Admin, Teacher, Student, Parent — use this single login.
+        </p>
+
+        {/* ── Quick Login ── */}
+        <div className="mt-5 rounded-xl border border-dashed bg-muted/40 p-4">
+          <div className="mb-3 flex items-center gap-1.5">
+            <Zap size={13} className="text-amber-500" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Quick Login
             </span>
           </div>
-
-            {/* ── Demo Credentials ── */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {DUMMY_USERS.map((user) => {
-              const { colors, badge, typeDef } = resolveUserMeta(user);
-              return (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => fillDemo(user)}
-                  className="group flex flex-col items-start rounded-lg border bg-background px-3 py-3 text-left shadow-sm transition-all hover:border-primary hover:shadow-md active:scale-[0.98]"
-                >
-                  {/* Name + Role badge */}
-                  <div className="mb-2 flex w-full items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${colors.dot}`} />
-                      <span className="truncate text-sm font-semibold leading-tight">
-                        {user.first_name} {user.last_name}
-                      </span>
-                    </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${colors.bg}`}>
-                      {badge}
-                    </span>
-                  </div>
-
-                  {/* Credentials */}
-                  <div className="w-full space-y-1">
-                    <div className="flex items-center gap-1">
-                      <span className="w-10 shrink-0 text-[10px] text-muted-foreground">Email</span>
-                      <span className="truncate font-mono text-[11px] text-foreground/80">{user.email}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="w-10 shrink-0 text-[10px] text-muted-foreground">Pass</span>
-                      <span className="font-mono text-[11px] text-foreground/80">{user.password}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="w-10 shrink-0 text-[10px] text-muted-foreground">Code</span>
-                      <span className="font-mono text-[11px] text-foreground/80">{user.school_code}</span>
-                    </div>
-                  </div>
-
-                  {/* Access level + institute type */}
-                  <div className="mt-2 w-full border-t pt-1.5 flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] text-muted-foreground">Access: </span>
-                      <span className="text-[10px] font-medium text-foreground/70">{ACCESS_LABELS[user.role_code] ?? '—'}</span>
-                    </div>
-                    {typeDef && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {typeDef.icon} {typeDef.label}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+          <div className="flex flex-col gap-2">
+            {QUICK_LOGINS.map((cred) => (
+              <button
+                key={cred.email}
+                type="button"
+                onClick={() => fillCredentials(cred)}
+                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-medium transition ${cred.color}`}
+              >
+                <span>{cred.label}</span>
+                <span className="ml-2 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wider opacity-70">
+                  {cred.badge}
+                </span>
+              </button>
+            ))}
           </div>
-
-          <p className="mt-3 text-center text-[11px] text-muted-foreground">
-            Works even when backend is offline (demo mode)
+          <p className="mt-2 text-[10px] text-muted-foreground/70">
+            Click a role to auto-fill credentials, then press Sign in.
           </p>
         </div>
       </div>
-
     </div>
   );
 }
+

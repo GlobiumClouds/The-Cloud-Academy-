@@ -31,8 +31,13 @@ function normalizeLoginResponse(payload) {
       role:        user.role       ?? null,
       permissions: user.permissions ?? [],
       avatar_url:  user.avatarUrl  ?? user.avatar_url  ?? null,
-      // preserve institute / school nested obj if present
       institute:   user.institute  ?? user.school     ?? null,
+      // convenience top-level field used by middleware cookie + login redirect
+      institute_type:
+        user.institute?.institute_type ??
+        user.school?.institute_type    ??
+        user.institute_type            ??
+        null,
     },
   };
 }

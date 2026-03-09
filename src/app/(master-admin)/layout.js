@@ -26,7 +26,7 @@ const NAV = [
   { href: '/master-admin',                        label: 'Dashboard',       icon: LayoutDashboard, perm: null                    },
   { href: '/master-admin/roles',                  label: 'Roles',           icon: ShieldCheck,     perm: 'platform_role.read'     },
   { href: '/master-admin/subscription-templates', label: 'Sub. Templates',  icon: FileText,        perm: 'sub_template.read'      },
-  { href: '/master-admin/schools',                label: 'Institutes',      icon: Building2,       perm: 'institute.read'         },
+  { href: '/master-admin/institutes',                label: 'Institutes',      icon: Building2,       perm: 'institute.read'         },
   { href: '/master-admin/users',                  label: 'Users',           icon: Users,           perm: 'platform_user.read'     },
   { href: '/master-admin/subscriptions',          label: 'Subscriptions',   icon: CreditCard,      perm: 'subscription.read'      },
   { href: '/master-admin/emails',                 label: 'Bulk Emails',     icon: Mail,            perm: 'email.view_history'     },
@@ -63,6 +63,8 @@ export default function MasterAdminLayout({ children }) {
   const [notifOpen,  setNotifOpen] = useState(false);
   const [mounted,    setMounted]   = useState(false);
 
+  console.log('Login User', user);
+  
   // Delay permission-filtering until after hydration so server HTML matches
   // first client render (Zustand reads localStorage only on client).
   useEffect(() => { setMounted(true); }, []);
@@ -74,7 +76,9 @@ export default function MasterAdminLayout({ children }) {
   const handleLogout = async () => {
     try { await authService.logout(); } catch (_) {}
     logout();
+    Cookies.remove('access_token');
     Cookies.remove('role_code');
+    Cookies.remove('institute_type');
     router.replace('/login');
     toast.success('Logged out');
   };

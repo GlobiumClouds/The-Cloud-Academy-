@@ -9,7 +9,7 @@
  */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -33,18 +33,23 @@ export default function InstituteLayoutWrapper({ children }) {
   // Close mobile drawer on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  const user         = useAuthStore((s) => s.user);
-  const logout       = useAuthStore((s) => s.logout);
-  const dashboardPath = useAuthStore((s) => s.dashboardPath());
+  const user          = useAuthStore((s) => s.user);
+  const logout        = useAuthStore((s) => s.logout);
+  const getDashPath   = useAuthStore((s) => s.dashboardPath);
+  const dashboardPath = mounted ? getDashPath() : '/login';
+
   const { typeDefinition } = useInstituteConfig();
   const allNavItems  = useInstituteNav();
+
   const navItems     = mounted ? allNavItems : [];
 
-  const grouped = navItems.reduce((acc, item) => {
-    acc[item.group] = acc[item.group] ?? [];
-    acc[item.group].push(item);
-    return acc;
-  }, {});
+  const grouped = useMemo(() => {
+    return navItems.reduce((acc, item) => {
+      acc[item.group] = acc[item.group] ?? [];
+      acc[item.group].push(item);
+      return acc;
+    }, {});
+  }, [navItems]);
 
   const handleLogout = async () => {
     try { await authService.logout(); } catch (_) { /* ignore */ }

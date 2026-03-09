@@ -29,6 +29,7 @@ import { Textarea }   from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn }         from '@/lib/utils';
 import { CARD_COLORS } from '@/lib/formatters';
+import { INSTITUTE_ROLE_TEMPLATES } from '@/config/roleTemplates';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -331,7 +332,405 @@ export default function MasterRolesPage() {
   );
 }
 
-// ─── Permission Tab Panel ─────────────────────────────────────────────────────
+// // ─── Permission Tab Panel ─────────────────────────────────────────────────────
+// function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFull }) {
+//   const [search, setSearch] = useState('');
+
+//   const filtered = useMemo(() => {
+//     if (!search.trim()) return groups;
+//     const q = search.toLowerCase();
+//     return groups
+//       .map((g) => ({
+//         ...g,
+//         perms: g.perms.filter(
+//           (p) => p.toLowerCase().includes(q) || permLabel(p).toLowerCase().includes(q),
+//         ),
+//       }))
+//       .filter((g) => g.perms.length > 0 || g.label.toLowerCase().includes(q));
+//   }, [search, groups]);
+
+//   const toggle = (perm) =>
+//     onChange((prev) =>
+//       prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm],
+//     );
+
+//   const toggleGroup = (perms) => {
+//     const allOn = perms.every((p) => selected.includes(p));
+//     onChange((prev) =>
+//       allOn ? prev.filter((p) => !perms.includes(p)) : [...new Set([...prev, ...perms])],
+//     );
+//   };
+
+//   return (
+//     <div className="space-y-3">
+//       {/* Full Access toggle */}
+//       <div className="flex items-center justify-between rounded-lg border bg-white/70 px-3 py-2.5">
+//         <div>
+//           <p className="text-xs font-bold text-slate-700">Full Access</p>
+//           <p className="text-[10px] text-muted-foreground">Grant ALL permissions for this user type</p>
+//         </div>
+//         <button
+//           type="button"
+//           onClick={onToggleFull}
+//           className="flex items-center gap-1.5 text-xs font-medium"
+//         >
+//           {isFull ? (
+//             <ToggleRight size={22} className="text-emerald-600" />
+//           ) : (
+//             <ToggleLeft size={22} className="text-slate-400" />
+//           )}
+//         </button>
+//       </div>
+
+//       {/* Per-permission picker — shown only when not full access */}
+//       {!isFull && (
+//         <>
+//           {/* Header bar */}
+//           <div className="flex flex-wrap items-center justify-between gap-2">
+//             <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+//               {selected.length} / {allPerms.length} selected
+//             </span>
+//             <div className="flex gap-1.5">
+//               <Button
+//                 type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs"
+//                 onClick={() => onChange(() => [...allPerms])}
+//               >
+//                 <CheckSquare size={11} /> All
+//               </Button>
+//               <Button
+//                 type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs"
+//                 onClick={() => onChange(() => [])}
+//               >
+//                 <Square size={11} /> None
+//               </Button>
+//             </div>
+//           </div>
+
+//           {/* Search */}
+//           <div className="relative">
+//             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+//             <Input
+//               placeholder="Filter permissions\u2026"
+//               value={search}
+//               onChange={(e) => setSearch(e.target.value)}
+//               className="h-8 pl-8 text-xs"
+//             />
+//           </div>
+
+//           {/* Groups */}
+//           <ScrollArea className="h-64 rounded-lg border p-2 bg-white/50">
+//             <div className="space-y-2">
+//               {filtered.map((group) => {
+//                 const allOn  = group.perms.every((p) => selected.includes(p));
+//                 const someOn = group.perms.some((p) => selected.includes(p));
+//                 const onCnt  = group.perms.filter((p) => selected.includes(p)).length;
+//                 return (
+//                   <div key={group.label} className="rounded-lg border bg-white/70 px-3 py-2">
+//                     <button
+//                       type="button"
+//                       className="flex w-full items-center gap-2 text-left mb-1.5"
+//                       onClick={() => toggleGroup(group.perms)}
+//                     >
+//                       <div className={cn(
+//                         'size-4 shrink-0 rounded border-2 flex items-center justify-center transition-colors',
+//                         allOn  ? 'bg-emerald-500 border-emerald-500 text-white'
+//                                : someOn ? 'bg-emerald-100 border-emerald-400'
+//                                : 'border-slate-300',
+//                       )}>
+//                         {allOn  && <span className="text-[9px] font-bold leading-none">\u2713</span>}
+//                         {!allOn && someOn && <span className="text-[9px] text-emerald-600 font-bold leading-none">\u2013</span>}
+//                       </div>
+//                       <span className="text-xs font-bold text-slate-700">{group.icon} {group.label}</span>
+//                       <span className={cn(
+//                         'ml-auto text-[10px] font-semibold rounded-full px-1.5 py-0.5',
+//                         onCnt > 0 ? 'bg-emerald-100 text-emerald-700' : 'text-muted-foreground',
+//                       )}>
+//                         {onCnt}/{group.perms.length}
+//                       </span>
+//                     </button>
+//                     <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pl-6 sm:grid-cols-3">
+//                       {group.perms.map((perm) => (
+//                         <label
+//                           key={perm}
+//                           className="flex cursor-pointer items-center gap-1.5 rounded py-0.5 px-1 hover:bg-muted/40 transition-colors"
+//                         >
+//                           <input
+//                             type="checkbox"
+//                             className="size-3.5 accent-emerald-600 shrink-0"
+//                             checked={selected.includes(perm)}
+//                             onChange={() => toggle(perm)}
+//                           />
+//                           <span className="text-xs text-slate-600 leading-tight">{permLabel(perm)}</span>
+//                         </label>
+//                       ))}
+//                     </div>
+//                   </div>
+//                 );
+//               })}
+//               {filtered.length === 0 && (
+//                 <div className="py-6 text-center text-sm text-muted-foreground">
+//                   No permissions match &ldquo;{search}&rdquo;
+//                 </div>
+//               )}
+//             </div>
+//           </ScrollArea>
+//         </>
+//       )}
+//     </div>
+//   );
+// }
+
+// // ─── Role Form Modal ──────────────────────────────────────────────────────────
+// function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
+//   const isEdit = !!role?.id;
+
+//   const { register, handleSubmit, reset, formState: { errors } } = useForm({
+//     defaultValues: {
+//       name:        role?.name        ?? '',
+//       code:        role?.code        ?? '',
+//       description: role?.description ?? '',
+//     },
+//   });
+
+//   // ── Per-user-type permission state ─────────────────────────────────────────
+//   const initial = () => {
+//     const byType = permsByType(role?.permissions);
+//     return {
+//       adminPerms:   isFullAccess(byType.instituteAdmin) ? [] : (byType.instituteAdmin ?? []),
+//       teacherPerms: isFullAccess(byType.teacher)        ? [] : (byType.teacher        ?? []),
+//       studentPerms: isFullAccess(byType.student)        ? [] : (byType.student        ?? []),
+//       parentPerms:  isFullAccess(byType.parent)         ? [] : (byType.parent         ?? []),
+//       adminFull:   isFullAccess(byType.instituteAdmin),
+//       teacherFull: isFullAccess(byType.teacher),
+//       studentFull: isFullAccess(byType.student),
+//       parentFull:  isFullAccess(byType.parent),
+//     };
+//   };
+
+//   const [adminPerms,   setAdminPerms]   = useState(initial().adminPerms);
+//   const [teacherPerms, setTeacherPerms] = useState(initial().teacherPerms);
+//   const [studentPerms, setStudentPerms] = useState(initial().studentPerms);
+//   const [parentPerms,  setParentPerms]  = useState(initial().parentPerms);
+//   const [adminFull,    setAdminFull]    = useState(initial().adminFull);
+//   const [teacherFull,  setTeacherFull]  = useState(initial().teacherFull);
+//   const [studentFull,  setStudentFull]  = useState(initial().studentFull);
+//   const [parentFull,   setParentFull]   = useState(initial().parentFull);
+//   const [activeTab,    setActiveTab]    = useState('admin');
+
+//   // Sync state when modal opens / role changes
+//   useEffect(() => {
+//     if (open) {
+//       reset({
+//         name:        role?.name        ?? '',
+//         code:        role?.code        ?? '',
+//         description: role?.description ?? '',
+//       });
+//       const init = initial();
+//       setAdminPerms(init.adminPerms);
+//       setTeacherPerms(init.teacherPerms);
+//       setStudentPerms(init.studentPerms);
+//       setParentPerms(init.parentPerms);
+//       setAdminFull(init.adminFull);
+//       setTeacherFull(init.teacherFull);
+//       setStudentFull(init.studentFull);
+//       setParentFull(init.parentFull);
+//       setActiveTab('admin');
+//     }
+//   }, [open, role?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+//   const handleClose = () => onClose();
+
+//   const handleFormSubmit = (fields) => {
+//     const code = (fields.code || fields.name)
+//       .toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+//     onSubmit({
+//       ...fields,
+//       code,
+//       permissions: {
+//         instituteAdmin: adminFull   ? ['ALL'] : adminPerms,
+//         teacher:        teacherFull ? ['ALL'] : teacherPerms,
+//         student:        studentFull ? ['ALL'] : studentPerms,
+//         parent:         parentFull  ? ['ALL'] : parentPerms,
+//       },
+//     });
+//   };
+
+//   // ── Tab config ─────────────────────────────────────────────────────────────
+//   const TABS = [
+//     {
+//       key:       'admin',
+//       label:     'Admin',
+//       icon:      <Building2 size={13} />,
+//       groups:    ADMIN_PERMISSION_GROUPS,
+//       allPerms:  ALL_ADMIN_PERMISSIONS,
+//       perms:     adminPerms,
+//       setPerms:  setAdminPerms,
+//       isFull:    adminFull,
+//       toggleFull: () => setAdminFull((v) => !v),
+//     },
+//     {
+//       key:       'teacher',
+//       label:     'Teacher',
+//       icon:      <BookOpen size={13} />,
+//       groups:    TEACHER_PERMISSION_GROUPS,
+//       allPerms:  ALL_TEACHER_PERMISSIONS,
+//       perms:     teacherPerms,
+//       setPerms:  setTeacherPerms,
+//       isFull:    teacherFull,
+//       toggleFull: () => setTeacherFull((v) => !v),
+//     },
+//     {
+//       key:       'student',
+//       label:     'Student',
+//       icon:      <GraduationCap size={13} />,
+//       groups:    STUDENT_PERMISSION_GROUPS,
+//       allPerms:  ALL_STUDENT_PERMISSIONS,
+//       perms:     studentPerms,
+//       setPerms:  setStudentPerms,
+//       isFull:    studentFull,
+//       toggleFull: () => setStudentFull((v) => !v),
+//     },
+//     {
+//       key:       'parent',
+//       label:     'Parent',
+//       icon:      <UserCheck size={13} />,
+//       groups:    PARENT_PERMISSION_GROUPS,
+//       allPerms:  ALL_PARENT_PERMISSIONS,
+//       perms:     parentPerms,
+//       setPerms:  setParentPerms,
+//       isFull:    parentFull,
+//       toggleFull: () => setParentFull((v) => !v),
+//     },
+//   ];
+
+//   const activeTabData = TABS.find((t) => t.key === activeTab);
+
+//   return (
+//     <AppModal
+//       open={open}
+//       onClose={handleClose}
+//       title={isEdit ? `\u270F Edit \u2014 ${role?.name}` : '\u2795 New Platform Role'}
+//       description={
+//         isEdit
+//           ? 'Update role name, code and permissions per user type'
+//           : 'Create a platform template role with per-user-type permissions.'
+//       }
+//       size="xl"
+//       footer={
+//         <div className="flex justify-end gap-2 w-full">
+//           <Button variant="outline" onClick={handleClose} disabled={loading}>Cancel</Button>
+//           <Button onClick={handleSubmit(handleFormSubmit)} disabled={loading} className="min-w-[140px] gap-1.5">
+//             {loading && <Loader2 size={14} className="animate-spin" />}
+//             {loading ? 'Saving\u2026' : isEdit ? 'Save Changes' : 'Create Role'}
+//           </Button>
+//         </div>
+//       }
+//     >
+//       <div className="space-y-5">
+
+//         {/* Identity fields */}
+//         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+//           <InputField
+//             label="Role Name" name="name" register={register} error={errors.name}
+//             rules={{ required: 'Name is required' }} placeholder="School Premium" required
+//           />
+//           <div className="space-y-1">
+//             <Label className="text-xs font-semibold">
+//               Code
+//               <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+//                 (auto-generated from name if empty)
+//               </span>
+//             </Label>
+//             <Input
+//               {...register('code')}
+//               placeholder="SCHOOL_PREMIUM"
+//               className="h-9 text-sm font-mono"
+//               onInput={(e) => {
+//                 e.target.value = e.target.value.toUpperCase().replace(/\s/g, '_');
+//               }}
+//             />
+//           </div>
+//         </div>
+
+//         <div className="space-y-1">
+//           <Label className="text-xs font-semibold">
+//             Description
+//             <span className="ml-1 text-[10px] font-normal text-muted-foreground">(optional)</span>
+//           </Label>
+//           <Textarea
+//             {...register('description')}
+//             placeholder="Describe what this role enables\u2026"
+//             rows={2}
+//             className="text-sm resize-none"
+//           />
+//         </div>
+
+//         {/* 4-Tab Permissions section */}
+//         <div>
+//           <p className="text-sm font-bold text-slate-700 mb-3">
+//             Permissions
+//             <span className="ml-2 text-xs font-normal text-muted-foreground">
+//               (configure per user type)
+//             </span>
+//           </p>
+
+//           {/* Tab bar */}
+//           <div className="flex rounded-lg border bg-muted/30 p-0.5 gap-0.5 mb-3">
+//             {TABS.map((tab) => {
+//               const isActive = activeTab === tab.key;
+//               const cnt      = tab.isFull ? null : tab.perms.length;
+//               return (
+//                 <button
+//                   key={tab.key}
+//                   type="button"
+//                   onClick={() => setActiveTab(tab.key)}
+//                   className={cn(
+//                     'flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 px-2 text-xs font-medium transition-all',
+//                     isActive
+//                       ? 'bg-white shadow-sm text-slate-800'
+//                       : 'text-muted-foreground hover:text-slate-700',
+//                   )}
+//                 >
+//                   {tab.icon}
+//                   <span className="hidden sm:inline">{tab.label}</span>
+//                   {tab.isFull ? (
+//                     <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">ALL</span>
+//                   ) : cnt > 0 ? (
+//                     <span className={cn(
+//                       'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+//                       isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground',
+//                     )}>{cnt}</span>
+//                   ) : null}
+//                 </button>
+//               );
+//             })}
+//           </div>
+
+//           {/* Active tab panel */}
+//           {activeTabData && (
+//             <PermTabPanel
+//               key={activeTabData.key}
+//               groups={activeTabData.groups}
+//               allPerms={activeTabData.allPerms}
+//               selected={activeTabData.perms}
+//               onChange={activeTabData.setPerms}
+//               isFull={activeTabData.isFull}
+//               onToggleFull={activeTabData.toggleFull}
+//             />
+//           )}
+//         </div>
+
+//       </div>
+//     </AppModal>
+//   );
+// }
+
+
+
+
+
+// Updated PermTabPanel component
+
 function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFull }) {
   const [search, setSearch] = useState('');
 
@@ -350,15 +749,18 @@ function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFu
 
   const toggle = (perm) =>
     onChange((prev) =>
-      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm],
+      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
     );
 
   const toggleGroup = (perms) => {
     const allOn = perms.every((p) => selected.includes(p));
     onChange((prev) =>
-      allOn ? prev.filter((p) => !perms.includes(p)) : [...new Set([...prev, ...perms])],
+      allOn ? prev.filter((p) => !perms.includes(p)) : [...new Set([...prev, ...perms])]
     );
   };
+
+  // Count selected permissions (excluding 'ALL')
+  const selectedCount = isFull ? allPerms.length : selected.length;
 
   return (
     <div className="space-y-3">
@@ -374,9 +776,15 @@ function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFu
           className="flex items-center gap-1.5 text-xs font-medium"
         >
           {isFull ? (
-            <ToggleRight size={22} className="text-emerald-600" />
+            <>
+              <ToggleRight size={22} className="text-emerald-600" />
+              <span className="text-emerald-600">Full Access</span>
+            </>
           ) : (
-            <ToggleLeft size={22} className="text-slate-400" />
+            <>
+              <ToggleLeft size={22} className="text-slate-400" />
+              <span className="text-slate-400">Custom</span>
+            </>
           )}
         </button>
       </div>
@@ -387,7 +795,7 @@ function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFu
           {/* Header bar */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-              {selected.length} / {allPerms.length} selected
+              {selectedCount} / {allPerms.length} selected
             </span>
             <div className="flex gap-1.5">
               <Button
@@ -409,7 +817,7 @@ function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFu
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Filter permissions\u2026"
+              placeholder="Filter permissions…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 pl-8 text-xs"
@@ -436,8 +844,8 @@ function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFu
                                : someOn ? 'bg-emerald-100 border-emerald-400'
                                : 'border-slate-300',
                       )}>
-                        {allOn  && <span className="text-[9px] font-bold leading-none">\u2713</span>}
-                        {!allOn && someOn && <span className="text-[9px] text-emerald-600 font-bold leading-none">\u2013</span>}
+                        {allOn  && <span className="text-[9px] font-bold leading-none">✓</span>}
+                        {!allOn && someOn && <span className="text-[9px] text-emerald-600 font-bold leading-none">–</span>}
                       </div>
                       <span className="text-xs font-bold text-slate-700">{group.icon} {group.label}</span>
                       <span className={cn(
@@ -468,7 +876,7 @@ function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFu
               })}
               {filtered.length === 0 && (
                 <div className="py-6 text-center text-sm text-muted-foreground">
-                  No permissions match &ldquo;{search}&rdquo;
+                  No permissions match "{search}"
                 </div>
               )}
             </div>
@@ -479,11 +887,12 @@ function PermTabPanel({ groups, allPerms, selected, onChange, isFull, onToggleFu
   );
 }
 
-// ─── Role Form Modal ──────────────────────────────────────────────────────────
+// Updated RoleFormModal component with institute buttons
+
 function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
   const isEdit = !!role?.id;
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, formState: { errors }, setValue } = useForm({
     defaultValues: {
       name:        role?.name        ?? '',
       code:        role?.code        ?? '',
@@ -515,6 +924,9 @@ function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
   const [studentFull,  setStudentFull]  = useState(initial().studentFull);
   const [parentFull,   setParentFull]   = useState(initial().parentFull);
   const [activeTab,    setActiveTab]    = useState('admin');
+  
+  // State for showing institute templates
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // Sync state when modal opens / role changes
   useEffect(() => {
@@ -534,6 +946,7 @@ function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
       setStudentFull(init.studentFull);
       setParentFull(init.parentFull);
       setActiveTab('admin');
+      setShowTemplates(false);
     }
   }, [open, role?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -542,16 +955,47 @@ function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
   const handleFormSubmit = (fields) => {
     const code = (fields.code || fields.name)
       .toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+    
+    // Important: 'ALL' nahi bhejna, proper array bhejna
+    const permissions = {
+      instituteAdmin: adminFull ? ALL_ADMIN_PERMISSIONS : adminPerms,
+      teacher: teacherFull ? ALL_TEACHER_PERMISSIONS : teacherPerms,
+      student: studentFull ? ALL_STUDENT_PERMISSIONS : studentPerms,
+      parent: parentFull ? ALL_PARENT_PERMISSIONS : parentPerms,
+    };
+    
     onSubmit({
       ...fields,
       code,
-      permissions: {
-        instituteAdmin: adminFull   ? ['ALL'] : adminPerms,
-        teacher:        teacherFull ? ['ALL'] : teacherPerms,
-        student:        studentFull ? ['ALL'] : studentPerms,
-        parent:         parentFull  ? ['ALL'] : parentPerms,
-      },
+      permissions,
     });
+  };
+
+  // Institute template apply karne ka function
+  const applyInstituteTemplate = (instituteType) => {
+    const template = INSTITUTE_ROLE_TEMPLATES[instituteType];
+    if (!template) return;
+    
+    // Form fields set karo
+    setValue('name', template.name);
+    setValue('description', template.description);
+    
+    // Permissions set karo (array mein, 'ALL' nahi)
+    setAdminPerms(template.permissions.instituteAdmin);
+    setTeacherPerms(template.permissions.teacher);
+    setStudentPerms(template.permissions.student);
+    setParentPerms(template.permissions.parent);
+    
+    // Full access off karo
+    setAdminFull(false);
+    setTeacherFull(false);
+    setStudentFull(false);
+    setParentFull(false);
+    
+    // Templates panel band karo
+    setShowTemplates(false);
+    
+    toast.success(`${template.name} template applied!`);
   };
 
   // ── Tab config ─────────────────────────────────────────────────────────────
@@ -604,11 +1048,68 @@ function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
 
   const activeTabData = TABS.find((t) => t.key === activeTab);
 
+  // Institute template buttons
+  const InstituteTemplateButtons = () => (
+    <div className="mb-4 p-3 border rounded-lg bg-blue-50/50">
+      <p className="text-xs font-medium text-blue-700 mb-2 flex items-center gap-1">
+        <Building2 size={14} />
+        Quick Templates — Select Institute Type
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="bg-white text-xs h-8"
+          onClick={() => applyInstituteTemplate('school')}
+        >
+          🏫 School
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="bg-white text-xs h-8"
+          onClick={() => applyInstituteTemplate('coaching')}
+        >
+          📚 Coaching
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="bg-white text-xs h-8"
+          onClick={() => applyInstituteTemplate('academy')}
+        >
+          🎓 Academy
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="bg-white text-xs h-8"
+          onClick={() => applyInstituteTemplate('college')}
+        >
+          🏛️ College
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="bg-white text-xs h-8"
+          onClick={() => applyInstituteTemplate('university')}
+        >
+          🏛️ University
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <AppModal
       open={open}
       onClose={handleClose}
-      title={isEdit ? `\u270F Edit \u2014 ${role?.name}` : '\u2795 New Platform Role'}
+      title={isEdit ? `✏️ Edit — ${role?.name}` : '➕ New Platform Role'}
       description={
         isEdit
           ? 'Update role name, code and permissions per user type'
@@ -616,22 +1117,48 @@ function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
       }
       size="xl"
       footer={
-        <div className="flex justify-end gap-2 w-full">
-          <Button variant="outline" onClick={handleClose} disabled={loading}>Cancel</Button>
-          <Button onClick={handleSubmit(handleFormSubmit)} disabled={loading} className="min-w-[140px] gap-1.5">
-            {loading && <Loader2 size={14} className="animate-spin" />}
-            {loading ? 'Saving\u2026' : isEdit ? 'Save Changes' : 'Create Role'}
-          </Button>
+        <div className="flex justify-between gap-2 w-full">
+          <div>
+            {!isEdit && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTemplates(!showTemplates)}
+                className="gap-1"
+              >
+                <Building2 size={14} />
+                {showTemplates ? 'Hide Templates' : 'Use Template'}
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit(handleFormSubmit)} disabled={loading} className="min-w-[140px] gap-1.5">
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              {loading ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Role'}
+            </Button>
+          </div>
         </div>
       }
     >
       <div className="space-y-5">
-
+        
+        {/* Institute Templates - show when toggled */}
+        {showTemplates && <InstituteTemplateButtons />}
+        
         {/* Identity fields */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <InputField
-            label="Role Name" name="name" register={register} error={errors.name}
-            rules={{ required: 'Name is required' }} placeholder="School Premium" required
+            label="Role Name" 
+            name="name" 
+            register={register} 
+            error={errors.name}
+            rules={{ required: 'Name is required' }} 
+            placeholder="School Premium" 
+            required
           />
           <div className="space-y-1">
             <Label className="text-xs font-semibold">
@@ -658,7 +1185,7 @@ function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
           </Label>
           <Textarea
             {...register('description')}
-            placeholder="Describe what this role enables\u2026"
+            placeholder="Describe what this role enables…"
             rows={2}
             className="text-sm resize-none"
           />
@@ -677,7 +1204,7 @@ function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
           <div className="flex rounded-lg border bg-muted/30 p-0.5 gap-0.5 mb-3">
             {TABS.map((tab) => {
               const isActive = activeTab === tab.key;
-              const cnt      = tab.isFull ? null : tab.perms.length;
+              const cnt      = tab.isFull ? ALL_ADMIN_PERMISSIONS.length : tab.perms.length;
               return (
                 <button
                   key={tab.key}
@@ -693,12 +1220,16 @@ function RoleFormModal({ open, onClose, role, onSubmit, loading }) {
                   {tab.icon}
                   <span className="hidden sm:inline">{tab.label}</span>
                   {tab.isFull ? (
-                    <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">ALL</span>
+                    <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
+                      FULL
+                    </span>
                   ) : cnt > 0 ? (
                     <span className={cn(
                       'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
                       isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground',
-                    )}>{cnt}</span>
+                    )}>
+                      {cnt}
+                    </span>
                   ) : null}
                 </button>
               );
