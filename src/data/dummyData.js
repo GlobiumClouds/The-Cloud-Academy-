@@ -2784,6 +2784,86 @@ export function paginate(arr, page = 1, limit = 20) {
   return { data: { rows, total, page, totalPages } };
 }
 
+// data/dummyData.js - Add these new dummy data arrays
+
+export const DUMMY_INVOICES = [
+  {
+    id: 'inv-1',
+    invoice_number: 'INV-SCH001-202403-1234',
+    institute_id: 'school-1',
+    institute_name: 'City Public School',
+    amount: 5000,
+    tax_amount: 900,
+    total_amount: 5900,
+    status: 'PAID',
+    due_date: '2024-04-05T00:00:00Z',
+    period_start: '2024-03-01T00:00:00Z',
+    period_end: '2024-03-31T00:00:00Z',
+    billing_cycle: 'MONTHLY',
+    payment_method: 'bank_transfer',
+    paid_at: '2024-03-15T10:30:00Z',
+    created_at: '2024-03-01T00:00:00Z',
+  },
+  {
+    id: 'inv-2',
+    invoice_number: 'INV-SCH001-202404-5678',
+    institute_id: 'school-1',
+    institute_name: 'City Public School',
+    amount: 5000,
+    tax_amount: 900,
+    total_amount: 5900,
+    status: 'PENDING',
+    due_date: '2024-05-08T00:00:00Z',
+    period_start: '2024-04-01T00:00:00Z',
+    period_end: '2024-04-30T00:00:00Z',
+    billing_cycle: 'MONTHLY',
+    created_at: '2024-04-01T00:00:00Z',
+  },
+  {
+    id: 'inv-3',
+    invoice_number: 'INV-SCH002-202403-9012',
+    institute_id: 'school-2',
+    institute_name: 'Green Valley College',
+    amount: 8000,
+    tax_amount: 1440,
+    total_amount: 9440,
+    status: 'OVERDUE',
+    due_date: '2024-04-05T00:00:00Z',
+    period_start: '2024-03-01T00:00:00Z',
+    period_end: '2024-03-31T00:00:00Z',
+    billing_cycle: 'MONTHLY',
+    created_at: '2024-03-01T00:00:00Z',
+  },
+];
+
+export const DUMMY_SUBSCRIPTION_HISTORY = [
+  {
+    id: 'sub-hist-1',
+    plan_id: 'plan-1',
+    plan_name: 'Basic',
+    plan_price: 5000,
+    status: 'active',
+    start_date: '2024-01-01T00:00:00Z',
+    end_date: null,
+    changed_at: '2024-01-01T00:00:00Z',
+    changed_by: 'admin@cloudsacademy.com',
+    reason: 'Initial subscription'
+  },
+  {
+    id: 'sub-hist-2',
+    plan_id: 'plan-2',
+    plan_name: 'Standard',
+    plan_price: 8000,
+    status: 'ended',
+    start_date: '2023-06-01T00:00:00Z',
+    end_date: '2023-12-31T00:00:00Z',
+    changed_at: '2024-01-01T00:00:00Z',
+    changed_by: 'admin@cloudsacademy.com',
+    reason: 'Upgraded to Basic plan'
+  }
+];
+
+
 // ──────────────────────────────────────────────────────────────────────────────
 // 11 ▸ EXPORT ALL
 // ──────────────────────────────────────────────────────────────────────────────
@@ -2831,6 +2911,8 @@ export default {
   DUMMY_FACULTIES,
   DUMMY_DEPARTMENTS,
   DUMMY_RESEARCH,
+  DUMMY_INVOICES,
+  DUMMY_SUBSCRIPTION_HISTORY,
   dummyLogin,
   paginate
 };
