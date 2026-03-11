@@ -356,3 +356,36 @@ export const RELATIONSHIP_OPTIONS = [
   { value: 'sibling',   label: 'Sibling'   },
   { value: 'other',     label: 'Other'     },
 ];
+
+
+export const BLOOD_GROUP_OPTIONS = [
+  { value: 'A+', label: 'A+' },
+  { value: 'A-', label: 'A-' },
+  { value: 'B+', label: 'B+' },
+  { value: 'B-', label: 'B-' },
+  { value: 'AB+', label: 'AB+' },
+  { value: 'AB-', label: 'AB-' },
+  { value: 'O+', label: 'O+' },
+  { value: 'O-', label: 'O-' },
+];
+
+export const RELIGION_OPTIONS = [
+  { value: 'islam', label: 'Islam' },
+  { value: 'christianity', label: 'Christianity' },
+  { value: 'hinduism', label: 'Hinduism' },
+  { value: 'sikhism', label: 'Sikhism' },
+  { value: 'other', label: 'Other' },
+];
+
+export const DOCUMENT_TYPES = [
+  { value: 'birth_certificate', label: 'Birth Certificate' },
+  { value: 'cnic_b_form', label: 'CNIC / B-Form' },
+  { value: 'previous_education_certificate', label: 'Previous Education Certificate' },
+  { value: 'character_certificate', label: 'Character Certificate' },
+  { value: 'domicile', label: 'Domicile' },
+  { value: 'passport_photos', label: 'Passport Size Photos' },
+  { value: 'father_cnic', label: "Father's CNIC" },
+  { value: 'fee_receipt', label: 'Fee Receipt' },
+  { value: 'medical_certificate', label: 'Medical Certificate' },
+  { value: 'other', label: 'Other' },
+];

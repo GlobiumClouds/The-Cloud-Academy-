@@ -5,7 +5,7 @@
 import { notFound } from 'next/navigation';
 import StudentsPage from '@/components/pages/StudentsPage';
 
-const VALID_TYPES = ['school', 'coaching', 'academy', 'college', 'university'];
+const VALID_TYPES = ['school', 'coaching', 'academy', 'college', 'university','tuition_center'];
 
 export default async function Students({ params }) {
   const { type } = await params;
@@ -21,6 +21,7 @@ export async function generateMetadata({ params }) {
     academy:    'Trainees',
     college:    'Students',
     university: 'Students',
+    tuition_center: 'Students',
   };
   return { title: labels[type] ?? 'Students' };
 }

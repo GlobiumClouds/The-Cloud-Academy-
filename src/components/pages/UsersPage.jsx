@@ -105,8 +105,8 @@ export default function UsersPage({ type }) {
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => { const s = getValue(); return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_COLORS[s])}>{s}</span>; } },
     { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
       <div className="flex items-center justify-end gap-1">
-        {canDo('user.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
-        {canDo('user.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+        {canDo('users.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
+        {canDo('users.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
       </div>
     )},
   ], [canDo]);
@@ -125,7 +125,7 @@ export default function UsersPage({ type }) {
           { name:'status', label:'Status', value:status, onChange:(v) => { setStatus(v); setPage(1); }, options:STATUS_OPTS },
           { name:'role',   label:'Role',   value:role,   onChange:(v) => { setRole(v);   setPage(1); }, options:ROLE_OPTS   },
         ]}
-        action={canDo('user.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New User</button> : null}
+        action={canDo('users.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New User</button> : null}
         enableColumnVisibility
         exportConfig={{ fileName: 'users' }}
         pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />

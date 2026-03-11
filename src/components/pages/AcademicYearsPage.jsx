@@ -95,10 +95,10 @@ export default function AcademicYearsPage({ type }) {
       id: 'actions', header: 'Actions', enableHiding: false,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-1">
-          {canDo('academicYear.update') && (
+          {canDo('academic_years.update') && (
             <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>
           )}
-          {canDo('academicYear.delete') && (
+          {canDo('academic_years.delete') && (
             <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>
           )}
         </div>
@@ -106,7 +106,7 @@ export default function AcademicYearsPage({ type }) {
     },
   ], [canDo]);
 
-  const addBtn = canDo('academicYear.create') ? (
+  const addBtn = canDo('academic_years.create') ? (
     <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
       <Plus size={14} /> Add Year
     </button>

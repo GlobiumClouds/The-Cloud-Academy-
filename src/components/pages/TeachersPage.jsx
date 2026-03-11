@@ -175,10 +175,10 @@ export default function TeachersPage({ type }) {
       id: 'actions', header: 'Actions', enableHiding: false,
       cell: ({ row }) => (
         <div className="flex justify-end gap-1">
-          {canDo('teacher.update') && (
+          {canDo('teachers.update') && (
             <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>
           )}
-          {canDo('teacher.delete') && (
+          {canDo('teachers.delete') && (
             <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>
           )}
         </div>
@@ -206,7 +206,7 @@ export default function TeachersPage({ type }) {
         emptyMessage={`No ${labelP.toLowerCase()} found`}
         search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder={`Search ${labelP.toLowerCase()}…`}
         filters={[{ name:'status', label:'Status', value:status, onChange:(v)=>{ setStatus(v); setPage(1); }, options:STATUS_OPTIONS }]}
-        action={canDo('teacher.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add {label}</button> : null}
+        action={canDo('teachers.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add {label}</button> : null}
         enableColumnVisibility
         exportConfig={{ fileName: 'teachers' }}
         pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }}
@@ -268,7 +268,7 @@ export default function TeachersPage({ type }) {
           <>
             <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
             <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
+              {remove.isPending ? 'Deleting' : 'Delete'}
             </button>
           </>
         }>
