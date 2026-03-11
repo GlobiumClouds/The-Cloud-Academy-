@@ -42,6 +42,28 @@ export const teacherService = {
 
   delete: (id) => api.delete(`/teachers/${id}`).then((r) => r.data),
 
+  getOptions: async (instituteId) => {
+    try {
+      const response = await api.get('/teachers', {
+        params: { institute_id: instituteId, limit: 200, is_active: true }
+      });
+      const list = response.data?.data || response.data?.data?.rows || [];
+      return {
+        data: list.map(t => ({
+          value: t.id,
+          label: `${t.first_name} ${t.last_name}`.trim(),
+        }))
+      };
+    } catch {
+      return {
+        data: DUMMY_TEACHERS.map(t => ({
+          value: t.id,
+          label: `${t.first_name} ${t.last_name}`.trim(),
+        }))
+      };
+    }
+  },
+
   uploadPhoto: (id, formData) =>
     api
       .post(`/teachers/${id}/photo`, formData, {

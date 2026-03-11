@@ -1,3 +1,15 @@
+<<<<<<< HEAD
+/**
+ * TeacherForm — Create / Edit teacher
+ * ─────────────────────────────────────────────────────────────────
+ * Props:
+ *   defaultValues  object
+ *   onSubmit       (data) => void
+ *   onCancel       () => void
+ *   loading        boolean
+ *   branchOptions  { value, label }[]
+ *   isEdit         boolean
+=======
 /// ── Teacher Form Component ─────────────────────────────────────────────────
 //src/components/forms/TeacherForm.jsx
 /**
@@ -13,11 +25,15 @@
  *   subjectOptions   { value, label }[]
  *   branchOptions    { value, label }[]
  *   isEdit           boolean
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
  */
 'use client';
 
 import { useForm } from 'react-hook-form';
+<<<<<<< HEAD
+=======
 import { useState } from 'react';
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 import {
   InputField,
   SelectField,
@@ -25,6 +41,10 @@ import {
   DatePickerField,
   FormSubmitButton,
 } from '@/components/common';
+<<<<<<< HEAD
+import { Button }    from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+=======
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,11 +64,18 @@ import {
   EMPLOYMENT_TYPE_OPTIONS,
   DOCUMENT_TYPES 
 } from '@/constants/index';
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 
 export default function TeacherForm({
   defaultValues = {},
   onSubmit,
   onCancel,
+<<<<<<< HEAD
+  loading       = false,
+  branchOptions = [],
+  isEdit        = false,
+}) {
+=======
   loading = false,
   departmentOptions = TEACHER_DEPARTMENT_OPTIONS,
   designationOptions = TEACHER_DESIGNATION_OPTIONS,
@@ -71,10 +98,56 @@ export default function TeacherForm({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
   const {
     register,
     control,
     handleSubmit,
+<<<<<<< HEAD
+    formState: { errors },
+  } = useForm({ defaultValues });
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+      {/* Personal */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Personal Information
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <InputField label="First Name"    name="first_name"   register={register} error={errors.first_name}   required placeholder="e.g. Ali"            />
+          <InputField label="Last Name"     name="last_name"    register={register} error={errors.last_name}    required placeholder="e.g. Hassan"         />
+          <InputField label="Email"         name="email"        register={register} error={errors.email}        type="email" placeholder="teacher@school.com" />
+          <InputField label="Phone"         name="phone"        register={register} error={errors.phone}        type="tel"   placeholder="e.g. 03001234567"  />
+          <InputField label="Employee ID"   name="employee_id"  register={register} error={errors.employee_id}  placeholder="e.g. EMP-001"                  />
+          <InputField label="Qualification" name="qualification" register={register} error={errors.qualification} placeholder="e.g. M.Ed, PhD"              />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Employment */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Employment Details
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <DatePickerField label="Joining Date" name="joining_date" control={control} error={errors.joining_date} />
+          <InputField      label="Salary (PKR)" name="salary"       register={register} error={errors.salary}  type="number" placeholder="e.g. 35000" />
+          {branchOptions.length > 0 && (
+            <SelectField label="Branch" name="branch_id" control={control} error={errors.branch_id} options={branchOptions} placeholder="Select branch" />
+          )}
+        </div>
+        <div className="mt-4">
+          <TextareaField label="Address" name="address" register={register} error={errors.address} placeholder="Residential address" rows={2} />
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+=======
     watch,
     setValue,
     formState: { errors },
@@ -748,13 +821,21 @@ export default function TeacherForm({
         <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
           Cancel
         </Button>
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
         <FormSubmitButton
           loading={loading}
           label={isEdit ? 'Save Changes' : 'Add Teacher'}
           loadingLabel={isEdit ? 'Saving…' : 'Adding…'}
+<<<<<<< HEAD
+=======
           className="w-full sm:w-auto"
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
         />
       </div>
     </form>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c

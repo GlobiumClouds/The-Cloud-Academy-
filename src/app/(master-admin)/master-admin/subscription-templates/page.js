@@ -769,8 +769,11 @@ const PLAN_PALETTE = {
   enterprise: { bg: 'bg-purple-50',  border: 'border-purple-200',  accent: 'text-purple-600',  iconBg: 'bg-purple-100',  hover: 'hover:border-purple-300' },
 };
 
+<<<<<<< HEAD
+=======
 
 
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 function getPlanPalette(plan, idx) {
   const key = (plan.code ?? plan.name ?? '').toLowerCase();
   for (const k of ['enterprise', 'premium', 'standard', 'basic']) {
@@ -1393,7 +1396,11 @@ function PlanFormModal({ open, onClose, plan, onSubmit, loading }) {
           <InputField label="Storage (GB)"  name="storage_gb"    register={register} type="number" placeholder="5" />
         </div>
 
+<<<<<<< HEAD
+        <SectionLabel>Features</SectionLabel>
+=======
         {/* <SectionLabel>Features</SectionLabel>
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
         {FEATURE_GROUPS.map((group) => (
           <div key={group} className="mb-3">
             <p className="text-xs font-semibold text-slate-500 mb-1.5">{group}</p>
@@ -1409,7 +1416,11 @@ function PlanFormModal({ open, onClose, plan, onSubmit, loading }) {
               ))}
             </div>
           </div>
+<<<<<<< HEAD
+        ))}
+=======
         ))} */}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 
         <SectionLabel>Status Flags</SectionLabel>
         <div className="space-y-2">

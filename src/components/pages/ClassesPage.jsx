@@ -1,148 +1,618 @@
+
+// src/components/pages/ClassesPage.jsx
 'use client';
-/**
- * ClassesPage — Adaptive:
- * school → Classes | coaching → Courses | academy → Programs | college/uni → Departments/Courses
- */
+
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, BookOpen } from 'lucide-react';
-import useInstituteConfig from '@/hooks/useInstituteConfig';
+import { 
+  Plus, 
+  BookOpen, 
+  Eye,
+  Copy,
+  Power 
+} from 'lucide-react';
+
 import useAuthStore from '@/store/authStore';
+import useInstituteStore from '@/store/instituteStore';
+import useInstituteConfig from '@/hooks/useInstituteConfig';
+
+// Reusable Components
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
-import SelectField from '@/components/common/SelectField';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 import StatsCard from '@/components/common/StatsCard';
-import { cn } from '@/lib/utils';
-import { DUMMY_CLASSES } from '@/data/dummyData';
+import TableRowActions from '@/components/common/TableRowActions';
+import ErrorAlert from '@/components/common/ErrorAlert';
+import PageLoader from '@/components/common/PageLoader';
+import ClassForm from '@/components/forms/ClassForm';
+import SectionHeader from '@/components/common/SectionHeader';
 
-const STATUS_OPTS = [{ value:'active', label:'Active' }, { value:'inactive', label:'Inactive' }];
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const schema = z.object({
-  name:       z.string().min(1, 'Required'),
-  capacity:   z.coerce.number().min(1, 'Required'),
-  teacher_id: z.string().optional(),
-  status:     z.string().min(1, 'Required'),
-  description:z.string().optional(),
-});
-
-
+import { classService } from '@/services/classService';
+import { academicYearService } from '@/services/academicYearService';
 
 export default function ClassesPage({ type }) {
-  const qc    = useQueryClient();
-  const canDo = useAuthStore((s) => s.canDo);
+  const queryClient = useQueryClient();
+  const { canDo } = useAuthStore();
+  const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
-
-  const label  = terms.primary_unit  ?? 'Class';
-  const labelP = terms.primary_units ?? 'Classes';
-
+  
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [page,   setPage]   = useState(1);
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [modal,   setModal]   = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [deleting,setDeleting]= useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState(null);
+  const [viewingClass, setViewingClass] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState(null);
+  const [statusDialog, setStatusDialog] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'active', capacity: 40 } });
+  // Get terms based on institute type
+  const classTerm = terms?.primary_unit || 'Class';
+  const classTermPlural = terms?.primary_units || 'Classes';
+  const sectionTerm = terms?.secondary_unit || 'Section';
+  const courseTerm = terms?.tertiary_unit || 'Course';
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['classes', type, page, pageSize, search, status],
-    queryFn: async () => {
-      try { const { classService } = await import('@/services'); return await classService.getAll({ page, limit: pageSize, search, status }); }
-      catch {
-        const d = DUMMY_CLASSES.filter(r => (!search || r.name.toLowerCase().includes(search.toLowerCase())) && (!status || r.status === status));
-        const slice = d.slice((page-1)*pageSize, page*pageSize);
-        return { data: { rows: slice, total: d.length, totalPages: Math.max(1, Math.ceil(d.length / pageSize)) } };
-      }
-    },
-    placeholderData: (p) => p,
+  // Fetch academic years for dropdown
+  const { data: academicYears, error: academicYearsError } = useQuery({
+    queryKey: ['academic-years-options', currentInstitute?.id],
+    queryFn: () => academicYearService.getOptions(currentInstitute?.id, true),
+    enabled: !!currentInstitute?.id,
   });
 
-  const rows = data?.data?.rows ?? DUMMY_CLASSES;
-  const total = data?.data?.total ?? rows.length;
-  const totalPages = data?.data?.totalPages ?? 1;
-
-  const save = useMutation({
-    mutationFn: async (vals) => {
-      try { const { classService } = await import('@/services'); return editing ? await classService.update(editing.id, vals) : await classService.create(vals); }
-      catch { return { data: vals }; }
-    },
-    onSuccess: () => { toast.success(editing ? 'Updated' : 'Created'); qc.invalidateQueries({ queryKey: ['classes'] }); closeModal(); },
-    onError: () => toast.error('Save failed'),
+  // Fetch classes
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['classes', currentInstitute?.id, page, pageSize, search, status],
+    queryFn: () => classService.getAll({
+      institute_id: currentInstitute?.id,
+      page,
+      limit: pageSize,
+      search: search || undefined,
+      status: status || undefined,
+    }),
+    enabled: !!currentInstitute?.id,
   });
 
-  const remove = useMutation({
-    mutationFn: async (id) => {
-      try { const { classService } = await import('@/services'); return await classService.delete(id); }
-      catch { return { success: true }; }
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: (data) => classService.create(data),
+    onSuccess: () => {
+      toast.success(`${classTerm} created successfully`);
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      setModalOpen(false);
+      setEditingClass(null);
     },
-    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['classes'] }); setDeleting(null); },
-    onError: () => toast.error('Delete failed'),
+    onError: (error) => {
+      toast.error(error.message || `Failed to create ${classTerm.toLowerCase()}`);
+    },
   });
 
-  const openAdd  = () => { setEditing(null); reset({ status:'active', capacity: 40 }); setModal(true); };
-  const openEdit = (row) => { setEditing(row); reset({ ...row }); setModal(true); };
-  const closeModal = () => { setModal(false); setEditing(null); reset(); };
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => classService.update(id, data),
+    onSuccess: () => {
+      toast.success(`${classTerm} updated successfully`);
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      setModalOpen(false);
+      setEditingClass(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to update ${classTerm.toLowerCase()}`);
+    },
+  });
 
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id) => classService.delete(id),
+    onSuccess: () => {
+      toast.success(`${classTerm} deleted successfully`);
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      setDeleteDialog(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to delete ${classTerm.toLowerCase()}`);
+    },
+  });
+
+  // Toggle status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, isActive }) => classService.toggleStatus(id, isActive),
+    onSuccess: () => {
+      toast.success('Status updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      setStatusDialog(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update status');
+    },
+  });
+
+  // Handle form submit
+  const handleSubmit = (formData) => {
+    if (editingClass && !editingClass.isCopy) {
+      updateMutation.mutate({ id: editingClass.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  // Open add modal
+  const openAddModal = () => {
+    setEditingClass(null);
+    setModalOpen(true);
+  };
+
+  // Normalize API data to form field names
+  const normalizeForForm = (classItem) => ({
+    ...classItem,
+    active: classItem.is_active ?? classItem.active ?? true,
+    sections: (classItem.sections || []).map(s => ({
+      ...s,
+      active: s.is_active ?? s.active ?? true,
+    })),
+    courses: (classItem.courses || []).map(c => ({
+      ...c,
+      code: c.code || c.course_code || '',
+      active: c.is_active ?? c.active ?? true,
+      materials: (c.materials || []).map(m => ({
+        ...m,
+        pdf_url: m.pdf_url || null,  // pass existing Cloudinary URL to form
+        active: m.is_active ?? m.active ?? true,
+      })),
+    })),
+  });
+
+  // Open edit modal
+  const openEditModal = (classItem) => {
+    setEditingClass(normalizeForForm(classItem));
+    setModalOpen(true);
+  };
+
+  // Open view modal
+  const openViewModal = (classItem) => {
+    setViewingClass(classItem);
+    setActiveTab('overview');
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingClass(null);
+  };
+
+  // Close view modal
+  const closeViewModal = () => {
+    setViewingClass(null);
+    setActiveTab('overview');
+  };
+
+  // Handle copy class
+  const handleCopyClass = (classItem) => {
+    const normalized = normalizeForForm(classItem);
+    const newClass = {
+      ...normalized,
+      id: undefined,
+      name: `${classItem.name} (Copy)`,
+      active: true,
+      isCopy: true,
+      sections: normalized.sections.map(s => ({ ...s, id: undefined, class_id: undefined })),
+      courses: normalized.courses.map(c => ({
+        ...c,
+        id: undefined,
+        class_id: undefined,
+        materials: (c.materials || []).map(m => ({ ...m, id: undefined, course_id: undefined }))
+      }))
+    };
+    setEditingClass(newClass);
+    setModalOpen(true);
+  };
+
+  // Handle toggle status
+  const handleToggleStatus = (classItem) => {
+    setStatusDialog(classItem);
+  };
+
+  // Table columns
   const columns = useMemo(() => [
-    { accessorKey: 'name',         header: `${label} Name`,  cell: ({ getValue }) => <span className="font-semibold">{getValue()}</span> },
-    { accessorKey: 'teacher_name', header: 'Class Teacher',  cell: ({ getValue }) => getValue() || '—' },
-    { accessorKey: 'capacity',     header: 'Capacity' },
-    { accessorKey: 'sections',     header: type === 'school' ? 'Sections' : 'Batches', cell: ({ getValue }) => getValue() ?? 0 },
-    { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', getValue() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}>{getValue()}</span> },
-    { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        {canDo('classes.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
-        {canDo('classes.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
-      </div>
-    )},
-  ], [canDo, label, type]);
+    {
+      accessorKey: 'name',
+      header: `${classTerm} Name`,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{row.original.name}</span>
+          {row.original.is_current && (
+            <Badge variant="default" className="bg-green-500">Current</Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'sections',
+      header: sectionTerm,
+      cell: ({ row }) => {
+        const sections = row.original.sections;
+        const count = Array.isArray(sections) ? sections.length : (sections || 0);
+        return (
+          <span className="text-sm">
+            {count} {count === 1 ? sectionTerm.toLowerCase() : `${sectionTerm.toLowerCase()}s`}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'courses',
+      header: courseTerm,
+      cell: ({ row }) => {
+        const courses = row.original.courses;
+        const count = Array.isArray(courses) ? courses.length : (courses || 0);
+        return (
+          <span className="text-sm">
+            {count} {count === 1 ? courseTerm.toLowerCase() : `${courseTerm.toLowerCase()}s`}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const isActive = row.original.is_active ?? row.original.status === 'active';
+        return (
+          <Badge variant={isActive ? 'success' : 'secondary'}>
+            {isActive ? 'Active' : 'Inactive'}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const classItem = row.original;
+        const canUpdate = canDo('classes.update');
+        const canDelete = canDo('classes.delete');
+        
+        const extraActions = [];
+        
+        if (canUpdate) {
+          extraActions.push({
+            label: 'View Details',
+            icon: <Eye className="h-4 w-4" />,
+            onClick: () => openViewModal(classItem)
+          });
+          
+          extraActions.push({
+            label: 'Copy Class',
+            icon: <Copy className="h-4 w-4" />,
+            onClick: () => handleCopyClass(classItem)
+          });
+          
+          extraActions.push({
+            label: classItem.is_active ? 'Deactivate' : 'Activate',
+            icon: <Power className="h-4 w-4" />,
+            onClick: () => handleToggleStatus(classItem),
+            variant: classItem.is_active ? 'destructive' : 'default'
+          });
+        }
+        
+        return (
+          <TableRowActions
+            onView={() => openViewModal(classItem)}
+            onEdit={canUpdate ? () => openEditModal(classItem) : undefined}
+            onDelete={canDelete ? () => setDeleteDialog(classItem) : undefined}
+            extra={extraActions}
+          />
+        );
+      },
+    },
+  ], [classTerm, sectionTerm, courseTerm, canDo]);
+
+  // Stats data
+  const stats = useMemo(() => {
+    const rows = Array.isArray(data?.data) ? data.data : [];
+    return {
+      total: data?.pagination?.total || rows.length,
+      active: rows.filter(c => c.is_active !== false).length,
+      inactive: rows.filter(c => c.is_active === false).length,
+    };
+  }, [data]);
+
+  // Loading state
+  if (isLoading && !data) {
+    return <PageLoader message={`Loading ${classTermPlural.toLowerCase()}...`} />;
+  }
 
   return (
-    <div className="space-y-5">
-      <PageHeader title={labelP} description={`${total} ${labelP.toLowerCase()} total`} />
+    <div className="space-y-6">
+      {/* Header */}
+      <PageHeader
+        title={classTermPlural}
+        description={`Manage ${classTermPlural.toLowerCase()} for your institute`}
+        action={
+          canDo('classes.create') && (
+            <Button onClick={openAddModal} size="sm">
+              <Plus className="mr-2 h-4 w-4" />
+              Add {classTerm}
+            </Button>
+          )
+        }
+      />
+
+      {/* Error Alerts */}
+      <ErrorAlert message={error?.message || academicYearsError?.message} />
+
+      {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label={`Total ${labelP}`} value={total}                                     icon={<BookOpen size={18} />} />
-        <StatsCard label="Active"            value={rows.filter(r => r.status === 'active').length} icon={<BookOpen size={18} />} />
-        <StatsCard label="Inactive"          value={rows.filter(r => r.status === 'inactive').length} icon={<BookOpen size={18} />} />
+        <StatsCard
+          label={`Total ${classTermPlural}`}
+          value={stats.total}
+          icon={<BookOpen className="h-4 w-4" />}
+          loading={isLoading}
+        />
+        <StatsCard
+          label="Active"
+          value={stats.active}
+          icon={<BookOpen className="h-4 w-4 text-green-500" />}
+          loading={isLoading}
+        />
+        <StatsCard
+          label="Inactive"
+          value={stats.inactive}
+          icon={<BookOpen className="h-4 w-4 text-gray-500" />}
+          loading={isLoading}
+        />
       </div>
-      <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage={`No ${labelP.toLowerCase()} found`}
-        search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder={`Search ${labelP.toLowerCase()}…`}
-        filters={[{ name:'status', label:'Status', value:status, onChange:(v) => { setStatus(v); setPage(1); }, options:STATUS_OPTS }]}
-        action={canDo('classes.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New {label}</button> : null}
+
+      {/* Data Table */}
+      <DataTable
+        columns={columns}
+        data={data?.data || []}
+        loading={isLoading}
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder={`Search ${classTermPlural.toLowerCase()}...`}
+        filters={[
+          {
+            name: 'status',
+            label: 'Status',
+            value: status,
+            onChange: setStatus,
+            options: [
+              { value: 'active', label: 'Active' },
+              { value: 'inactive', label: 'Inactive' },
+            ],
+          },
+        ]}
         enableColumnVisibility
-        exportConfig={{ fileName: 'classes' }}
-        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />
+        exportConfig={{
+          fileName: classTermPlural.toLowerCase().replace(/\s+/g, '-'),
+          dateField: 'created_at'
+        }}
+        pagination={{
+          page,
+          totalPages: data?.pagination?.totalPages || 1,
+          onPageChange: setPage,
+          total: data?.pagination?.total || 0,
+          pageSize,
+          onPageSizeChange: setPageSize,
+        }}
+        emptyMessage={`No ${classTermPlural.toLowerCase()} found`}
+      />
 
-      <AppModal open={modal} onClose={closeModal} title={editing ? `Edit ${label}` : `New ${label}`} size="md"
-        footer={<><button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button><button type="submit" form="class-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">{save.isPending ? 'Saving…' : editing ? 'Update' : 'Create'}</button></>}>
-        <form id="class-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
-          <div className="space-y-1.5"><label className="text-sm font-medium">{label} Name *</label><input {...register('name')} className="input-base" placeholder={`e.g. ${label} 9`} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Capacity *</label><input type="number" {...register('capacity')} className="input-base" />{errors.capacity && <p className="text-xs text-destructive">{errors.capacity.message}</p>}</div>
-            <SelectField label="Status" name="status" control={control} error={errors.status} options={STATUS_OPTS} required />
-          </div>
-          <div className="space-y-1.5"><label className="text-sm font-medium">Description</label><input {...register('description')} className="input-base" /></div>
-        </form>
+      {/* Add/Edit Modal */}
+      <AppModal
+        open={modalOpen}
+        onClose={closeModal}
+        title={editingClass ? (editingClass.isCopy ? `Copy ${classTerm}` : `Edit ${classTerm}`) : `Add ${classTerm}`}
+        size="xl"
+        description={
+          editingClass?.isCopy 
+            ? `Create a new ${classTerm.toLowerCase()} based on ${editingClass.name}`
+            : undefined
+        }
+      >
+        <ClassForm
+          key={editingClass?.id || 'new'}
+          defaultValues={editingClass || {}}
+          onSubmit={handleSubmit}
+          onCancel={closeModal}
+          loading={createMutation.isPending || updateMutation.isPending}
+          academicYearOptions={academicYears?.data || []}
+          instituteType={type}
+          isEdit={!!editingClass && !editingClass.isCopy}
+        />
       </AppModal>
 
-      {/* Delete Confirm */}
-      <AppModal open={!!deleting} onClose={() => setDeleting(null)} title={`Delete ${label}`} size="sm"
+      {/* View Modal */}
+      <AppModal
+        open={!!viewingClass}
+        onClose={closeViewModal}
+        title={`${classTerm} Details: ${viewingClass?.name}`}
+        size="lg"
         footer={
-          <>
-            <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-            <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
-            </button>
-          </>
-        }>
-        <p className="text-sm text-muted-foreground">Delete <strong>{deleting?.name}</strong>? This cannot be undone.</p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={closeViewModal}>
+              Close
+            </Button>
+            {canDo('classes.update') && (
+              <Button onClick={() => {
+                openEditModal(viewingClass);
+                closeViewModal();
+              }}>
+                Edit {classTerm}
+              </Button>
+            )}
+          </div>
+        }
+      >
+        {viewingClass && (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="sections">{sectionTerm}s</TabsTrigger>
+              <TabsTrigger value="courses">{courseTerm}s</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Name</p>
+                  <p className="font-medium">{viewingClass.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <Badge variant={viewingClass.is_active ? 'success' : 'secondary'}>
+                    {viewingClass.is_active ? 'Active' : 'Inactive'}
+                  </Badge>
+                </div>
+                {viewingClass.code && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Code</p>
+                    <p className="font-mono text-sm">{viewingClass.code}</p>
+                  </div>
+                )}
+                {viewingClass.academic_year && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Academic Year</p>
+                    <p className="text-sm">{viewingClass.academic_year.name}</p>
+                  </div>
+                )}
+                {viewingClass.description && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">Description</p>
+                    <p className="text-sm bg-muted/50 p-3 rounded-md">{viewingClass.description}</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="sections" className="space-y-4 pt-4">
+              {viewingClass.sections && viewingClass.sections.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {viewingClass.sections.map((section, idx) => (
+                    <div key={idx} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{section.name}</span>
+                        <Badge variant={section.is_active ? 'success' : 'secondary'} size="sm">
+                          {section.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      {(section.room_no || section.capacity) && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          {section.room_no && <span>📍 Room: {section.room_no} </span>}
+                          {section.capacity && <span>👥 Capacity: {section.capacity}</span>}
+                        </div>
+                      )}
+                      {section.teacher && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          👨‍🏫 Teacher: {section.teacher.name}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">
+                  No {sectionTerm.toLowerCase()}s found
+                </p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="courses" className="space-y-4 pt-4">
+              {viewingClass.courses && viewingClass.courses.length > 0 ? (
+                <div className="space-y-3">
+                  {viewingClass.courses.map((course, idx) => (
+                    <div key={idx} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium">{course.name}</span>
+                          {course.code && (
+                            <Badge variant="outline" className="ml-2">
+                              {course.code}
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant={course.is_active ? 'success' : 'secondary'} size="sm">
+                          {course.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      
+                      {course.teacher && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          👨‍🏫 Teacher: {course.teacher.name}
+                        </div>
+                      )}
+                      
+                      {course.materials && course.materials.length > 0 && (
+                        <div className="mt-3 border-t pt-2">
+                          <SectionHeader title="Materials" />
+                          <div className="grid grid-cols-2 gap-2">
+                            {course.materials.map((material, midx) => (
+                              <div key={midx} className="flex items-center justify-between text-sm p-2 bg-muted/30 rounded">
+                                <span>{material.name}</span>
+                                <Badge variant={material.is_active ? 'success' : 'secondary'} size="sm">
+                                  {material.is_active ? 'Active' : 'Inactive'}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">
+                  No {courseTerm.toLowerCase()}s found
+                </p>
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
       </AppModal>
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={!!deleteDialog}
+        onClose={() => setDeleteDialog(null)}
+        onConfirm={() => deleteMutation.mutate(deleteDialog.id)}
+        loading={deleteMutation.isPending}
+        title={`Delete ${classTerm}`}
+        description={
+          <>
+            Are you sure you want to delete <strong>{deleteDialog?.name}</strong>? 
+            This action cannot be undone. All associated sections, courses, and student records will be affected.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+      />
+
+      {/* Status Toggle Confirmation */}
+      <ConfirmDialog
+        open={!!statusDialog}
+        onClose={() => setStatusDialog(null)}
+        onConfirm={() => toggleStatusMutation.mutate({
+          id: statusDialog.id,
+          isActive: !statusDialog.is_active
+        })}
+        loading={toggleStatusMutation.isPending}
+        title={statusDialog?.is_active ? `Deactivate ${classTerm}` : `Activate ${classTerm}`}
+        description={
+          <>
+            Are you sure you want to {statusDialog?.is_active ? 'deactivate' : 'activate'} {' '}
+            <strong>{statusDialog?.name}</strong>?
+          </>
+        }
+        confirmLabel={statusDialog?.is_active ? 'Deactivate' : 'Activate'}
+        variant={statusDialog?.is_active ? 'destructive' : 'default'}
+      />
     </div>
   );
 }

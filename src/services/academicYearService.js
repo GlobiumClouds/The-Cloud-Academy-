@@ -6,7 +6,6 @@
  * PUT    /academic-years/:id
  * PATCH  /academic-years/:id/set-current
  * DELETE /academic-years/:id
- * GET    /academic-years/current
  */
 
 import api from '@/lib/api';
@@ -191,17 +190,18 @@ export const academicYearService = {
    */
   getOptions: async (instituteId, onlyActive = true) => {
     try {
-      const response = await api.get('/academic-years/options', {
-        params: { 
-          institute_id: instituteId,
-          only_active: onlyActive 
-        }
-      });
-      return response.data;
+      const params = { institute_id: instituteId, limit: 100, sortBy: 'start_date', sortOrder: 'DESC' };
+      if (onlyActive) params.is_active = true;
+      const response = await api.get('/academic-years', { params });
+      const years = (response.data?.data || []).map(y => ({
+        value: y.id,
+        label: y.name,
+        is_current: y.is_current
+      }));
+      return { data: years };
     } catch (error) {
       console.error('Error fetching academic year options:', error);
-      // Return formatted options from dummy data
-      const years = DUMMY_ACADEMIC_YEARS.filter(y => 
+      const years = DUMMY_ACADEMIC_YEARS.filter(y =>
         onlyActive ? y.is_active : true
       ).map(y => ({
         value: y.id,

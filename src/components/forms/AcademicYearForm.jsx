@@ -2,11 +2,10 @@
  * AcademicYearForm — Create / Edit academic year
  * ─────────────────────────────────────────────────────────────────
  * Props:
- *   defaultValues  object          Pre-filled values for edit mode
- *   onSubmit       (data) => void  Called with form data
+ *   defaultValues  object
+ *   onSubmit       (data) => void
  *   onCancel       () => void
  *   loading        boolean
- *   instituteId    string          Current institute ID
  *   isEdit         boolean
  */
 'use client';
@@ -179,59 +178,21 @@ export default function AcademicYearForm({
         register={register}
         error={errors.description}
         placeholder="Optional notes about this academic year"
-        rows={3}
+        rows={2}
+      />
+      <SwitchField
+        label="Set as Current Year"
+        name="is_current"
+        control={control}
+        hint="Only one academic year can be current at a time"
       />
 
-      {/* Current Year Switch */}
-      <div className="flex items-center justify-between rounded-lg border p-4">
-        <div className="space-y-0.5">
-          <Label htmlFor="is_current" className="text-base font-medium">
-            Set as Current Year
-          </Label>
-          <p className="text-sm text-muted-foreground">
-            Only one academic year can be current at a time
-          </p>
-        </div>
-        <Switch
-          id="is_current"
-          checked={isCurrent}
-          onCheckedChange={(checked) => setValue('is_current', checked)}
-        />
-      </div>
-
-      {/* Warning if current year already exists */}
-      {currentYearExists && (
-        <Alert className="border-yellow-500 bg-yellow-50">
-          <AlertCircle className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-700">
-            There is already a current academic year. Setting this as current will automatically 
-            demote the existing current year.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Duration Info */}
-      {startDate && endDate && !dateError && (
-        <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4" />
-            <span>
-              Duration: {Math.ceil(Math.abs(new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))} days
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Form Actions */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <FormSubmitButton
           loading={loading}
-          label={isEdit ? 'Save Changes' : 'Create Academic Year'}
+          label={isEdit ? 'Save Changes' : 'Create Year'}
           loadingLabel={isEdit ? 'Saving…' : 'Creating…'}
-          disabled={!!dateError}
         />
       </div>
     </form>

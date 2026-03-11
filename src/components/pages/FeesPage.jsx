@@ -103,8 +103,13 @@ export default function FeesPage({ type }) {
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => { const s = getValue(); return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_COLORS[s])}>{s}</span>; } },
     { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
       <div className="flex items-center justify-end gap-1">
+<<<<<<< HEAD
+        {canDo('fee.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
+        {canDo('fee.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+=======
         {canDo('fees.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
         {canDo('fees.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
       </div>
     )},
   ], [canDo, terms.student]);
@@ -120,7 +125,11 @@ export default function FeesPage({ type }) {
       <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No fee records found"
         search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder={`Search ${terms.students.toLowerCase()}…`}
         filters={[{ name:'status', label:'Status', value:status, onChange:(v) => { setStatus(v); setPage(1); }, options:STATUS_OPTS }]}
+<<<<<<< HEAD
+        action={canDo('fee.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add Fee</button> : null}
+=======
         action={canDo('fees.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add Fee</button> : null}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
         enableColumnVisibility
         exportConfig={{ fileName: 'fee-records' }}
         pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />

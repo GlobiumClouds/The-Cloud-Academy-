@@ -88,8 +88,13 @@ export default function RolesPage({ type }) {
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', getValue() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}>{getValue()}</span> },
     { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
       <div className="flex items-center justify-end gap-1">
+<<<<<<< HEAD
+        {canDo('role.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
+        {canDo('role.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+=======
         {canDo('roles.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
         {canDo('roles.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
       </div>
     )},
   ], [canDo]);
@@ -105,7 +110,11 @@ export default function RolesPage({ type }) {
       <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No roles found"
         search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder="Search roles…"
         filters={[{ name:'status', label:'Status', value:status, onChange:(v) => { setStatus(v); setPage(1); }, options:STATUS_OPTS }]}
+<<<<<<< HEAD
+        action={canDo('role.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New Role</button> : null}
+=======
         action={canDo('roles.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New Role</button> : null}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
         enableColumnVisibility
         exportConfig={{ fileName: 'roles' }}
         pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />

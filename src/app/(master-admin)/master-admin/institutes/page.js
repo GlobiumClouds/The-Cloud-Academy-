@@ -252,7 +252,6 @@ export default function MasterAdminInstitutesPage() {
       subscription_status: statusFilter || undefined,
       institute_type_id:   typeFilter   || undefined,
     }),
-    
     staleTime: 0,
   });
 

@@ -276,10 +276,17 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     );
   }
 
+<<<<<<< HEAD
+  if (isEdit && !canDo('student.update')) {
+    return <div className="py-20 text-center text-muted-foreground">You don't have permission to edit {studentLabel.toLowerCase()}s.</div>;
+  }
+  if (!isEdit && !canDo('student.create')) {
+=======
   if (isEdit && !canDo('students.update')) {
     return <div className="py-20 text-center text-muted-foreground">You don't have permission to edit {studentLabel.toLowerCase()}s.</div>;
   }
   if (!isEdit && !canDo('students.create')) {
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
     return <div className="py-20 text-center text-muted-foreground">You don't have permission to add {studentLabel.toLowerCase()}s.</div>;
   }
 
@@ -400,6 +407,8 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     </form>
   );
 }
+<<<<<<< HEAD
+=======
 
 
 
@@ -407,3 +416,4 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
 
 
 
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c

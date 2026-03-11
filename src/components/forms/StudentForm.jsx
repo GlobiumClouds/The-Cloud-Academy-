@@ -1,24 +1,15 @@
-// ── Student Form Component ─────────────────────────────────────────────────
-// src/components/forms/StudentForm.jsx
-// /**
-//  * StudentForm — Create / Edit student
-//  * ─────────────────────────────────────────────────────────────────
-//  * Props:
-//  *   defaultValues      object          Pre-filled values for edit mode
-//  *   onSubmit           (data) => void  Called with form data
-//  *   onCancel           () => void
-//  *   loading            boolean
-//  *   classOptions       { value, label }[]
-//  *   sectionOptions     { value, label }[]
-//  *   academicYearOptions { value, label }[]
-//  *   courseOptions      { value, label }[] (for coaching/academy)
-//  *   batchOptions       { value, label }[] (for coaching/academy)
-//  *   programOptions     { value, label }[] (for college/university)
-//  *   instituteType      string           'school' | 'coaching' | 'academy' | 'college' | 'university' | 'tuition_center'
-//  *   isEdit             boolean
-//  */
 /**
- * StudentForm — Create / Edit student (Fully Responsive)
+ * StudentForm — Create / Edit student
+ * ─────────────────────────────────────────────────────────────────
+ * Props:
+ *   defaultValues      object          Pre-filled values for edit mode
+ *   onSubmit           (data) => void  Called with form data
+ *   onCancel           () => void
+ *   loading            boolean
+ *   classOptions       { value, label }[]
+ *   sectionOptions     { value, label }[]
+ *   academicYearOptions{ value, label }[]
+ *   isEdit             boolean
  */
 'use client';
 
