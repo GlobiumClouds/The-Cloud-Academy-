@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import BranchesPage from '@/components/pages/BranchesPage';
-const VALID_TYPES = ['school','coaching','academy','college','university'];
+const VALID_TYPES = ['school','coaching','academy','college','university','tuition_center'];
 export async function generateStaticParams() { return VALID_TYPES.map((type) => ({ type })); }
 export default async function Branches({ params }) {
   const { type } = await params;
@@ -9,5 +9,6 @@ export default async function Branches({ params }) {
 }
 export async function generateMetadata({ params }) {
   const { type } = await params;
-  return { title: type === 'university' ? 'Campuses' : 'Branches' };
+  const l = { school:'Branches', coaching:'Branches', academy:'Branches', college:'Branches', university:'Campuses', tuition_center: 'Branches',};
+  return { title: l[type] ?? 'Branches' };
 }

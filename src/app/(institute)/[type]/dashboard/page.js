@@ -8,7 +8,7 @@
 import { notFound } from 'next/navigation';
 import DashboardPage from '@/components/pages/DashboardPage';
 
-const VALID_TYPES = ['school', 'coaching', 'academy', 'college', 'university'];
+const VALID_TYPES = ['school', 'coaching', 'academy', 'college', 'university', 'tuition_center'];
 
 export async function generateStaticParams() {
   return VALID_TYPES.map((type) => ({ type }));
@@ -28,6 +28,7 @@ export async function generateMetadata({ params }) {
     academy:    'Academy Dashboard',
     college:    'College Dashboard',
     university: 'University Dashboard',
+    tuition_center: 'Tuition Center Dashboard',
   };
   return { title: labels[type] ?? 'Dashboard' };
 }
