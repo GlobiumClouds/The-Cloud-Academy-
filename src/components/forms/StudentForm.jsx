@@ -1,20 +1,24 @@
-
+// ── Student Form Component ─────────────────────────────────────────────────
+// src/components/forms/StudentForm.jsx
+// /**
+//  * StudentForm — Create / Edit student
+//  * ─────────────────────────────────────────────────────────────────
+//  * Props:
+//  *   defaultValues      object          Pre-filled values for edit mode
+//  *   onSubmit           (data) => void  Called with form data
+//  *   onCancel           () => void
+//  *   loading            boolean
+//  *   classOptions       { value, label }[]
+//  *   sectionOptions     { value, label }[]
+//  *   academicYearOptions { value, label }[]
+//  *   courseOptions      { value, label }[] (for coaching/academy)
+//  *   batchOptions       { value, label }[] (for coaching/academy)
+//  *   programOptions     { value, label }[] (for college/university)
+//  *   instituteType      string           'school' | 'coaching' | 'academy' | 'college' | 'university' | 'tuition_center'
+//  *   isEdit             boolean
+//  */
 /**
- * StudentForm — Create / Edit student
- * ─────────────────────────────────────────────────────────────────
- * Props:
- *   defaultValues      object          Pre-filled values for edit mode
- *   onSubmit           (data) => void  Called with form data
- *   onCancel           () => void
- *   loading            boolean
- *   classOptions       { value, label }[]
- *   sectionOptions     { value, label }[]
- *   academicYearOptions { value, label }[]
- *   courseOptions      { value, label }[] (for coaching/academy)
- *   batchOptions       { value, label }[] (for coaching/academy)
- *   programOptions     { value, label }[] (for college/university)
- *   instituteType      string           'school' | 'coaching' | 'academy' | 'college' | 'university' | 'tuition_center'
- *   isEdit             boolean
+ * StudentForm — Create / Edit student (Fully Responsive)
  */
 'use client';
 
@@ -31,8 +35,9 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { PlusCircle, X, Upload } from 'lucide-react';
-import { GENDER_OPTIONS , RELIGION_OPTIONS, RELATIONSHIP_OPTIONS, DOCUMENT_TYPES,BLOOD_GROUP_OPTIONS} from '@/constants';
+import { PlusCircle, X, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { GENDER_OPTIONS, RELIGION_OPTIONS, BLOOD_GROUP_OPTIONS, DOCUMENT_TYPES } from '@/constants';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 export default function StudentForm({
   defaultValues = {},
@@ -50,6 +55,8 @@ export default function StudentForm({
 }) {
   const [activeTab, setActiveTab] = useState('personal');
   const [documents, setDocuments] = useState(defaultValues.documents || []);
+  const isMobile = useMediaQuery('(max-width: 640px)');
+  const isTablet = useMediaQuery('(max-width: 1024px)');
   
   const {
     register,
@@ -62,7 +69,6 @@ export default function StudentForm({
     defaultValues: {
       documents: [],
       ...defaultValues,
-      // Ensure details object exists
       details: {
         studentDetails: {
           ...defaultValues.details?.studentDetails,
@@ -71,19 +77,26 @@ export default function StudentForm({
     } 
   });
 
-  // Helper to set nested fields
-  const setNestedValue = (path, value) => {
-    const keys = path.split('.');
-    const lastKey = keys.pop();
-    const obj = keys.reduce((acc, key) => acc[key] || {}, watch());
-    setValue(`${keys.join('.')}.${lastKey}`, value);
+  // Mobile tab navigation
+  const nextTab = () => {
+    const tabs = ['personal', 'academic', 'guardian', 'contact', 'fee', 'documents'];
+    const currentIndex = tabs.indexOf(activeTab);
+    if (currentIndex < tabs.length - 1) {
+      setActiveTab(tabs[currentIndex + 1]);
+    }
+  };
+
+  const prevTab = () => {
+    const tabs = ['personal', 'academic', 'guardian', 'contact', 'fee', 'documents'];
+    const currentIndex = tabs.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(tabs[currentIndex - 1]);
+    }
   };
 
   // Document handlers
   const handleDocumentUpload = (e) => {
     const files = Array.from(e.target.files);
-    // In real implementation, you'd upload to cloud storage first
-    // Here we're just simulating with local object URLs
     const newDocs = files.map(file => ({
       id: Date.now() + Math.random(),
       type: 'other',
@@ -107,10 +120,12 @@ export default function StudentForm({
 
   // Render academic fields based on institute type
   const renderAcademicFields = () => {
+    const fieldClass = isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-3';
+    
     switch(instituteType) {
       case 'school':
         return (
-          <>
+          <div className={`grid grid-cols-1 gap-4 ${isMobile ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
             <SelectField 
               label="Class" 
               name="details.studentDetails.class_id" 
@@ -142,13 +157,13 @@ export default function StudentForm({
               error={errors.details?.studentDetails?.previous_school} 
               placeholder="Previous school name" 
             />
-          </>
+          </div>
         );
       
       case 'college':
       case 'university':
         return (
-          <>
+          <div className={`grid grid-cols-1 gap-4 ${isMobile ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
             <SelectField 
               label="Program" 
               name="details.studentDetails.program_id" 
@@ -184,13 +199,13 @@ export default function StudentForm({
               error={errors.details?.studentDetails?.specialization} 
               placeholder="e.g. Computer Science" 
             />
-          </>
+          </div>
         );
       
       case 'coaching':
       case 'academy':
         return (
-          <>
+          <div className={`grid grid-cols-1 gap-4 ${isMobile ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
             <SelectField 
               label="Course" 
               name="details.studentDetails.course_id" 
@@ -213,14 +228,14 @@ export default function StudentForm({
               name="details.studentDetails.target_exam" 
               register={register} 
               error={errors.details?.studentDetails?.target_exam} 
-              placeholder="e.g. MDCAT, CSS, etc." 
+              placeholder="e.g. MDCAT, CSS" 
             />
-          </>
+          </div>
         );
       
       case 'tuition_center':
         return (
-          <>
+          <div className={`grid grid-cols-1 gap-4 ${isMobile ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
             <InputField 
               label="Grade/Class" 
               name="details.studentDetails.grade" 
@@ -245,7 +260,7 @@ export default function StudentForm({
               name="details.studentDetails.subjects" 
               register={register} 
               error={errors.details?.studentDetails?.subjects} 
-              placeholder="e.g. Math, Physics (comma separated)" 
+              placeholder="e.g. Math, Physics" 
             />
             <InputField 
               label="Preferred Timings" 
@@ -254,7 +269,7 @@ export default function StudentForm({
               error={errors.details?.studentDetails?.timings} 
               placeholder="e.g. 4-6 PM" 
             />
-          </>
+          </div>
         );
       
       default:
@@ -263,30 +278,19 @@ export default function StudentForm({
   };
 
   const onSubmitForm = (data) => {
-    // Format data before submitting
     const formattedData = {
       ...data,
       user_type: 'STUDENT',
-      // Ensure registration_no is set for login
       registration_no: data.registration_no || data.gr_number,
-      // Combine all details into the details.studentDetails object
       details: {
         studentDetails: {
           ...data.details?.studentDetails,
-          // Academic fields
-          class_id: data.details?.studentDetails?.class_id,
-          section_id: data.details?.studentDetails?.section_id,
-          course_id: data.details?.studentDetails?.course_id,
-          batch_id: data.details?.studentDetails?.batch_id,
-          program_id: data.details?.studentDetails?.program_id,
-          // Personal info
           date_of_birth: data.dob,
           gender: data.gender,
           blood_group: data.blood_group,
           religion: data.religion,
           nationality: data.nationality,
           cnic: data.cnic,
-          // Guardian info
           father_name: data.father_name,
           father_cnic: data.father_cnic,
           father_phone: data.father_phone,
@@ -296,51 +300,68 @@ export default function StudentForm({
           guardian_name: data.guardian_name,
           guardian_relation: data.guardian_relation,
           guardian_phone: data.guardian_phone,
-          // Address
           present_address: data.present_address,
           permanent_address: data.permanent_address,
           city: data.city,
-          // Medical
           medical_conditions: data.medical_conditions,
           allergies: data.allergies,
-          // Fee info
           fee_plan_id: data.fee_plan_id,
           monthly_fee: data.monthly_fee,
           concession_type: data.concession_type,
           concession_percentage: data.concession_percentage,
-          // Admission info
           admission_date: data.admission_date,
           previous_school: data.previous_school,
         }
       },
-      // Documents array
       documents: documents,
     };
     
     onSubmit(formattedData);
   };
 
+  // Responsive tabs list - horizontal scroll on mobile
+  const renderTabsList = () => {
+    if (isMobile) {
+      return (
+        <div className="overflow-x-auto pb-2 mb-4">
+          <TabsList className="inline-flex w-auto min-w-full">
+            <TabsTrigger value="personal" className="px-3 py-1.5 text-xs">Personal</TabsTrigger>
+            <TabsTrigger value="academic" className="px-3 py-1.5 text-xs">Academic</TabsTrigger>
+            <TabsTrigger value="guardian" className="px-3 py-1.5 text-xs">Guardian</TabsTrigger>
+            <TabsTrigger value="contact" className="px-3 py-1.5 text-xs">Contact</TabsTrigger>
+            <TabsTrigger value="fee" className="px-3 py-1.5 text-xs">Fee</TabsTrigger>
+            <TabsTrigger value="documents" className="px-3 py-1.5 text-xs">Docs</TabsTrigger>
+          </TabsList>
+        </div>
+      );
+    }
+    
+    return (
+      <TabsList className={`grid grid-cols-6 mb-6 ${isTablet ? 'text-sm' : ''}`}>
+        <TabsTrigger value="personal">Personal</TabsTrigger>
+        <TabsTrigger value="academic">Academic</TabsTrigger>
+        <TabsTrigger value="guardian">Guardian</TabsTrigger>
+        <TabsTrigger value="contact">Contact</TabsTrigger>
+        <TabsTrigger value="fee">Fee</TabsTrigger>
+        <TabsTrigger value="documents">Docs</TabsTrigger>
+      </TabsList>
+    );
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4 sm:space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-6 mb-6">
-          <TabsTrigger value="personal">Personal</TabsTrigger>
-          <TabsTrigger value="academic">Academic</TabsTrigger>
-          <TabsTrigger value="guardian">Guardian</TabsTrigger>
-          <TabsTrigger value="contact">Contact</TabsTrigger>
-          <TabsTrigger value="fee">Fee</TabsTrigger>
-          <TabsTrigger value="documents">Docs</TabsTrigger>
-        </TabsList>
+        {renderTabsList()}
 
         {/* Tab 1: Personal Information */}
         <TabsContent value="personal">
           <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-5">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Basic Information
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField 
                     label="First Name" 
                     name="first_name" 
@@ -358,7 +379,7 @@ export default function StudentForm({
                     placeholder="e.g. Ali" 
                   />
                   <InputField 
-                    label="GR/Registration No"  
+                    label="GR/Reg No"  
                     name="registration_no"  
                     register={register} 
                     error={errors.registration_no}  
@@ -421,12 +442,12 @@ export default function StudentForm({
         {/* Tab 2: Academic Information */}
         <TabsContent value="academic">
           <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-5">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Academic Details ({instituteType.replace('_', ' ').toUpperCase()})
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <SelectField 
                     label="Academic Year" 
                     name="details.studentDetails.academic_year_id" 
@@ -450,10 +471,10 @@ export default function StudentForm({
                     error={errors.details?.studentDetails?.roll_no} 
                     placeholder="e.g. 101" 
                   />
-                  
-                  {/* Institute-specific academic fields */}
-                  {renderAcademicFields()}
                 </div>
+                
+                {/* Institute-specific academic fields */}
+                {renderAcademicFields()}
               </div>
             </CardContent>
           </Card>
@@ -462,12 +483,12 @@ export default function StudentForm({
         {/* Tab 3: Guardian Information */}
         <TabsContent value="guardian">
           <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-5">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Father's Information
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField 
                     label="Father's Name" 
                     name="father_name" 
@@ -510,10 +531,10 @@ export default function StudentForm({
 
                 <Separator className="my-4" />
 
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Mother's Information
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField 
                     label="Mother's Name" 
                     name="mother_name" 
@@ -547,10 +568,10 @@ export default function StudentForm({
 
                 <Separator className="my-4" />
 
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Guardian Information (if different from parents)
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Guardian Information
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField 
                     label="Guardian Name" 
                     name="guardian_name" 
@@ -559,7 +580,7 @@ export default function StudentForm({
                     placeholder="e.g. Aslam Khan" 
                   />
                   <InputField 
-                    label="Relation with Guardian" 
+                    label="Relation" 
                     name="guardian_relation" 
                     register={register} 
                     error={errors.guardian_relation} 
@@ -589,12 +610,12 @@ export default function StudentForm({
         {/* Tab 4: Contact Information */}
         <TabsContent value="contact">
           <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-5">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Contact Details
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
                   <InputField 
                     label="Phone Number" 
                     name="phone" 
@@ -644,7 +665,7 @@ export default function StudentForm({
                   error={errors.present_address} 
                   required 
                   placeholder="Full residential address" 
-                  rows={2} 
+                  rows={isMobile ? 2 : 2} 
                 />
 
                 <TextareaField 
@@ -653,15 +674,15 @@ export default function StudentForm({
                   register={register} 
                   error={errors.permanent_address} 
                   placeholder="If different from present address" 
-                  rows={2} 
+                  rows={isMobile ? 2 : 2} 
                 />
 
                 <Separator className="my-4" />
 
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Emergency Contact
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField 
                     label="Contact Person" 
                     name="emergency_contact_name" 
@@ -693,14 +714,14 @@ export default function StudentForm({
         {/* Tab 5: Fee Information */}
         <TabsContent value="fee">
           <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-5">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Fee Details
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField 
-                    label="Fee Plan ID" 
+                    label="Fee Plan" 
                     name="fee_plan_id" 
                     register={register} 
                     error={errors.fee_plan_id} 
@@ -715,7 +736,7 @@ export default function StudentForm({
                     placeholder="e.g. 5000" 
                   />
                   <InputField 
-                    label="Admission Fee Paid" 
+                    label="Admission Fee" 
                     name="admission_fee" 
                     register={register} 
                     error={errors.admission_fee} 
@@ -733,7 +754,7 @@ export default function StudentForm({
                       { value: 'discount', label: 'Discount' },
                       { value: 'waiver', label: 'Fee Waiver' }
                     ]} 
-                    placeholder="Select concession type" 
+                    placeholder="Select type" 
                   />
                   <InputField 
                     label="Concession %" 
@@ -748,24 +769,24 @@ export default function StudentForm({
                     name="concession_reason" 
                     register={register} 
                     error={errors.concession_reason} 
-                    placeholder="Reason for concession/scholarship" 
-                    rows={1} 
+                    placeholder="Reason for concession" 
+                    rows={isMobile ? 1 : 1} 
                   />
                 </div>
 
                 <Separator className="my-4" />
 
-                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Medical Information
                 </p>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
                   <TextareaField 
                     label="Medical Conditions" 
                     name="medical_conditions" 
                     register={register} 
                     error={errors.medical_conditions} 
-                    placeholder="Any medical conditions we should know about" 
-                    rows={2} 
+                    placeholder="Any medical conditions" 
+                    rows={isMobile ? 2 : 2} 
                   />
                   <TextareaField 
                     label="Allergies" 
@@ -773,7 +794,7 @@ export default function StudentForm({
                     register={register} 
                     error={errors.allergies} 
                     placeholder="Any allergies" 
-                    rows={2} 
+                    rows={isMobile ? 2 : 2} 
                   />
                 </div>
               </div>
@@ -784,13 +805,13 @@ export default function StudentForm({
         {/* Tab 6: Documents */}
         <TabsContent value="documents">
           <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                     Uploaded Documents
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="w-full sm:w-auto">
                     <input
                       type="file"
                       id="document-upload"
@@ -801,7 +822,8 @@ export default function StudentForm({
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size={isMobile ? "default" : "sm"}
+                      className="w-full sm:w-auto"
                       onClick={() => document.getElementById('document-upload').click()}
                     >
                       <Upload className="h-4 w-4 mr-2" />
@@ -811,23 +833,21 @@ export default function StudentForm({
                 </div>
 
                 {documents.length === 0 ? (
-                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                    <p className="text-muted-foreground">No documents uploaded yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Click the button above to upload student documents
+                  <div className="text-center py-6 sm:py-8 border-2 border-dashed rounded-lg">
+                    <p className="text-sm text-muted-foreground">No documents uploaded yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Click the button above to upload
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {documents.map((doc, index) => (
-                      <div key={doc.id || index} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1">
-                            <p className="font-medium">{doc.file_name || doc.title || 'Document'}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Uploaded: {new Date(doc.uploaded_at).toLocaleString()}
-                            </p>
-                          </div>
+                      <div key={doc.id || index} className="flex items-center justify-between p-2 sm:p-3 border rounded-lg">
+                        <div className="flex-1 min-w-0 mr-2">
+                          <p className="font-medium text-sm truncate">{doc.file_name || doc.title || 'Document'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(doc.uploaded_at).toLocaleDateString()}
+                          </p>
                         </div>
                         <Button
                           type="button"
@@ -843,7 +863,7 @@ export default function StudentForm({
                 )}
 
                 <SelectField 
-                  label="Document Type (for next upload)" 
+                  label="Document Type" 
                   name="next_document_type" 
                   control={control} 
                   options={DOCUMENT_TYPES} 
@@ -855,15 +875,45 @@ export default function StudentForm({
         </TabsContent>
       </Tabs>
 
+      {/* Mobile Navigation */}
+      {isMobile && (
+        <div className="flex justify-between items-center gap-2 pt-2">
+          <Button 
+            type="button" 
+            variant="outline" 
+            size="sm"
+            onClick={prevTab}
+            disabled={activeTab === 'personal'}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+          </span>
+          <Button 
+            type="button" 
+            variant="outline" 
+            size="sm"
+            onClick={nextTab}
+            disabled={activeTab === 'documents'}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
+
       {/* Form Actions */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
-        <Button type="button" variant="outline" onClick={onCancel}>
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t">
+        <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
           Cancel
         </Button>
         <FormSubmitButton
           loading={loading}
           label={isEdit ? 'Save Changes' : 'Add Student'}
           loadingLabel={isEdit ? 'Saving…' : 'Adding…'}
+          className="w-full sm:w-auto"
         />
       </div>
     </form>

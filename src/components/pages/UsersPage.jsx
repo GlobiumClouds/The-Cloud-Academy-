@@ -155,7 +155,7 @@ export default function UsersPage({ type }) {
           <>
             <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
             <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
+              {remove.isPending ? 'Deleting' : 'Delete'}
             </button>
           </>
         }>
