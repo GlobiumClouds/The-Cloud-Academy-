@@ -1,3 +1,4 @@
+//src/app/(master-admin)/master-admin/subscriptions/page.js
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -9,10 +10,11 @@ import {
 import { toast } from 'sonner';
 
 import { masterAdminService } from '@/services';
-import { PageHeader, AppModal, StatsCard, DataTable } from '@/components/common';
+import { PageHeader, AppModal, StatsCard, DataTable, SelectField } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useForm } from 'react-hook-form';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -56,9 +58,13 @@ export default function MasterAdminInvoicesPage() {
   const [page,         setPage]         = useState(1);
   const [payModal,     setPayModal]     = useState(null);
   const [payForm,      setPayForm]      = useState({
-    payment_method: 'MANUAL',
     payment_reference: '',
     notes: '',
+  });
+
+  // react-hook-form for SelectField
+  const { control, watch, reset } = useForm({
+    defaultValues: { payment_method: 'MANUAL' },
   });
 
   // ── Fetch all invoices ────────────────────────────────────────────────────
@@ -75,7 +81,7 @@ export default function MasterAdminInvoicesPage() {
         limit: 15,
       }),
     staleTime: 0,
-    refetchOnWindowFocus: true,
+    // refetchOnWindowFocus: true,
   });
 
   const invoices   = data?.data?.rows       ?? data?.rows       ?? [];
@@ -90,19 +96,32 @@ export default function MasterAdminInvoicesPage() {
       qc.invalidateQueries({ queryKey: ['all-invoices'] });
       toast.success('Invoice marked as paid ✅');
       setPayModal(null);
-      setPayForm({ payment_method: 'MANUAL', payment_reference: '', notes: '' });
+      setPayForm({ payment_reference: '', notes: '' });
+      reset({ payment_method: 'MANUAL' });
     },
     onError: (e) => toast.error(e?.response?.data?.message ?? e.message ?? 'Failed'),
   });
 
   const openPayModal = (inv) => {
     setPayModal(inv);
-    setPayForm({ payment_method: 'MANUAL', payment_reference: '', notes: '' });
+    setPayForm({ payment_reference: '', notes: '' });
+    // ensure SelectField defaults to MANUAL on open
+    reset({ payment_method: 'MANUAL' });
   };
 
   const handleStatusChange = (s) => { setStatusFilter(s); setPage(1); };
   const handleDateFrom     = (v) => { setDateFrom(v);     setPage(1); };
   const handleDateTo       = (v) => { setDateTo(v);       setPage(1); };
+
+  const handleConfirmPaid = () => {
+    if (!payModal) return;
+    const payload = {
+      payment_method: watch('payment_method'),
+      payment_reference: payForm.payment_reference,
+      notes: payForm.notes,
+    };
+    markPaidMutation.mutate({ id: payModal.id, formData: payload });
+  };
 
   // ── Column Definitions ────────────────────────────────────────────────────
   const columns = useMemo(() => [
@@ -317,7 +336,10 @@ export default function MasterAdminInvoicesPage() {
       {payModal && (
         <AppModal
           open={!!payModal}
-          onClose={() => setPayModal(null)}
+          onClose={() => {
+            setPayModal(null);
+            reset({ payment_method: 'MANUAL' });
+          }}
           title="✅ Mark Invoice as Paid"
           description={`${payModal.invoice_number ?? 'Invoice'} — ${payModal.institute?.institute_name ?? ''}`}
           size="sm"
@@ -325,13 +347,16 @@ export default function MasterAdminInvoicesPage() {
             <>
               <Button
                 variant="outline"
-                onClick={() => setPayModal(null)}
+                onClick={() => {
+                  setPayModal(null);
+                  reset({ payment_method: 'MANUAL' });
+                }}
                 disabled={markPaidMutation.isPending}
               >
                 Cancel
               </Button>
               <Button
-                onClick={() => markPaidMutation.mutate({ id: payModal.id, formData: payForm })}
+                onClick={handleConfirmPaid}
                 disabled={markPaidMutation.isPending}
                 className="gap-1.5 min-w-[130px]"
               >
@@ -362,20 +387,15 @@ export default function MasterAdminInvoicesPage() {
               </div>
             </div>
 
-            {/* Payment method */}
+            {/* Payment method (SelectField controlled by react-hook-form) */}
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Payment Method
-              </label>
-              <select
-                value={payForm.payment_method}
-                onChange={(e) => setPayForm((p) => ({ ...p, payment_method: e.target.value }))}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {PAYMENT_METHODS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              <SelectField
+                label="Payment Method"
+                name="payment_method"
+                control={control}
+                options={PAYMENT_METHODS}
+                required
+              />
             </div>
 
             {/* Reference */}
@@ -384,11 +404,11 @@ export default function MasterAdminInvoicesPage() {
                 Reference / Transaction ID{' '}
                 <span className="font-normal">(optional)</span>
               </label>
-              <input
+              <Input
                 value={payForm.payment_reference}
                 onChange={(e) => setPayForm((p) => ({ ...p, payment_reference: e.target.value }))}
                 placeholder="e.g. TXN-20240101-001"
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-9"
               />
             </div>
 

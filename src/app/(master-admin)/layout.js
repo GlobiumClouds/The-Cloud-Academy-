@@ -28,7 +28,7 @@ const NAV = [
   { href: '/master-admin/subscription-templates', label: 'Sub. Templates',  icon: FileText,        perm: 'sub_template.read'      },
   { href: '/master-admin/institutes',                label: 'Institutes',      icon: Building2,       perm: 'institute.read'         },
   // { href: '/master-admin/users',                  label: 'Users',           icon: Users,           perm: 'platform_user.read'     },
-  { href: '/master-admin/subscriptions',          label: 'Subscriptions',   icon: CreditCard,      perm: 'subscription.read'      },
+  { href: '/master-admin/subscriptions',          label: 'Invoices',   icon: CreditCard,      perm: 'subscription.read'      },
   { href: '/master-admin/emails',                 label: 'Bulk Emails',     icon: Mail,            perm: 'email.view_history'     },
   { href: '/master-admin/reports',                label: 'Reports',         icon: BarChart3,       perm: 'report.platform_overview'},
   { href: '/master-admin/notifications',          label: 'Notifications',   icon: BellRing,        perm: 'notification.broadcast' },
