@@ -15,6 +15,10 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { Plus, Eye, Pencil, Trash2 } from 'lucide-react';
+<<<<<<< HEAD
+=======
+import { toast } from 'sonner';
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
@@ -22,6 +26,11 @@ import { studentService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
+<<<<<<< HEAD
+=======
+import StudentForm from '@/components/forms/StudentForm';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 import { cn } from '@/lib/utils';
 import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
 
@@ -66,24 +75,41 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete) {
             className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
             title="View"
           >
+<<<<<<< HEAD
             <Eye size={13} /> View
           </button>
           {canDo('student.update') && (
+=======
+            <Eye size={13} />
+          </button>
+          {canDo('students.update') && (
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
             <button
               onClick={() => router.push(`/${type}/students/${stu.id}/edit`)}
               className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
               title="Edit"
             >
+<<<<<<< HEAD
               <Pencil size={13} /> Edit
             </button>
           )}
           {canDo('student.delete') && (
+=======
+              <Pencil size={13} />
+            </button>
+          )}
+          {canDo('students.delete') && (
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
             <button
               onClick={() => onDelete(stu)}
               className="flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
               title="Delete"
             >
+<<<<<<< HEAD
               <Trash2 size={13} /> Delete
+=======
+              <Trash2 size={13} />
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
             </button>
           )}
         </div>
@@ -107,6 +133,7 @@ export default function StudentsPage({ type }) {
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleting, setDeleting] = useState(null);
+<<<<<<< HEAD
 
   const remove = useMutation({
     mutationFn: async (id) => {
@@ -114,6 +141,98 @@ export default function StudentsPage({ type }) {
       catch { return { success: true }; }
     },
     onSuccess: () => { toast && toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['students'] }); setDeleting(null); },
+=======
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Fetch classes/sections etc for form
+  const { data: classOptions = [] } = useQuery({
+    queryKey: ['classes', type],
+    queryFn: async () => {
+      try {
+        const res = await fetch(`/api/${type}/classes`);
+        const data = await res.json();
+        return data.map(c => ({ value: c.id, label: c.name }));
+      } catch {
+        // Dummy data
+        return [
+          { value: '1', label: 'Class 1' },
+          { value: '2', label: 'Class 2' },
+          { value: '3', label: 'Class 3' },
+        ];
+      }
+    },
+    enabled: isAddModalOpen, // Only fetch when modal opens
+  });
+
+  const { data: sectionOptions = [] } = useQuery({
+    queryKey: ['sections', type],
+    queryFn: async () => {
+      try {
+        const res = await fetch(`/api/${type}/sections`);
+        const data = await res.json();
+        return data.map(s => ({ value: s.id, label: s.name }));
+      } catch {
+        return [
+          { value: 'A', label: 'Section A' },
+          { value: 'B', label: 'Section B' },
+          { value: 'C', label: 'Section C' },
+        ];
+      }
+    },
+    enabled: isAddModalOpen,
+  });
+
+  const { data: academicYearOptions = [] } = useQuery({
+    queryKey: ['academicYears', type],
+    queryFn: async () => {
+      try {
+        const res = await fetch(`/api/${type}/academic-years`);
+        const data = await res.json();
+        return data.map(y => ({ value: y.id, label: y.name }));
+      } catch {
+        return [
+          { value: '2024', label: '2024-2025' },
+          { value: '2023', label: '2023-2024' },
+        ];
+      }
+    },
+    enabled: isAddModalOpen,
+  });
+
+  const addStudent = useMutation({
+    mutationFn: async (data) => {
+      try {
+        return await studentService.create(data, type);
+      } catch {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return { success: true, id: Math.random().toString() };
+      }
+    },
+    onSuccess: () => {
+      toast.success(`${terms.student} added successfully`);
+      setIsAddModalOpen(false);
+      qc.invalidateQueries({ queryKey: ['students', type] });
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to add ${terms.student}`);
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id) => {
+      try { 
+        return await studentService.delete(id, type); 
+      } catch { 
+        return { success: true }; 
+      }
+    },
+    onSuccess: () => { 
+      toast.success('Deleted'); 
+      qc.invalidateQueries({ queryKey: ['students', type] }); 
+      setDeleting(null); 
+    },
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
   });
 
   const filters = useMemo(() => ({
@@ -123,8 +242,14 @@ export default function StudentsPage({ type }) {
   const { data, isLoading } = useQuery({
     queryKey: ['students', type, filters],
     queryFn:  async () => {
+<<<<<<< HEAD
       try { return await studentService.getAll(filters, type); }
       catch {
+=======
+      try { 
+        return await studentService.getAll(filters, type); 
+      } catch {
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
         const d = DUMMY_FLAT_STUDENTS.filter(r =>
           (!filters.search || `${r.first_name} ${r.last_name}`.toLowerCase().includes(filters.search.toLowerCase()))
         );
@@ -149,9 +274,19 @@ export default function StudentsPage({ type }) {
     { value: 'false', label: 'Inactive' },
   ];
 
+<<<<<<< HEAD
   const addButton = canDo('student.create') ? (
     <button
       onClick={() => router.push(`/${type}/students/add`)}
+=======
+  const handleAddStudent = (formData) => {
+    addStudent.mutate(formData);
+  };
+
+  const addButton = canDo('students.create') ? (
+    <button
+      onClick={() => setIsAddModalOpen(true)}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
       className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
     >
       <Plus size={14} /> Add {terms.student}
@@ -196,6 +331,7 @@ export default function StudentsPage({ type }) {
         }}
       />
 
+<<<<<<< HEAD
       {/* Delete Confirm */}
       <AppModal open={!!deleting} onClose={() => setDeleting(null)} title="Delete Student" size="sm"
         footer={
@@ -208,6 +344,38 @@ export default function StudentsPage({ type }) {
         }>
         <p className="text-sm text-muted-foreground">Delete <strong>{deleting?.first_name} {deleting?.last_name}</strong>? This cannot be undone.</p>
       </AppModal>
+=======
+      {/* Add Student Modal */}
+      <AppModal
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title={`Add ${terms.student}`}
+        description={`Fill in the details to add a new ${terms.student.toLowerCase()}`}
+        size="xl"
+      >
+        <StudentForm
+          onSubmit={handleAddStudent}
+          onCancel={() => setIsAddModalOpen(false)}
+          loading={addStudent.isPending}
+          classOptions={classOptions}
+          sectionOptions={sectionOptions}
+          academicYearOptions={academicYearOptions}
+          isEdit={false}
+        />
+      </AppModal>
+
+      {/* Delete Confirm */}
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => remove.mutate(deleting?.id)}
+        loading={remove.isPending}
+        title="Delete Student"
+        description={`Are you sure you want to delete ${deleting?.first_name} ${deleting?.last_name}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+      />
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
     </div>
   );
 }
@@ -265,3 +433,10 @@ function StudentCell({ student: s, columnKey }) {
       return <span className="text-sm">{s[columnKey] ?? '—'}</span>;
   }
 }
+<<<<<<< HEAD
+=======
+
+
+
+
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c

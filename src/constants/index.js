@@ -348,6 +348,7 @@ export const SALARY_GRADES = [
   { value: 'G5', label: 'Grade 5 — Administration'   },
 ];
 
+<<<<<<< HEAD
 // ── Relationship options (parent/guardian) ────────────────────────────────
 export const RELATIONSHIP_OPTIONS = [
   { value: 'father',    label: 'Father'    },
@@ -356,3 +357,119 @@ export const RELATIONSHIP_OPTIONS = [
   { value: 'sibling',   label: 'Sibling'   },
   { value: 'other',     label: 'Other'     },
 ];
+=======
+// ── Blood group options ─────────────────────────────────────────────────
+export const BLOOD_GROUP_OPTIONS = [
+  { value: 'A+', label: 'A+' },
+  { value: 'A-', label: 'A-' },
+  { value: 'B+', label: 'B+' },
+  { value: 'B-', label: 'B-' },
+  { value: 'AB+', label: 'AB+' },
+  { value: 'AB-', label: 'AB-' },
+  { value: 'O+', label: 'O+' },
+  { value: 'O-', label: 'O-' },
+];
+
+export const RELIGION_OPTIONS = [
+  { value: 'islam', label: 'Islam' },
+  { value: 'christianity', label: 'Christianity' },
+  { value: 'hinduism', label: 'Hinduism' },
+  { value: 'sikhism', label: 'Sikhism' },
+  { value: 'other', label: 'Other' },
+];
+
+
+export const MARITAL_STATUS_OPTIONS = [
+  { value: 'single', label: 'Single' },
+  { value: 'married', label: 'Married' },
+  { value: 'divorced', label: 'Divorced' },
+  { value: 'widowed', label: 'Widowed' },
+];
+// Relationship Options
+export const RELATIONSHIP_OPTIONS = [
+  { value: 'father', label: 'Father' },
+  { value: 'mother', label: 'Mother' },
+  { value: 'brother', label: 'Brother' },
+  { value: 'sister', label: 'Sister' },
+  { value: 'uncle', label: 'Uncle' },
+  { value: 'aunt', label: 'Aunt' },
+  { value: 'grandfather', label: 'Grandfather' },
+  { value: 'grandmother', label: 'Grandmother' },
+  { value: 'other', label: 'Other' },
+];
+
+// Document Types
+export const DOCUMENT_TYPES = [
+  { value: 'birth_certificate', label: 'Birth Certificate' },
+  { value: 'cnic_b_form', label: 'CNIC / B-Form' },
+  { value: 'previous_education', label: 'Previous Education' },
+  { value: 'degree_certificate', label: 'Degree Certificate' },
+  { value: 'transcript', label: 'Transcript' },
+  { value: 'experience_letter', label: 'Experience Letter' },
+  { value: 'character_certificate', label: 'Character Certificate' },
+  { value: 'domicile', label: 'Domicile' },
+  { value: 'passport_photos', label: 'Passport Photos' },
+  { value: 'father_cnic', label: "Father's CNIC" },
+  { value: 'medical_certificate', label: 'Medical Certificate' },
+  { value: 'other', label: 'Other' },
+];
+
+// Teacher Qualification Options
+export const TEACHER_QUALIFICATION_OPTIONS = [
+  { value: 'phd', label: 'PhD' },
+  { value: 'masters', label: 'Masters' },
+  { value: 'bachelors', label: 'Bachelors' },
+  { value: 'intermediate', label: 'Intermediate' },
+  { value: 'b_ed', label: 'B.Ed' },
+  { value: 'm_ed', label: 'M.Ed' },
+  { value: 'other', label: 'Other' },
+];
+
+// Teacher Designation Options
+export const TEACHER_DESIGNATION_OPTIONS = [
+  { value: 'senior_teacher', label: 'Senior Teacher' },
+  { value: 'subject_specialist', label: 'Subject Specialist' },
+  { value: 'assistant_teacher', label: 'Assistant Teacher' },
+  { value: 'head_teacher', label: 'Head Teacher' },
+  { value: 'coordinator', label: 'Coordinator' },
+  { value: 'lecturer', label: 'Lecturer' },
+  { value: 'assistant_professor', label: 'Assistant Professor' },
+  { value: 'associate_professor', label: 'Associate Professor' },
+  { value: 'professor', label: 'Professor' },
+];
+
+// Teacher Department Options
+export const TEACHER_DEPARTMENT_OPTIONS = [
+  { value: 'science', label: 'Science' },
+  { value: 'mathematics', label: 'Mathematics' },
+  { value: 'english', label: 'English' },
+  { value: 'urdu', label: 'Urdu' },
+  { value: 'islamiat', label: 'Islamiat' },
+  { value: 'computer_science', label: 'Computer Science' },
+  { value: 'physics', label: 'Physics' },
+  { value: 'chemistry', label: 'Chemistry' },
+  { value: 'biology', label: 'Biology' },
+  { value: 'commerce', label: 'Commerce' },
+  { value: 'arts', label: 'Arts' },
+  { value: 'physical_education', label: 'Physical Education' },
+];
+
+// Teacher Status Options
+export const TEACHER_STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'on_leave', label: 'On Leave' },
+  { value: 'resigned', label: 'Resigned' },
+  { value: 'terminated', label: 'Terminated' },
+  { value: 'retired', label: 'Retired' },
+];
+
+// Employment Type Options
+export const EMPLOYMENT_TYPE_OPTIONS = [
+  { value: 'permanent', label: 'Permanent' },
+  { value: 'contract', label: 'Contract' },
+  { value: 'part_time', label: 'Part Time' },
+  { value: 'visiting', label: 'Visiting' },
+  { value: 'intern', label: 'Intern' },
+  { value: 'probation', label: 'Probation' },
+];
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c

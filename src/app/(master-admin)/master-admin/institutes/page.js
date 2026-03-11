@@ -252,6 +252,10 @@ export default function MasterAdminInstitutesPage() {
       subscription_status: statusFilter || undefined,
       institute_type_id:   typeFilter   || undefined,
     }),
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
     staleTime: 0,
   });
 

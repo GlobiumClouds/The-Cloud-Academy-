@@ -96,8 +96,13 @@ export default function NoticesPage({ type }) {
     { accessorKey: 'priority', header: 'Priority', cell: ({ getValue }) => { const p = getValue(); return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', PRIORITY_COLORS[p])}>{p}</span>; } },
     { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
       <div className="flex items-center justify-end gap-1">
+<<<<<<< HEAD
         {canDo('notice.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
         {canDo('notice.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+=======
+        {canDo('notices.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
+        {canDo('notices.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
       </div>
     )},
   ], [canDo]);
@@ -113,7 +118,11 @@ export default function NoticesPage({ type }) {
       <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No notices found"
         search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder="Search notices…"
         filters={[{ name:'priority', label:'Priority', value:priority, onChange:(v) => { setPriority(v); setPage(1); }, options:PRIORITY_OPTS }]}
+<<<<<<< HEAD
         action={canDo('notice.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New Notice</button> : null}
+=======
+        action={canDo('notices.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> New Notice</button> : null}
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
         enableColumnVisibility
         exportConfig={{ fileName: 'notices' }}
         pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />

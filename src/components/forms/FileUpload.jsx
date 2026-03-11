@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // components/shared/Forms/FileUpload.js
+=======
+//src/components/forms/FileUpload.jsx
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 'use client';
 
 import { useState, useRef } from 'react';

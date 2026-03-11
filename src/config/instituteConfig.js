@@ -151,11 +151,19 @@ const TERMS = {
 export const NAV = {
   school: [
     { group: 'Main',       label: 'Dashboard',        href: '/school/dashboard',        icon: 'LayoutDashboard',   permission: 'dashboard.view' },
+<<<<<<< HEAD
     { group: 'Academic',   label: 'Classes',          href: '/school/classes',          icon: 'BookOpen',          permission: 'classes.read' },
     // { group: 'Academic',   label: 'Sections',         href: '/school/sections',         icon: 'Layers',            permission: 'sections.read' },
     { group: 'Academic',   label: 'Subjects',         href: '/school/subjects',         icon: 'FileText',          permission: 'subjects.read' },
     { group: 'Academic',   label: 'Timetable',        href: '/school/timetable',        icon: 'Calendar',          permission: 'timetable.read' },
     { group: 'Academic',   label: 'Academic Years',   href: '/school/academic-years',   icon: 'CalendarDays',      permission: 'academic_years.read' },
+=======
+    { group: 'Academic',   label: 'Academic Years',   href: '/school/academic-years',   icon: 'CalendarDays',      permission: 'academic_years.read' },
+    { group: 'Academic',   label: 'Classes',          href: '/school/classes',          icon: 'BookOpen',          permission: 'classes.read' },
+    { group: 'Academic',   label: 'Sections',         href: '/school/sections',         icon: 'Layers',            permission: 'sections.read' },
+    { group: 'Academic',   label: 'Subjects',         href: '/school/subjects',         icon: 'FileText',          permission: 'subjects.read' },
+    { group: 'Academic',   label: 'Timetable',        href: '/school/timetable',        icon: 'Calendar',          permission: 'timetable.read' },
+>>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
     { group: 'People',     label: 'Students',         href: '/school/students',         icon: 'Users',             permission: 'students.read' },
     { group: 'People',     label: 'Teachers',         href: '/school/teachers',         icon: 'GraduationCap',     permission: 'teachers.read' },
     { group: 'People',     label: 'Parents',          href: '/school/parents',          icon: 'Heart',             permission: 'parents.read' },
