@@ -21,7 +21,7 @@
  *     options={GENDER_OPTIONS}
  *     placeholder="Select gender"
  *     required
- *   />
+*   />
  */
 'use client';
 

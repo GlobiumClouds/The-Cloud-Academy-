@@ -19,6 +19,7 @@ import {
   TextareaField,
   DatePickerField,
   FormSubmitButton,
+  SwitchField,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -186,6 +187,15 @@ export default function AcademicYearForm({
         control={control}
         hint="Only one academic year can be current at a time"
       />
+
+      {currentYearExists && (
+        <Alert className="py-2 border-amber-200 bg-amber-50 text-amber-800">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-sm">
+            Note: Another year is already set as current. Saving this will unset the previous current year.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex justify-end gap-3 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>

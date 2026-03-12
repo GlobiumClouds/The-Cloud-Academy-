@@ -1,17 +1,20 @@
-//src/components/forms/ClassForm.jsx
-/**
- * ClassForm — Create / Edit class with sections and courses (Fully Responsive)
- * ─────────────────────────────────────────────────────────────────
- * Props:
- *   defaultValues      object          Pre-filled values for edit mode
- *   onSubmit           (data) => void  Called with form data
- *   onCancel           () => void
- *   loading            boolean
- *   academicYearOptions { value, label }[]
- *   teacherOptions     { value, label }[]
- *   instituteType      string
- *   isEdit             boolean
- */
+// // src/components/forms/ClassForm.jsx
+// /**
+//  * ClassForm — Create / Edit class with sections and courses (Fully Responsive)
+//  * ─────────────────────────────────────────────────────────────────
+//  * Props:
+//  *   defaultValues      object          Pre-filled values for edit mode
+//  *   onSubmit           (data) => void  Called with form data
+//  *   onCancel           () => void
+//  *   loading            boolean
+//  *   academicYearOptions { value, label }[]
+//  *   teacherOptions     { value, label }[]
+//  *   instituteType      string
+//  *   isEdit             boolean
+//  */
+
+// src/components/forms/ClassForm.jsx (COMPLETE FIXED VERSION)
+
 'use client';
 
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
@@ -22,7 +25,6 @@ import {
   InputField,
   SelectField,
   TextareaField,
-  SwitchField,
   FormSubmitButton,
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
@@ -31,7 +33,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Plus, 
   Trash2, 
@@ -40,11 +41,10 @@ import {
   FileText,
   Upload,
   X,
-  AlertCircle,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // Constants
 const MAX_PDF_MB = 10;
@@ -53,10 +53,10 @@ const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024;
 // Validation Schemas
 const materialSchema = z.object({
   id: z.string().optional(),
-  name: z.string().optional().default(''),
-  description: z.string().optional(),
+  name: z.string().min(1, 'Material name is required'),
+  description: z.string().optional().default(''),
   file: z.any().optional(),
-  pdf_url: z.string().optional(),   // existing Cloudinary URL
+  pdf_url: z.string().optional(),
   active: z.boolean().default(true),
 });
 
@@ -64,7 +64,7 @@ const courseSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Course name is required'),
   code: z.string().optional().default(''),
-  description: z.string().optional(),
+  description: z.string().optional().default(''),
   active: z.boolean().default(true),
   materials: z.array(materialSchema).default([]),
 });
@@ -82,7 +82,7 @@ const sectionSchema = z.object({
 
 const classSchema = z.object({
   name: z.string().min(1, 'Class name is required'),
-  description: z.string().optional(),
+  description: z.string().optional().default(''),
   academic_year_id: z.string().min(1, 'Academic year is required'),
   active: z.boolean().default(true),
   sections: z.array(sectionSchema).default([]),
@@ -102,6 +102,12 @@ export default function ClassForm({
   const [uploadingFiles, setUploadingFiles] = useState({});
   const [isMobile, setIsMobile] = useState(false);
 
+  // ✅ FIXED: Log incoming props for debugging
+  useEffect(() => {
+    console.log('📥 ClassForm received defaultValues:', defaultValues);
+    console.log('📥 isEdit mode:', isEdit);
+  }, [defaultValues, isEdit]);
+
   // Check if mobile on mount
   useEffect(() => {
     const checkMobile = () => {
@@ -112,6 +118,46 @@ export default function ClassForm({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // ✅ FIXED: Prepare initial values
+  const getInitialValues = () => {
+    const initial = {
+      name: '',
+      description: '',
+      academic_year_id: '',
+      active: true,
+      sections: [],
+      courses: [],
+      ...defaultValues,
+    };
+    
+    // Ensure sections have all fields
+    initial.sections = (initial.sections || []).map(s => ({
+      id: s.id,
+      name: s.name || '',
+      room_no: s.room_no || '',
+      capacity: s.capacity || 30,
+      active: s.active ?? true,
+    }));
+
+    // Ensure courses have all fields
+    initial.courses = (initial.courses || []).map(c => ({
+      id: c.id,
+      name: c.name || '',
+      code: c.code || '',
+      description: c.description || '',
+      active: c.active ?? true,
+      materials: (c.materials || []).map(m => ({
+        id: m.id,
+        name: m.name || '',
+        description: m.description || '',
+        pdf_url: m.pdf_url || null,
+        active: m.active ?? true,
+      })),
+    }));
+
+    return initial;
+  };
+
   const {
     register,
     control,
@@ -120,27 +166,19 @@ export default function ClassForm({
     setValue,
     getValues,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm({
     resolver: zodResolver(classSchema),
-    defaultValues: {
-      active: true,
-      sections: [],
-      courses: [],
-      ...defaultValues,
-    },
+    defaultValues: getInitialValues(),
   });
 
-  // Re-initialize form whenever the item being edited changes
+  // ✅ FIXED: Reset form when defaultValues change (important for edit mode)
   useEffect(() => {
-    reset({
-      active: true,
-      sections: [],
-      courses: [],
-      ...defaultValues,
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultValues?.id]);
+    if (defaultValues && Object.keys(defaultValues).length > 0) {
+      console.log('🔄 Resetting form with new values:', defaultValues);
+      reset(getInitialValues());
+    }
+  }, [defaultValues?.id]); // Only reset when ID changes
 
   // Field arrays
   const { 
@@ -154,10 +192,6 @@ export default function ClassForm({
     append: appendCourse, 
     remove: removeCourse 
   } = useFieldArray({ control, name: 'courses' });
-
-  // Watch values
-  const watchSections = watch('sections');
-  const watchCourses = watch('courses');
 
   // Navigation for mobile tabs
   const nextTab = () => {
@@ -189,21 +223,26 @@ export default function ClassForm({
     return terms[instituteType]?.[key] || key;
   };
 
-  // Handle file selection for course materials (RHF-controlled)
-  const handleFileChange = (courseIndex, materialIndex, file, rhfOnChange) => {
+  // Handle file selection
+  const handleFileChange = (courseIndex, materialIndex, file, onChange) => {
     if (file && file.size > MAX_PDF_BYTES) {
       alert(`File size must be less than ${MAX_PDF_MB}MB`);
       return;
     }
-    // Store FileList/File into RHF field so it's available on submit
-    rhfOnChange(file ?? null);
+    
+    onChange(file);
+    
     setUploadingFiles(prev => ({
       ...prev,
-      [`${courseIndex}-${materialIndex}`]: file ? file.name : null,
+      [`${courseIndex}-${materialIndex}`]: file ? {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      } : null,
     }));
   };
 
-  // Remove newly selected file (don't remove existing pdf_url)
+  // Remove file
   const removeMaterialFile = (courseIndex, materialIndex) => {
     setValue(`courses.${courseIndex}.materials.${materialIndex}.file`, null);
     setUploadingFiles(prev => {
@@ -236,10 +275,10 @@ export default function ClassForm({
 
   // Add material to course
   const handleAddMaterial = (courseIndex) => {
-    const materials = getValues(`courses.${courseIndex}.materials`) || [];
+    const currentMaterials = getValues(`courses.${courseIndex}.materials`) || [];
     setValue(`courses.${courseIndex}.materials`, [
-      ...materials,
-      { name: '', description: '', active: true }
+      ...currentMaterials,
+      { name: '', description: '', active: true, file: null }
     ]);
   };
 
@@ -248,49 +287,85 @@ export default function ClassForm({
     const materials = getValues(`courses.${courseIndex}.materials`) || [];
     materials.splice(materialIndex, 1);
     setValue(`courses.${courseIndex}.materials`, materials);
+    
+    setUploadingFiles(prev => {
+      const newState = { ...prev };
+      delete newState[`${courseIndex}-${materialIndex}`];
+      return newState;
+    });
   };
 
-  // Form submit handler
+  // ✅ FIXED: Form submit handler with validation
   const onSubmitForm = (data) => {
+    console.log('📤 Form submitting with data:', data);
+    console.log('📤 Form is dirty:', isDirty);
+    
+    // Format data for API
     const formattedData = {
       ...data,
       sections: data.sections.map(section => ({
-        ...section,
-        capacity: section.capacity ? parseInt(section.capacity) : null,
+        id: section.id, // Keep ID for updates
+        name: section.name,
+        room_no: section.room_no || '',
+        capacity: section.capacity ? Number(section.capacity) : null,
+        active: section.active,
       })),
       courses: data.courses.map(course => ({
-        ...course,
-        materials: course.materials?.map(material => ({
-          ...material,
-          // file is now a File object (set via Controller), not FileList
+        id: course.id, // Keep ID for updates
+        name: course.name,
+        code: course.code || '',
+        description: course.description || '',
+        active: course.active,
+        materials: (course.materials || []).map(material => ({
+          id: material.id, // Keep ID for updates
+          name: material.name,
+          description: material.description || '',
+          pdf_url: material.pdf_url,
+          active: material.active,
           file: material.file instanceof File ? material.file : undefined,
         }))
       }))
     };
+    
+    console.log('📦 Formatted data for API:', formattedData);
     onSubmit(formattedData);
   };
 
-  // Auto-jump to first tab that has validation errors
+  // Handle form errors
   const onFormError = (errs) => {
-    if (errs.name || errs.description || errs.academic_year_id) {
+    console.log('❌ Form validation errors:', errs);
+    
+    if (errs.name || errs.academic_year_id) {
       setActiveTab('basic');
     } else if (errs.sections) {
       setActiveTab('sections');
     } else if (errs.courses) {
       setActiveTab('courses');
     }
+    
+    // Show error toast
+    toast.error('Please fix the errors in the form');
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmitForm, onFormError)} className="space-y-4 sm:space-y-6">
-      {/* Mobile/Desktop Tabs */}
+      {/* Debug info - remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="text-xs text-muted-foreground p-2 border rounded">
+          <p>Mode: {isEdit ? 'Edit' : 'Create'}</p>
+          <p>Form Dirty: {isDirty ? 'Yes' : 'No'}</p>
+          <p>Sections: {sectionFields.length}</p>
+          <p>Courses: {courseFields.length}</p>
+        </div>
+      )}
+
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        {/* Scrollable tabs for mobile */}
         <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className={`inline-flex w-auto sm:grid ${isMobile ? 'flex-nowrap' : 'grid-cols-3'} mb-4 sm:mb-6`}>
             <TabsTrigger value="basic" className="px-3 sm:px-4">
               Basic Info
-              {(errors.name || errors.description || errors.academic_year_id) && (
+              {(errors.name || errors.academic_year_id) && (
                 <span className="ml-1 h-2 w-2 rounded-full bg-destructive inline-block" />
               )}
             </TabsTrigger>
@@ -301,9 +376,6 @@ export default function ClassForm({
                   {sectionFields.length}
                 </Badge>
               )}
-              {errors.sections && (
-                <span className="ml-1 h-2 w-2 rounded-full bg-destructive inline-block" />
-              )}
             </TabsTrigger>
             <TabsTrigger value="courses" className="px-3 sm:px-4">
               {getTerm('course')}s
@@ -312,9 +384,6 @@ export default function ClassForm({
                   {courseFields.length}
                 </Badge>
               )}
-              {errors.courses && (
-                <span className="ml-1 h-2 w-2 rounded-full bg-destructive inline-block" />
-              )}
             </TabsTrigger>
           </TabsList>
         </div>
@@ -322,25 +391,13 @@ export default function ClassForm({
         {/* Mobile Navigation */}
         {isMobile && (
           <div className="flex items-center justify-between mb-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={prevTab}
-              disabled={activeTab === 'basic'}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={prevTab} disabled={activeTab === 'basic'}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm font-medium capitalize">
               {activeTab === 'basic' ? 'Basic Info' : activeTab}
             </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={nextTab}
-              disabled={activeTab === 'courses'}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={nextTab} disabled={activeTab === 'courses'}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -377,11 +434,11 @@ export default function ClassForm({
                   
                   <div className="col-span-1 md:col-span-2">
                     <TextareaField
-                      label="Description"
+                      label="Description (Optional)"
                       name="description"
                       register={register}
                       error={errors.description}
-                      placeholder={`Description for this ${getTerm('class').toLowerCase()}`}
+                      placeholder={`Description for this ${getTerm('class').toLowerCase()} (optional)`}
                       rows={2}
                     />
                   </div>
@@ -438,9 +495,6 @@ export default function ClassForm({
                   <div className="text-center py-6 sm:py-8 border-2 border-dashed rounded-lg">
                     <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                     <p className="text-sm sm:text-base text-muted-foreground">No sections added yet</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                      Click the button above to add sections
-                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3 sm:space-y-4">
@@ -484,10 +538,8 @@ export default function ClassForm({
                           />
                         </div>
 
-                        <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                          <Label htmlFor={`section-${index}-active`} className="text-xs sm:text-sm">
-                            Status
-                          </Label>
+                        <div className="mt-3 flex items-center justify-between">
+                          <Label htmlFor={`section-${index}-active`}>Status</Label>
                           <Controller
                             name={`sections.${index}.active`}
                             control={control}
@@ -534,16 +586,16 @@ export default function ClassForm({
                   <div className="text-center py-6 sm:py-8 border-2 border-dashed rounded-lg">
                     <BookOpen className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                     <p className="text-sm sm:text-base text-muted-foreground">No courses added yet</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                      Click the button above to add courses
-                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4 sm:space-y-6">
                     {courseFields.map((field, courseIndex) => (
                       <div key={field.id} className="border rounded-lg p-3 sm:p-4">
+                        {/* Course Header */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
-                          <h4 className="text-sm sm:text-base font-medium">Course {courseIndex + 1}</h4>
+                          <h4 className="text-sm sm:text-base font-medium">
+                            {getTerm('course')} {courseIndex + 1}: {watch(`courses.${courseIndex}.name`) || 'New Course'}
+                          </h4>
                           <Button
                             type="button"
                             variant="ghost"
@@ -552,10 +604,11 @@ export default function ClassForm({
                             onClick={() => removeCourse(courseIndex)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Remove Course
+                            Remove
                           </Button>
                         </div>
 
+                        {/* Course Details */}
                         <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
                           <InputField
                             label="Course Name"
@@ -567,30 +620,28 @@ export default function ClassForm({
                           />
                           
                           <InputField
-                            label="Course Code"
+                            label="Course Code (Optional)"
                             name={`courses.${courseIndex}.code`}
                             register={register}
                             error={errors.courses?.[courseIndex]?.code}
-                            required
                             placeholder="e.g. MATH-101"
                           />
                           
                           <div className="col-span-1 md:col-span-2">
                             <TextareaField
-                              label="Description"
+                              label="Description (Optional)"
                               name={`courses.${courseIndex}.description`}
                               register={register}
                               error={errors.courses?.[courseIndex]?.description}
-                              placeholder="Course description"
+                              placeholder="Course description (optional)"
                               rows={2}
                             />
                           </div>
                         </div>
 
-                        <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between border-t pt-3 gap-3">
-                          <Label htmlFor={`course-${courseIndex}-active`} className="text-xs sm:text-sm">
-                            Course Status
-                          </Label>
+                        {/* Course Status */}
+                        <div className="mt-3 flex items-center justify-between border-t pt-3">
+                          <Label htmlFor={`course-${courseIndex}-active`}>Course Status</Label>
                           <Controller
                             name={`courses.${courseIndex}.active`}
                             control={control}
@@ -623,15 +674,16 @@ export default function ClassForm({
                             </Button>
                           </div>
 
-                          {(!watchCourses[courseIndex]?.materials || 
-                            watchCourses[courseIndex].materials.length === 0) ? (
+                          {(!watch(`courses.${courseIndex}.materials`) || 
+                            watch(`courses.${courseIndex}.materials`).length === 0) ? (
                             <p className="text-xs sm:text-sm text-muted-foreground text-center py-4">
                               No materials added yet
                             </p>
                           ) : (
                             <div className="space-y-3">
-                              {watchCourses[courseIndex].materials.map((material, materialIndex) => (
+                              {watch(`courses.${courseIndex}.materials`).map((material, materialIndex) => (
                                 <div key={materialIndex} className="bg-accent/20 rounded-lg p-3">
+                                  {/* Material Header */}
                                   <div className="flex flex-col sm:flex-row items-start justify-between mb-2 gap-2">
                                     <div className="w-full sm:flex-1">
                                       <InputField
@@ -654,94 +706,103 @@ export default function ClassForm({
                                     </Button>
                                   </div>
 
-                                  <div className="grid grid-cols-1 gap-3">
+                                  {/* Material Description */}
+                                  <div className="mb-3">
                                     <TextareaField
-                                      label="Description"
+                                      label="Description (Optional)"
                                       name={`courses.${courseIndex}.materials.${materialIndex}.description`}
                                       register={register}
                                       error={errors.courses?.[courseIndex]?.materials?.[materialIndex]?.description}
-                                      placeholder="Material description"
+                                      placeholder="Material description (optional)"
                                       rows={1}
                                     />
+                                  </div>
 
-                                    <div className="space-y-2">
-                                      <Label className="text-xs sm:text-sm">PDF File (Max {MAX_PDF_MB}MB)</Label>
+                                  {/* File Upload Section */}
+                                  <div className="space-y-2 mb-3">
+                                    <Label>PDF File (Max {MAX_PDF_MB}MB)</Label>
 
-                                      {/* Show existing uploaded PDF link */}
-                                      {watchCourses[courseIndex]?.materials?.[materialIndex]?.pdf_url && !uploadingFiles[`${courseIndex}-${materialIndex}`] && (
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-accent/20 rounded px-2 py-1">
-                                          <FileText className="h-3 w-3 shrink-0" />
-                                          <a
-                                            href={watchCourses[courseIndex].materials[materialIndex].pdf_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="truncate hover:underline text-blue-600"
-                                          >
-                                            Current PDF
-                                          </a>
-                                          <span className="text-muted-foreground">(upload new to replace)</span>
-                                        </div>
-                                      )}
-
-                                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                        {/* Use Controller so file is stored in RHF state */}
-                                        <Controller
-                                          name={`courses.${courseIndex}.materials.${materialIndex}.file`}
-                                          control={control}
-                                          render={({ field: { onChange } }) => (
-                                            <>
-                                              <input
-                                                type="file"
-                                                accept=".pdf,application/pdf"
-                                                onChange={(e) => handleFileChange(courseIndex, materialIndex, e.target.files?.[0] ?? null, onChange)}
-                                                className="hidden"
-                                                id={`file-${courseIndex}-${materialIndex}`}
-                                              />
-                                              <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => document.getElementById(`file-${courseIndex}-${materialIndex}`).click()}
-                                                className="flex-1"
-                                              >
-                                                <Upload className="h-4 w-4 mr-2" />
-                                                <span className="truncate">
-                                                  {uploadingFiles[`${courseIndex}-${materialIndex}`] || 'Choose PDF'}
-                                                </span>
-                                              </Button>
-                                            </>
-                                          )}
-                                        />
-                                        {uploadingFiles[`${courseIndex}-${materialIndex}`] && (
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => removeMaterialFile(courseIndex, materialIndex)}
-                                            className="w-full sm:w-auto"
-                                          >
-                                            <X className="h-4 w-4" />
-                                          </Button>
-                                        )}
+                                    {/* Show existing PDF if any */}
+                                    {watch(`courses.${courseIndex}.materials.${materialIndex}.pdf_url`) && 
+                                     !uploadingFiles[`${courseIndex}-${materialIndex}`] && (
+                                      <div className="flex items-center gap-2 text-xs bg-accent/30 rounded px-2 py-1 mb-2">
+                                        <FileText className="h-3 w-3 shrink-0" />
+                                        <a
+                                          href={watch(`courses.${courseIndex}.materials.${materialIndex}.pdf_url`)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="truncate hover:underline text-blue-600"
+                                        >
+                                          Current PDF
+                                        </a>
+                                        <span className="text-muted-foreground">(upload new to replace)</span>
                                       </div>
-                                    </div>
+                                    )}
 
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                      <Label htmlFor={`material-${courseIndex}-${materialIndex}-active`} className="text-xs sm:text-sm">
-                                        Active
-                                      </Label>
+                                    {/* File Input */}
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                       <Controller
-                                        name={`courses.${courseIndex}.materials.${materialIndex}.active`}
+                                        name={`courses.${courseIndex}.materials.${materialIndex}.file`}
                                         control={control}
-                                        render={({ field }) => (
-                                          <Switch
-                                            id={`material-${courseIndex}-${materialIndex}-active`}
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                          />
+                                        render={({ field: { onChange } }) => (
+                                          <>
+                                            <input
+                                              type="file"
+                                              accept=".pdf,application/pdf"
+                                              onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                handleFileChange(courseIndex, materialIndex, file, onChange);
+                                              }}
+                                              className="hidden"
+                                              id={`file-${courseIndex}-${materialIndex}`}
+                                            />
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => document.getElementById(`file-${courseIndex}-${materialIndex}`).click()}
+                                              className="flex-1"
+                                            >
+                                              <Upload className="h-4 w-4 mr-2" />
+                                              <span className="truncate">
+                                                {uploadingFiles[`${courseIndex}-${materialIndex}`]?.name || 'Choose PDF'}
+                                              </span>
+                                            </Button>
+                                          </>
                                         )}
                                       />
+                                      
+                                      {uploadingFiles[`${courseIndex}-${materialIndex}`] && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeMaterialFile(courseIndex, materialIndex)}
+                                          className="w-full sm:w-auto"
+                                        >
+                                          <X className="h-4 w-4" />
+                                          Clear
+                                        </Button>
+                                      )}
                                     </div>
+                                  </div>
+
+                                  {/* Material Status */}
+                                  <div className="flex items-center justify-between">
+                                    <Label htmlFor={`material-${courseIndex}-${materialIndex}-active`}>
+                                      Active
+                                    </Label>
+                                    <Controller
+                                      name={`courses.${courseIndex}.materials.${materialIndex}.active`}
+                                      control={control}
+                                      render={({ field }) => (
+                                        <Switch
+                                          id={`material-${courseIndex}-${materialIndex}-active`}
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                        />
+                                      )}
+                                    />
                                   </div>
                                 </div>
                               ))}
@@ -768,12 +829,22 @@ export default function ClassForm({
         >
           Cancel
         </Button>
-        <FormSubmitButton
-          loading={loading}
-          label={isEdit ? 'Save Changes' : `Create ${getTerm('class')}`}
-          loadingLabel={isEdit ? 'Saving…' : 'Creating…'}
+        
+        {/* ✅ FIXED: Submit button with proper loading state */}
+        <Button
+          type="submit"
+          disabled={loading}
           className="w-full sm:w-auto"
-        />
+        >
+          {loading ? (
+            <>
+              <span className="mr-2">Saving...</span>
+              <span className="animate-spin">⏳</span>
+            </>
+          ) : (
+            isEdit ? 'Save Changes' : `Create ${getTerm('class')}`
+          )}
+        </Button>
       </div>
     </form>
   );

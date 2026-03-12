@@ -1,16 +1,22 @@
 
-// src/components/pages/ClassesPage.jsx
+// src/components/pages/ClassesPage.jsx (FIXED VERSION WITH FORM HOOK FOR FILTERS)
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useForm } from 'react-hook-form'; // ✅ Import useForm for filters
 import { 
   Plus, 
   BookOpen, 
   Eye,
   Copy,
-  Power 
+  Power,
+  RefreshCw,
+  Filter,
+  Download,
+  Calendar
 } from 'lucide-react';
 
 import useAuthStore from '@/store/authStore';
@@ -28,22 +34,25 @@ import ErrorAlert from '@/components/common/ErrorAlert';
 import PageLoader from '@/components/common/PageLoader';
 import ClassForm from '@/components/forms/ClassForm';
 import SectionHeader from '@/components/common/SectionHeader';
+import SelectField from '@/components/common/SelectField'; // ✅ Original SelectField
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 import { classService } from '@/services/classService';
 import { academicYearService } from '@/services/academicYearService';
 
 export default function ClassesPage({ type }) {
   const queryClient = useQueryClient();
-  const { canDo } = useAuthStore();
+  const { canDo, user } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
   
+  // State Management
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
@@ -53,63 +62,126 @@ export default function ClassesPage({ type }) {
   const [statusDialog, setStatusDialog] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
 
+  // ✅ FORM HOOK FOR FILTERS - using react-hook-form
+  const { control: filterControl, watch: filterWatch, setValue: setFilterValue } = useForm({
+    defaultValues: {
+      academic_year: '',
+      status: '',
+    }
+  });
+
+  // Watch filter values
+  const selectedAcademicYear = filterWatch('academic_year');
+  const selectedStatus = filterWatch('status');
+
   // Get terms based on institute type
   const classTerm = terms?.primary_unit || 'Class';
   const classTermPlural = terms?.primary_units || 'Classes';
   const sectionTerm = terms?.secondary_unit || 'Section';
   const courseTerm = terms?.tertiary_unit || 'Course';
 
+  // Debug logging
+  useEffect(() => {
+    console.log('📋 ClassesPage mounted');
+    console.log('🏫 Current Institute:', currentInstitute);
+    console.log('👤 User:', user);
+  }, []);
+
   // Fetch academic years for dropdown
-  const { data: academicYears, error: academicYearsError } = useQuery({
+  const { 
+    data: academicYears, 
+    error: academicYearsError,
+    isLoading: academicYearsLoading 
+  } = useQuery({
     queryKey: ['academic-years-options', currentInstitute?.id],
     queryFn: () => academicYearService.getOptions(currentInstitute?.id, true),
     enabled: !!currentInstitute?.id,
   });
 
   // Fetch classes
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['classes', currentInstitute?.id, page, pageSize, search, status],
-    queryFn: () => classService.getAll({
-      institute_id: currentInstitute?.id,
-      page,
-      limit: pageSize,
-      search: search || undefined,
-      status: status || undefined,
-    }),
+  const { 
+    data, 
+    isLoading, 
+    error, 
+    refetch,
+    isFetching 
+  } = useQuery({
+    queryKey: ['classes', currentInstitute?.id, page, pageSize, search, selectedStatus, selectedAcademicYear],
+    queryFn: async () => {
+      console.log('📥 Fetching classes with params:', {
+        institute_id: currentInstitute?.id,
+        page,
+        limit: pageSize,
+        search: search || undefined,
+        status: selectedStatus || undefined,
+        academic_year_id: selectedAcademicYear || undefined,
+      });
+      
+      const response = await classService.getAll({
+        institute_id: currentInstitute?.id,
+        page,
+        limit: pageSize,
+        search: search || undefined,
+        status: selectedStatus || undefined,
+        academic_year_id: selectedAcademicYear || undefined,
+      });
+      
+      console.log('📥 Classes response:', response);
+      
+      // Debug: Check if academic_year is coming in response
+      if (response?.data?.length > 0) {
+        console.log('📥 First class academic_year:', response.data[0].academic_year);
+      }
+      
+      return response;
+    },
     enabled: !!currentInstitute?.id,
   });
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data) => classService.create(data),
-    onSuccess: () => {
+    mutationFn: (data) => {
+      console.log('➕ Creating class with data:', data);
+      return classService.create(data);
+    },
+    onSuccess: (response) => {
+      console.log('✅ Create success:', response);
       toast.success(`${classTerm} created successfully`);
       queryClient.invalidateQueries({ queryKey: ['classes'] });
       setModalOpen(false);
       setEditingClass(null);
     },
     onError: (error) => {
+      console.error('❌ Create error:', error);
       toast.error(error.message || `Failed to create ${classTerm.toLowerCase()}`);
     },
   });
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => classService.update(id, data),
-    onSuccess: () => {
+    mutationFn: ({ id, data }) => {
+      console.log('📝 Updating class:', id, 'with data:', data);
+      return classService.update(id, data);
+    },
+    onSuccess: (response) => {
+      console.log('✅ Update success:', response);
       toast.success(`${classTerm} updated successfully`);
       queryClient.invalidateQueries({ queryKey: ['classes'] });
       setModalOpen(false);
       setEditingClass(null);
     },
     onError: (error) => {
+      console.error('❌ Update error:', error);
       toast.error(error.message || `Failed to update ${classTerm.toLowerCase()}`);
     },
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id) => classService.delete(id),
+    mutationFn: (id) => {
+      console.log('🗑️ Deleting class:', id);
+      return classService.delete(id);
+    },
     onSuccess: () => {
       toast.success(`${classTerm} deleted successfully`);
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -122,7 +194,10 @@ export default function ClassesPage({ type }) {
 
   // Toggle status mutation
   const toggleStatusMutation = useMutation({
-    mutationFn: ({ id, isActive }) => classService.toggleStatus(id, isActive),
+    mutationFn: ({ id, isActive }) => {
+      console.log('🔄 Toggling status for class:', id, 'to:', isActive);
+      return classService.toggleStatus(id, isActive);
+    },
     onSuccess: () => {
       toast.success('Status updated successfully');
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -135,87 +210,126 @@ export default function ClassesPage({ type }) {
 
   // Handle form submit
   const handleSubmit = (formData) => {
-    if (editingClass && !editingClass.isCopy) {
-      updateMutation.mutate({ id: editingClass.id, data: formData });
+    console.log('📤 Form submitted:', formData);
+    console.log('📤 Editing class:', editingClass);
+    
+    if (editingClass && editingClass.id && !editingClass.isCopy) {
+      // Edit mode
+      console.log('📝 Updating class with ID:', editingClass.id);
+      updateMutation.mutate({ 
+        id: editingClass.id, 
+        data: formData 
+      });
     } else {
+      // Create mode
+      console.log('➕ Creating new class');
       createMutation.mutate(formData);
     }
   };
 
   // Open add modal
   const openAddModal = () => {
+    console.log('➕ Opening add modal');
     setEditingClass(null);
     setModalOpen(true);
   };
 
   // Normalize API data to form field names
-  const normalizeForForm = (classItem) => ({
-    ...classItem,
-    active: classItem.is_active ?? classItem.active ?? true,
-    sections: (classItem.sections || []).map(s => ({
-      ...s,
-      active: s.is_active ?? s.active ?? true,
-    })),
-    courses: (classItem.courses || []).map(c => ({
-      ...c,
-      code: c.code || c.course_code || '',
-      active: c.is_active ?? c.active ?? true,
-      materials: (c.materials || []).map(m => ({
-        ...m,
-        pdf_url: m.pdf_url || null,  // pass existing Cloudinary URL to form
-        active: m.is_active ?? m.active ?? true,
+  const normalizeForForm = (classItem) => {
+    if (!classItem) return {};
+    
+    console.log('🔄 Normalizing class item for form:', classItem);
+    
+    return {
+      id: classItem.id,
+      name: classItem.name || '',
+      description: classItem.description || '',
+      academic_year_id: classItem.academic_year_id || '',
+      active: classItem.is_active ?? classItem.active ?? true,
+      
+      // Sections mapping
+      sections: (classItem.sections || []).map(s => ({
+        id: s.id,
+        name: s.name || '',
+        room_no: s.room_no || '',
+        capacity: s.capacity || 30,
+        active: s.is_active ?? s.active ?? true,
       })),
-    })),
-  });
+      
+      // Courses mapping
+      courses: (classItem.courses || []).map(c => ({
+        id: c.id,
+        name: c.name || '',
+        code: c.code || c.course_code || '',
+        description: c.description || '',
+        active: c.is_active ?? c.active ?? true,
+        materials: (c.materials || []).map(m => ({
+          id: m.id,
+          name: m.name || '',
+          description: m.description || '',
+          pdf_url: m.pdf_url || null,
+          active: m.is_active ?? m.active ?? true,
+        })),
+      })),
+    };
+  };
 
   // Open edit modal
   const openEditModal = (classItem) => {
-    setEditingClass(normalizeForForm(classItem));
+    console.log('📝 Opening edit modal for:', classItem);
+    const normalized = normalizeForForm(classItem);
+    console.log('📝 Normalized form values:', normalized);
+    setEditingClass(normalized);
     setModalOpen(true);
   };
 
   // Open view modal
   const openViewModal = (classItem) => {
+    console.log('👁️ Opening view modal for:', classItem);
     setViewingClass(classItem);
     setActiveTab('overview');
   };
 
   // Close modal
   const closeModal = () => {
+    console.log('🚪 Closing modal');
     setModalOpen(false);
     setEditingClass(null);
   };
 
   // Close view modal
   const closeViewModal = () => {
+    console.log('🚪 Closing view modal');
     setViewingClass(null);
     setActiveTab('overview');
   };
 
-  // Handle copy class
-  const handleCopyClass = (classItem) => {
-    const normalized = normalizeForForm(classItem);
-    const newClass = {
-      ...normalized,
-      id: undefined,
-      name: `${classItem.name} (Copy)`,
-      active: true,
-      isCopy: true,
-      sections: normalized.sections.map(s => ({ ...s, id: undefined, class_id: undefined })),
-      courses: normalized.courses.map(c => ({
-        ...c,
-        id: undefined,
-        class_id: undefined,
-        materials: (c.materials || []).map(m => ({ ...m, id: undefined, course_id: undefined }))
-      }))
-    };
-    setEditingClass(newClass);
-    setModalOpen(true);
-  };
 
   // Handle toggle status
   const handleToggleStatus = (classItem) => {
+    console.log('🔄 Toggling status for:', classItem);
     setStatusDialog(classItem);
+  };
+
+  // Handle refresh
+  const handleRefresh = () => {
+    console.log('🔄 Refreshing classes...');
+    refetch();
+    toast.info('Refreshing data...');
+  };
+
+  // Handle export
+  const handleExport = () => {
+    console.log('📥 Exporting classes...');
+    // Implement export logic
+    toast.info('Export feature coming soon');
+  };
+
+  // Handle clear filters
+  const handleClearFilters = () => {
+    setFilterValue('academic_year', '');
+    setFilterValue('status', '');
+    setSearch('');
   };
 
   // Table columns
@@ -233,15 +347,51 @@ export default function ClassesPage({ type }) {
       ),
     },
     {
+      accessorKey: 'academic_year',
+      header: 'Academic Year',
+      cell: ({ row }) => {
+        const year = row.original.academic_year;
+        // Check both possible formats
+        if (year) {
+          if (typeof year === 'object') {
+            return (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span>{year.name || `${year.start_year} - ${year.end_year}`}</span>
+              </div>
+            );
+          } else if (typeof year === 'string') {
+            return <span>{year}</span>;
+          }
+        }
+        
+        // If academic_year_id is present but no object, try to get from lookup
+        const yearId = row.original.academic_year_id;
+        if (yearId && academicYears?.data) {
+          const foundYear = academicYears.data.find(y => y.value === yearId);
+          if (foundYear) {
+            return (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span>{foundYear.label}</span>
+              </div>
+            );
+          }
+        }
+        
+        return <span className="text-muted-foreground">—</span>;
+      },
+    },
+    {
       accessorKey: 'sections',
       header: sectionTerm,
       cell: ({ row }) => {
         const sections = row.original.sections;
         const count = Array.isArray(sections) ? sections.length : (sections || 0);
         return (
-          <span className="text-sm">
+          <Badge variant="outline">
             {count} {count === 1 ? sectionTerm.toLowerCase() : `${sectionTerm.toLowerCase()}s`}
-          </span>
+          </Badge>
         );
       },
     },
@@ -252,9 +402,9 @@ export default function ClassesPage({ type }) {
         const courses = row.original.courses;
         const count = Array.isArray(courses) ? courses.length : (courses || 0);
         return (
-          <span className="text-sm">
+          <Badge variant="outline">
             {count} {count === 1 ? courseTerm.toLowerCase() : `${courseTerm.toLowerCase()}s`}
-          </span>
+          </Badge>
         );
       },
     },
@@ -281,18 +431,7 @@ export default function ClassesPage({ type }) {
         const extraActions = [];
         
         if (canUpdate) {
-          extraActions.push({
-            label: 'View Details',
-            icon: <Eye className="h-4 w-4" />,
-            onClick: () => openViewModal(classItem)
-          });
-          
-          extraActions.push({
-            label: 'Copy Class',
-            icon: <Copy className="h-4 w-4" />,
-            onClick: () => handleCopyClass(classItem)
-          });
-          
+                    
           extraActions.push({
             label: classItem.is_active ? 'Deactivate' : 'Activate',
             icon: <Power className="h-4 w-4" />,
@@ -311,7 +450,7 @@ export default function ClassesPage({ type }) {
         );
       },
     },
-  ], [classTerm, sectionTerm, courseTerm, canDo]);
+  ], [classTerm, sectionTerm, courseTerm, canDo, academicYears?.data]);
 
   // Stats data
   const stats = useMemo(() => {
@@ -320,6 +459,8 @@ export default function ClassesPage({ type }) {
       total: data?.pagination?.total || rows.length,
       active: rows.filter(c => c.is_active !== false).length,
       inactive: rows.filter(c => c.is_active === false).length,
+      withSections: rows.filter(c => c.sections?.length > 0).length,
+      withCourses: rows.filter(c => c.courses?.length > 0).length,
     };
   }, [data]);
 
@@ -330,25 +471,49 @@ export default function ClassesPage({ type }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Actions */}
       <PageHeader
         title={classTermPlural}
         description={`Manage ${classTermPlural.toLowerCase()} for your institute`}
         action={
-          canDo('classes.create') && (
-            <Button onClick={openAddModal} size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Add {classTerm}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={isFetching}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
-          )
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleExport}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+            {canDo('classes.create') && (
+              <Button onClick={openAddModal} size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Add {classTerm}
+              </Button>
+            )}
+          </div>
         }
       />
 
       {/* Error Alerts */}
-      <ErrorAlert message={error?.message || academicYearsError?.message} />
+      {(error || academicYearsError) && (
+        <ErrorAlert 
+          message={error?.message || academicYearsError?.message} 
+          onRetry={refetch}
+        />
+      )}
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
         <StatsCard
           label={`Total ${classTermPlural}`}
           value={stats.total}
@@ -367,28 +532,82 @@ export default function ClassesPage({ type }) {
           icon={<BookOpen className="h-4 w-4 text-gray-500" />}
           loading={isLoading}
         />
+        <StatsCard
+          label={`With ${sectionTerm}s`}
+          value={stats.withSections}
+          icon={<BookOpen className="h-4 w-4 text-blue-500" />}
+          loading={isLoading}
+        />
+        <StatsCard
+          label={`With ${courseTerm}s`}
+          value={stats.withCourses}
+          icon={<BookOpen className="h-4 w-4 text-purple-500" />}
+          loading={isLoading}
+        />
       </div>
+
+      {/* Filters - Using SelectField with control from filter form */}
+      <Card>
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm font-medium flex items-center">
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="py-2">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Academic Year Filter - WITH control from filter form */}
+            <div className="w-64">
+              <SelectField
+                label="Academic Year"
+                name="academic_year"
+                control={filterControl}  // ✅ control prop from filter form
+                options={[
+                  { value: 'all', label: 'All Academic Years' },
+                  ...(academicYears?.data || [])
+                ]}
+                placeholder="Select Academic Year"
+              />
+            </div>
+
+            {/* Status Filter - WITH control from filter form */}
+            <div className="w-48">
+              <SelectField
+                label="Status"
+                name="status"
+                control={filterControl}  // ✅ control prop from filter form
+                options={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                ]}
+                placeholder="Select Status"
+              />
+            </div>
+
+            {/* Clear Filters Button */}
+            {(selectedAcademicYear || selectedStatus) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="mb-1"
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Data Table */}
       <DataTable
         columns={columns}
         data={data?.data || []}
-        loading={isLoading}
+        loading={isLoading || isFetching}
         search={search}
         onSearch={setSearch}
         searchPlaceholder={`Search ${classTermPlural.toLowerCase()}...`}
-        filters={[
-          {
-            name: 'status',
-            label: 'Status',
-            value: status,
-            onChange: setStatus,
-            options: [
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
-            ],
-          },
-        ]}
         enableColumnVisibility
         exportConfig={{
           fileName: classTermPlural.toLowerCase().replace(/\s+/g, '-'),
@@ -397,10 +616,17 @@ export default function ClassesPage({ type }) {
         pagination={{
           page,
           totalPages: data?.pagination?.totalPages || 1,
-          onPageChange: setPage,
+          onPageChange: (newPage) => {
+            console.log('📄 Changing to page:', newPage);
+            setPage(newPage);
+          },
           total: data?.pagination?.total || 0,
           pageSize,
-          onPageSizeChange: setPageSize,
+          onPageSizeChange: (newSize) => {
+            console.log('📄 Changing page size to:', newSize);
+            setPageSize(newSize);
+            setPage(1);
+          },
         }}
         emptyMessage={`No ${classTermPlural.toLowerCase()} found`}
       />
@@ -471,18 +697,27 @@ export default function ClassesPage({ type }) {
                     {viewingClass.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
+                
+                {/* Academic Year Display */}
+                <div>
+                  <p className="text-sm text-muted-foreground">Academic Year</p>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm">
+                      {viewingClass.academic_year?.name || 
+                       viewingClass.academic_year || 
+                       '—'}
+                    </p>
+                  </div>
+                </div>
+                
                 {viewingClass.code && (
                   <div>
                     <p className="text-sm text-muted-foreground">Code</p>
                     <p className="font-mono text-sm">{viewingClass.code}</p>
                   </div>
                 )}
-                {viewingClass.academic_year && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Academic Year</p>
-                    <p className="text-sm">{viewingClass.academic_year.name}</p>
-                  </div>
-                )}
+                
                 {viewingClass.description && (
                   <div className="col-span-2">
                     <p className="text-sm text-muted-foreground">Description</p>
@@ -490,31 +725,68 @@ export default function ClassesPage({ type }) {
                   </div>
                 )}
               </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Sections</p>
+                  <p className="text-2xl font-bold">{viewingClass.sections?.length || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Courses</p>
+                  <p className="text-2xl font-bold">{viewingClass.courses?.length || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Materials</p>
+                  <p className="text-2xl font-bold">
+                    {viewingClass.courses?.reduce((acc, c) => acc + (c.materials?.length || 0), 0) || 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Created</p>
+                  <p className="text-sm">
+                    {viewingClass.created_at ? new Date(viewingClass.created_at).toLocaleDateString() : '—'}
+                  </p>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="sections" className="space-y-4 pt-4">
               {viewingClass.sections && viewingClass.sections.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {viewingClass.sections.map((section, idx) => (
-                    <div key={idx} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{section.name}</span>
-                        <Badge variant={section.is_active ? 'success' : 'secondary'} size="sm">
-                          {section.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </div>
-                      {(section.room_no || section.capacity) && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          {section.room_no && <span>📍 Room: {section.room_no} </span>}
-                          {section.capacity && <span>👥 Capacity: {section.capacity}</span>}
+                    <Card key={idx}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{section.name}</span>
+                          <Badge variant={section.is_active ? 'success' : 'secondary'} size="sm">
+                            {section.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
                         </div>
-                      )}
-                      {section.teacher && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          👨‍🏫 Teacher: {section.teacher.name}
-                        </div>
-                      )}
-                    </div>
+                        {(section.room_no || section.capacity) && (
+                          <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                            {section.room_no && (
+                              <div className="flex items-center">
+                                <span className="w-20">📍 Room:</span>
+                                <span>{section.room_no}</span>
+                              </div>
+                            )}
+                            {section.capacity && (
+                              <div className="flex items-center">
+                                <span className="w-20">👥 Capacity:</span>
+                                <span>{section.capacity}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {section.teacher && (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            👨‍🏫 Teacher: {section.teacher.name}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               ) : (
@@ -528,43 +800,57 @@ export default function ClassesPage({ type }) {
               {viewingClass.courses && viewingClass.courses.length > 0 ? (
                 <div className="space-y-3">
                   {viewingClass.courses.map((course, idx) => (
-                    <div key={idx} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="font-medium">{course.name}</span>
-                          {course.code && (
-                            <Badge variant="outline" className="ml-2">
-                              {course.code}
-                            </Badge>
-                          )}
-                        </div>
-                        <Badge variant={course.is_active ? 'success' : 'secondary'} size="sm">
-                          {course.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </div>
-                      
-                      {course.teacher && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          👨‍🏫 Teacher: {course.teacher.name}
-                        </div>
-                      )}
-                      
-                      {course.materials && course.materials.length > 0 && (
-                        <div className="mt-3 border-t pt-2">
-                          <SectionHeader title="Materials" />
-                          <div className="grid grid-cols-2 gap-2">
-                            {course.materials.map((material, midx) => (
-                              <div key={midx} className="flex items-center justify-between text-sm p-2 bg-muted/30 rounded">
-                                <span>{material.name}</span>
-                                <Badge variant={material.is_active ? 'success' : 'secondary'} size="sm">
-                                  {material.is_active ? 'Active' : 'Inactive'}
-                                </Badge>
-                              </div>
-                            ))}
+                    <Card key={idx}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="font-medium">{course.name}</span>
+                            {course.code && (
+                              <Badge variant="outline" className="ml-2">
+                                {course.code}
+                              </Badge>
+                            )}
                           </div>
+                          <Badge variant={course.is_active ? 'success' : 'secondary'} size="sm">
+                            {course.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
                         </div>
-                      )}
-                    </div>
+                        
+                        {course.description && (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {course.description}
+                          </p>
+                        )}
+                        
+                        {course.teacher && (
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            👨‍🏫 Teacher: {course.teacher.name}
+                          </div>
+                        )}
+                        
+                        {course.materials && course.materials.length > 0 && (
+                          <div className="mt-3">
+                            <SectionHeader title="Materials" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                              {course.materials.map((material, midx) => (
+                                <div 
+                                  key={midx} 
+                                  className="flex items-center justify-between text-sm p-2 bg-muted/30 rounded"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <BookOpen className="h-4 w-4" />
+                                    <span>{material.name}</span>
+                                  </div>
+                                  <Badge variant={material.is_active ? 'success' : 'secondary'} size="sm">
+                                    {material.is_active ? 'Active' : 'Inactive'}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               ) : (
