@@ -1,1208 +1,1726 @@
-<<<<<<< HEAD
-'use client';
-=======
-// 'use client';
 // /**
 //  * TeachersPage — Adaptive for all institute types
 //  * School → Teachers | Coaching → Instructors | Academy → Trainers
 //  * College → Lecturers | University → Faculty / Staff
 //  */
-// import { useState, useMemo } from 'react';
+// // src/components/pages/TeachersPage.jsx (FULLY FIXED WITH SELECTFIELD CONTROL)
+
+// 'use client';
+
+// import { useState, useMemo, useEffect } from 'react';
 // import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-// import { useForm } from 'react-hook-form';
+// import { toast } from 'sonner';
+// import { useForm } from 'react-hook-form'; // ✅ Import useForm for filters
 // import { zodResolver } from '@hookform/resolvers/zod';
 // import { z } from 'zod';
-// import { toast } from 'sonner';
-// import { Plus, Pencil, Trash2, GraduationCap, Phone, Mail } from 'lucide-react';
+// import { 
+//   Plus, 
+//   GraduationCap, 
+//   Eye,
+//   Pencil,
+//   Trash2,
+//   QrCode,
+//   Download,
+//   RefreshCw,
+//   Filter,
+//   Mail,
+//   Phone,
+//   UserCog
+// } from 'lucide-react';
 
-// import useInstituteConfig from '@/hooks/useInstituteConfig';
 // import useAuthStore from '@/store/authStore';
+// import useInstituteStore from '@/store/instituteStore';
+// import useInstituteConfig from '@/hooks/useInstituteConfig';
+
+// // Components
 // import DataTable from '@/components/common/DataTable';
 // import PageHeader from '@/components/common/PageHeader';
 // import AppModal from '@/components/common/AppModal';
-// import SelectField from '@/components/common/SelectField';
-// import DatePickerField from '@/components/common/DatePickerField';
+// import ConfirmDialog from '@/components/common/ConfirmDialog';
 // import StatsCard from '@/components/common/StatsCard';
-// import { cn } from '@/lib/utils';
-// import { DUMMY_FLAT_TEACHERS } from '@/data/dummyData';
+// import TableRowActions from '@/components/common/TableRowActions';
+// import ErrorAlert from '@/components/common/ErrorAlert';
+// import PageLoader from '@/components/common/PageLoader';
+// import TeacherForm from '@/components/forms/TeacherForm';
+// import SelectField from '@/components/common/SelectField'; // ✅ Our SelectField with control
 
-// // ─── Options ────────────────────────────────────────────────────────────────
-// const GENDER_OPTIONS   = [{ value:'male', label:'Male' }, { value:'female', label:'Female' }, { value:'other', label:'Other' }];
-// const STATUS_OPTIONS   = [{ value:'true', label:'Active' }, { value:'false', label:'Inactive' }];
-// const SUBJECT_OPTIONS  = [
-//   { value:'mathematics', label:'Mathematics' }, { value:'physics', label:'Physics' },
-//   { value:'chemistry', label:'Chemistry' }, { value:'biology', label:'Biology' },
-//   { value:'english', label:'English' }, { value:'computer', label:'Computer Science' },
-//   { value:'urdu', label:'Urdu' }, { value:'islamiat', label:'Islamiat' },
-// ];
+// import { Button } from '@/components/ui/button';
+// import { Badge } from '@/components/ui/badge';
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+// import { Separator } from '@/components/ui/separator';
 
-// // ─── Zod schema ─────────────────────────────────────────────────────────────
-// const schema = z.object({
-//   first_name:  z.string().min(2, 'First name required'),
-//   last_name:   z.string().min(2, 'Last name required'),
-//   email:       z.string().email('Valid email required'),
-//   phone:       z.string().min(10, 'Phone required'),
-//   gender:      z.string().min(1, 'Select gender'),
-//   joining_date:z.string().optional(),
-//   qualification:z.string().optional(),
-//   specialization:z.string().optional(),
-//   is_active:   z.string().optional(),
+// import { teacherService } from '@/services/teacherService';
+
+// // ✅ Zod schema for filters
+// const filterSchema = z.object({
+//   status: z.string().optional(),
+//   role: z.string().optional(),
 // });
 
-// // ─── Dummy fallback ──────────────────────────────────────────────────────────
-// const genDummy = (type) => {
-//   const base = DUMMY_FLAT_TEACHERS ?? [];
-//   return base.length ? base : [
-//     { id:'t1', first_name:'Ahmed', last_name:'Raza', email:'ahmed@inst.pk', phone:'0300-1234567', gender:'male', qualification:'M.Sc Physics', joining_date:'2022-04-01', is_active:true },
-//   ];
-// };
-
 // export default function TeachersPage({ type }) {
-//   const qc     = useQueryClient();
-//   const canDo  = useAuthStore((s) => s.canDo);
+//   const queryClient = useQueryClient();
+//   const { canDo, user } = useAuthStore();
+//   const { currentInstitute } = useInstituteStore();
 //   const { terms } = useInstituteConfig();
-//   const label  = terms.teacher ?? 'Teacher';
-//   const labelP = terms.teachers ?? 'Teachers';
-
-//   const [search,   setSearch]   = useState('');
-//   const [status,   setStatus]   = useState('');
-//   const [page,     setPage]     = useState(1);
+  
+//   // State
+//   const [search, setSearch] = useState('');
+//   const [page, setPage] = useState(1);
 //   const [pageSize, setPageSize] = useState(10);
-//   const [modal,    setModal]    = useState(false);
-//   const [editing,  setEditing]  = useState(null);
+//   const [modalState, setModalState] = useState({
+//     isOpen: false,
+//     mode: 'add', // 'add' | 'edit' | 'view'
+//     data: null
+//   });
 //   const [deleting, setDeleting] = useState(null);
+//   const [regeneratingQR, setRegeneratingQR] = useState(null);
+//   const [roleOptions, setRoleOptions] = useState([]);
 
-//   // Form
-//   const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
-//     resolver: zodResolver(schema),
-//     defaultValues: { is_active: 'true', gender: '' },
+//   // ✅ FILTER FORM with react-hook-form
+//   const {
+//     control: filterControl,
+//     watch: filterWatch,
+//     setValue: setFilterValue,
+//     reset: resetFilters
+//   } = useForm({
+//     resolver: zodResolver(filterSchema),
+//     defaultValues: {
+//       status: '',
+//       role: '',
+//     }
 //   });
 
-//   // Fetch
-//   const { data, isLoading } = useQuery({
-//     queryKey: ['teachers', type, page, pageSize, search, status],
+//   // Watch filter values
+//   const selectedStatus = filterWatch('status');
+//   const selectedRole = filterWatch('role');
+
+//   // Terms
+//   const teacherLabel = terms?.teacher || 'Teacher';
+//   const teachersLabel = terms?.teachers || 'Teachers';
+
+//   // Fetch teacher roles
+//   const { data: rolesData, isLoading: rolesLoading } = useQuery({
+//     queryKey: ['teacher-roles', currentInstitute?.id],
 //     queryFn: async () => {
 //       try {
-//         const { teacherService } = await import('@/services');
-//         return await teacherService.getAll({ page, limit: pageSize, search, is_active: status });
-//       } catch {
-//         const dummy = genDummy(type).filter(t =>
-//           (!search || `${t.first_name} ${t.last_name}`.toLowerCase().includes(search.toLowerCase())) &&
-//           (!status || String(t.is_active) === status)
-//         );
-//         const slice = dummy.slice((page-1)*pageSize, page*pageSize);
-//         return { data: { rows: slice, total: dummy.length, totalPages: Math.max(1, Math.ceil(dummy.length / pageSize)) } };
+//         const response = await teacherService.getRoles();
+//         return response;
+//       } catch (error) {
+//         console.error('Roles fetch error:', error);
+//         return { data: [] };
 //       }
 //     },
-//     placeholderData: (p) => p,
+//     enabled: !!currentInstitute?.id,
 //   });
 
-//   const teachers   = data?.data?.rows       ?? genDummy(type);
-//   const total      = data?.data?.total      ?? teachers.length;
-//   const totalPages = data?.data?.totalPages ?? 1;
+//   // Update role options when data arrives
+//   useEffect(() => {
+//     if (rolesData?.data) {
+//       setRoleOptions(rolesData.data);
+//     }
+//   }, [rolesData]);
 
-//   // Save mutation
-//   const save = useMutation({
-//     mutationFn: async (vals) => {
-//       try {
-//         const { teacherService } = await import('@/services');
-//         return editing
-//           ? await teacherService.update(editing.id, vals)
-//           : await teacherService.create(vals);
-//       } catch { return { data: { ...vals, id: `t-${Date.now()}` } }; }
+//   // Fetch teachers with filters
+//   const { 
+//     data, 
+//     isLoading, 
+//     error, 
+//     refetch,
+//     isFetching 
+//   } = useQuery({
+//     queryKey: ['teachers', currentInstitute?.id, page, pageSize, search, selectedStatus, selectedRole],
+//     queryFn: async () => {
+//       console.log('📥 Fetching teachers with filters:', {
+//         institute_id: currentInstitute?.id,
+//         page,
+//         limit: pageSize,
+//         search: search || undefined,
+//         status: selectedStatus || undefined,
+//         role_id: selectedRole || undefined
+//       });
+      
+//       const response = await teacherService.getAll({
+//         institute_id: currentInstitute?.id,
+//         page,
+//         limit: pageSize,
+//         search: search || undefined,
+//         status: selectedStatus || undefined,
+//         role_id: selectedRole || undefined
+//       });
+      
+//       return response;
 //     },
-//     onSuccess: () => {
-//       toast.success(editing ? `${label} updated` : `${label} added`);
-//       qc.invalidateQueries({ queryKey: ['teachers'] });
+//     enabled: !!currentInstitute?.id,
+//   });
+
+//   // Create mutation
+//   const createMutation = useMutation({
+//     mutationFn: (data) => teacherService.create(data),
+//     onSuccess: (response) => {
+//       toast.success(`${teacherLabel} created successfully`);
+//       queryClient.invalidateQueries({ queryKey: ['teachers'] });
 //       closeModal();
 //     },
-//     onError: () => toast.error('Save failed'),
-//   });
-
-//   const remove = useMutation({
-//     mutationFn: async (id) => {
-//       try { const { teacherService } = await import('@/services'); return await teacherService.delete(id); }
-//       catch { return { success: true }; }
+//     onError: (error) => {
+//       toast.error(error.message || `Failed to create ${teacherLabel.toLowerCase()}`);
 //     },
-//     onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['teachers'] }); setDeleting(null); },
-//     onError: () => toast.error('Delete failed'),
 //   });
 
-//   const openAdd  = () => { setEditing(null); reset({ is_active:'true', gender:'' }); setModal(true); };
-//   const openEdit = (row) => {
-//     setEditing(row);
-//     reset({ ...row, is_active: String(row.is_active), gender: row.gender ?? '' });
-//     setModal(true);
-//   };
-//   const closeModal = () => { setModal(false); setEditing(null); reset(); };
+//   // Update mutation
+//   const updateMutation = useMutation({
+//     mutationFn: ({ id, data }) => teacherService.update(id, data),
+//     onSuccess: () => {
+//       toast.success(`${teacherLabel} updated successfully`);
+//       queryClient.invalidateQueries({ queryKey: ['teachers'] });
+//       closeModal();
+//     },
+//     onError: (error) => {
+//       toast.error(error.message || `Failed to update ${teacherLabel.toLowerCase()}`);
+//     },
+//   });
 
-//   // Columns
+//   // Delete mutation
+//   const deleteMutation = useMutation({
+//     mutationFn: (id) => teacherService.delete(id),
+//     onSuccess: () => {
+//       toast.success('Teacher deleted successfully');
+//       queryClient.invalidateQueries({ queryKey: ['teachers'] });
+//       setDeleting(null);
+//     },
+//     onError: (error) => {
+//       toast.error(error.message || 'Failed to delete teacher');
+//     },
+//   });
+
+//   // Regenerate QR mutation
+//   const regenerateQRMutation = useMutation({
+//     mutationFn: (id) => teacherService.regenerateQR(id),
+//     onSuccess: (response) => {
+//       toast.success('QR Code regenerated successfully');
+//       queryClient.invalidateQueries({ queryKey: ['teachers'] });
+//       setRegeneratingQR(null);
+      
+//       // Update viewing teacher if in view mode
+//       if (modalState.mode === 'view' && modalState.data) {
+//         setModalState({
+//           ...modalState,
+//           data: {
+//             ...modalState.data,
+//             qr_code_url: response.data?.qr_code
+//           }
+//         });
+//       }
+//     },
+//     onError: (error) => {
+//       toast.error(error.message || 'Failed to regenerate QR code');
+//     },
+//   });
+
+//   // Handle form submit
+//   const handleSubmit = (formData) => {
+//     console.log('📤 Form submitted:', formData);
+    
+//     if (modalState.mode === 'edit' && modalState.data) {
+//       updateMutation.mutate({ id: modalState.data.id, data: formData });
+//     } else {
+//       createMutation.mutate(formData);
+//     }
+//   };
+
+//   // Modal handlers
+//   const openAddModal = () => {
+//     setModalState({ isOpen: true, mode: 'add', data: null });
+//   };
+
+//   const openEditModal = (teacher) => {
+//     console.log('📝 Editing teacher:', teacher);
+//     setModalState({ isOpen: true, mode: 'edit', data: teacher });
+//   };
+
+//   const openViewModal = (teacher) => {
+//     console.log('👁️ Viewing teacher:', teacher);
+//     setModalState({ isOpen: true, mode: 'view', data: teacher });
+//   };
+
+//   const closeModal = () => {
+//     setModalState({ isOpen: false, mode: 'add', data: null });
+//   };
+
+//   // Handle regenerate QR
+//   const handleRegenerateQR = (teacherId) => {
+//     setRegeneratingQR(teacherId);
+//     regenerateQRMutation.mutate(teacherId);
+//   };
+
+//   // Handle clear filters
+//   const handleClearFilters = () => {
+//     resetFilters();
+//     setSearch('');
+//     setPage(1);
+//   };
+
+//   // Table columns
 //   const columns = useMemo(() => [
 //     {
 //       accessorKey: 'name',
 //       header: 'Name',
-//       cell: ({ row: { original: t } }) => (
-//         <div className="flex items-center gap-2">
-//           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-//             {t.first_name?.[0]}{t.last_name?.[0]}
+//       cell: ({ row }) => {
+//         const teacher = row.original;
+//         return (
+//           <div className="flex items-center gap-3">
+//             <Avatar className="h-8 w-8">
+//               <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+//                 {teacher.first_name?.[0]}{teacher.last_name?.[0]}
+//               </AvatarFallback>
+//             </Avatar>
+//             <div>
+//               <p className="font-medium leading-tight">
+//                 {teacher.first_name} {teacher.last_name}
+//               </p>
+//               <p className="text-xs text-muted-foreground">
+//                 {teacher.registration_no || 'No ID'}
+//               </p>
+//             </div>
 //           </div>
-//           <div>
-//             <p className="font-medium leading-tight">{t.first_name} {t.last_name}</p>
-//             <p className="text-xs text-muted-foreground">{t.qualification}</p>
-//           </div>
-//         </div>
-//       ),
+//         );
+//       },
 //     },
 //     {
 //       accessorKey: 'contact',
 //       header: 'Contact',
-//       cell: ({ row: { original: t } }) => (
-//         <div className="space-y-0.5 text-xs">
-//           <div className="flex items-center gap-1"><Mail size={11} />{t.email}</div>
-//           <div className="flex items-center gap-1"><Phone size={11} />{t.phone}</div>
-//         </div>
-//       ),
+//       cell: ({ row }) => {
+//         const teacher = row.original;
+//         return (
+//           <div className="space-y-0.5 text-xs">
+//             <div className="flex items-center gap-1">
+//               <Mail size={11} className="text-muted-foreground" />
+//               {teacher.email}
+//             </div>
+//             <div className="flex items-center gap-1">
+//               <Phone size={11} className="text-muted-foreground" />
+//               {teacher.phone}
+//             </div>
+//           </div>
+//         );
+//       },
 //     },
-//     { accessorKey: 'gender', header: 'Gender', cell: ({ getValue }) => <span className="capitalize">{getValue()}</span> },
-//     { accessorKey: 'joining_date', header: 'Joined', cell: ({ getValue }) => getValue() ? new Date(getValue()).toLocaleDateString('en-PK') : '—' },
+//     {
+//       accessorKey: 'department',
+//       header: 'Department',
+//       cell: ({ row }) => row.original.details?.teacherDetails?.department || '—',
+//     },
+//     {
+//       accessorKey: 'designation',
+//       header: 'Designation',
+//       cell: ({ row }) => row.original.details?.teacherDetails?.designation || '—',
+//     },
 //     {
 //       accessorKey: 'is_active',
 //       header: 'Status',
-//       cell: ({ getValue }) => (
-//         <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getValue() ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500')}>
-//           {getValue() ? 'Active' : 'Inactive'}
-//         </span>
-//       ),
+//       cell: ({ row }) => {
+//         const isActive = row.original.is_active;
+//         return (
+//           <Badge variant={isActive ? 'success' : 'secondary'}>
+//             {isActive ? 'Active' : 'Inactive'}
+//           </Badge>
+//         );
+//       },
 //     },
 //     {
-//       id: 'actions', header: 'Actions', enableHiding: false,
-//       cell: ({ row }) => (
-//         <div className="flex justify-end gap-1">
-//           {canDo('teachers.update') && (
-//             <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>
-//           )}
-//           {canDo('teachers.delete') && (
-//             <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>
-//           )}
-//         </div>
-//       ),
+//       id: 'actions',
+//       header: 'Actions',
+//       cell: ({ row }) => {
+//         const teacher = row.original;
+//         const canUpdate = canDo('teachers.update');
+//         const canDelete = canDo('teachers.delete');
+        
+//         const extraActions = [];
+        
+//         if (canUpdate) {
+//           // extraActions.push({
+//           //   label: 'View Details',
+//           //   icon: <Eye className="h-4 w-4" />,
+//           //   onClick: () => openViewModal(teacher)
+//           // });
+          
+//           extraActions.push({
+//             label: 'Regenerate QR Code',
+//             icon: <QrCode className="h-4 w-4" />,
+//             onClick: () => handleRegenerateQR(teacher.id)
+//           });
+//         }
+        
+//         return (
+//           <TableRowActions
+//             onView={() => openViewModal(teacher)}
+//             onEdit={canUpdate ? () => openEditModal(teacher) : undefined}
+//             onDelete={canDelete ? () => setDeleting(teacher) : undefined}
+//             extra={extraActions}
+//           />
+//         );
+//       },
 //     },
 //   ], [canDo]);
 
-//   const active   = teachers.filter(t => t.is_active).length;
+//   // Stats
+//   const teachers = data?.data || [];
+//   const total = data?.pagination?.total || 0;
+//   const active = teachers.filter(t => t.is_active).length;
 //   const inactive = teachers.filter(t => !t.is_active).length;
+
+//   // Loading
+//   if (isLoading && !data) {
+//     return <PageLoader message={`Loading ${teachersLabel.toLowerCase()}...`} />;
+//   }
 
 //   return (
 //     <div className="space-y-5">
-//       <PageHeader title={labelP} description={`${total} total`} />
-
-//       {/* Stats */}
-//       <div className="grid gap-4 sm:grid-cols-3">
-//         <StatsCard label={`Total ${labelP}`} value={total} icon={<GraduationCap size={18} />} />
-//         <StatsCard label="Active" value={active} icon={<GraduationCap size={18} />} trend={null} description="currently teaching" />
-//         <StatsCard label="Inactive" value={inactive} icon={<GraduationCap size={18} />} />
-//       </div>
-
-//       {/* Table */}
-//       <DataTable
-//         columns={columns} data={teachers} loading={isLoading}
-//         emptyMessage={`No ${labelP.toLowerCase()} found`}
-//         search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder={`Search ${labelP.toLowerCase()}…`}
-//         filters={[{ name:'status', label:'Status', value:status, onChange:(v)=>{ setStatus(v); setPage(1); }, options:STATUS_OPTIONS }]}
-//         action={canDo('teachers.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add {label}</button> : null}
-//         enableColumnVisibility
-//         exportConfig={{ fileName: 'teachers' }}
-//         pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }}
+//       <PageHeader
+//         title={teachersLabel}
+//         description={`Manage ${teachersLabel.toLowerCase()} • ${total} total`}
+//         action={
+//           <div className="flex items-center gap-2">
+//             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+//               <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+//               Refresh
+//             </Button>
+//             {canDo('teachers.create') && (
+//               <Button onClick={openAddModal} size="sm">
+//                 <Plus className="mr-2 h-4 w-4" />
+//                 Add {teacherLabel}
+//               </Button>
+//             )}
+//           </div>
+//         }
 //       />
 
-//       {/* Add / Edit Modal */}
-//       <AppModal open={modal} onClose={closeModal} title={editing ? `Edit ${label}` : `Add ${label}`} size="lg"
-//         footer={<>
-//           <button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-//           <button type="submit" form="teacher-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">
-//             {save.isPending ? 'Saving…' : editing ? 'Update' : 'Add'}
-//           </button>
-//         </>}
+//       {/* Error Alert */}
+//       <ErrorAlert message={error?.message} onRetry={refetch} />
+
+//       {/* Stats */}
+//       <div className="grid gap-4 sm:grid-cols-4">
+//         <StatsCard
+//           label={`Total ${teachersLabel}`}
+//           value={total}
+//           icon={<GraduationCap size={18} />}
+//         />
+//         <StatsCard
+//           label="Active"
+//           value={active}
+//           icon={<GraduationCap size={18} className="text-green-500" />}
+//         />
+//         <StatsCard
+//           label="Inactive"
+//           value={inactive}
+//           icon={<GraduationCap size={18} className="text-gray-500" />}
+//         />
+//         <StatsCard
+//           label="With QR"
+//           value={teachers.filter(t => t.qr_code_url).length}
+//           icon={<QrCode size={18} className="text-blue-500" />}
+//         />
+//       </div>
+
+//       {/* Filters - WITH CONTROL from filter form */}
+//       <Card>
+//         <CardHeader className="py-3">
+//           <CardTitle className="text-sm font-medium flex items-center">
+//             <Filter className="h-4 w-4 mr-2" />
+//             Filters
+//           </CardTitle>
+//         </CardHeader>
+//         <CardContent className="py-2">
+//           <div className="flex flex-wrap items-end gap-3">
+//             {/* Status Filter - WITH control */}
+//             <div className="w-48">
+//               <SelectField
+//                 label="Status"
+//                 name="status"
+//                 control={filterControl} // ✅ WITH control
+//                 options={[
+//                   { value: 'all', label: 'All Status' },
+//                   { value: 'active', label: 'Active' },
+//                   { value: 'inactive', label: 'Inactive' },
+//                 ]}
+//                 placeholder="Select Status"
+//               />
+//             </div>
+
+//             {/* Clear Filters Button */}
+//             {(selectedStatus || selectedRole) && (
+//               <Button
+//                 variant="ghost"
+//                 size="sm"
+//                 onClick={handleClearFilters}
+//                 className="mb-1"
+//               >
+//                 Clear Filters
+//               </Button>
+//             )}
+//           </div>
+//         </CardContent>
+//       </Card>
+
+//       {/* Data Table */}
+//       <DataTable
+//         columns={columns}
+//         data={teachers}
+//         loading={isLoading || isFetching}
+//         search={search}
+//         onSearch={(val) => {
+//           setSearch(val);
+//           setPage(1);
+//         }}
+//         searchPlaceholder={`Search ${teachersLabel.toLowerCase()}...`}
+//         enableColumnVisibility
+//         exportConfig={{
+//           fileName: `${type}_teachers_${new Date().toISOString().split('T')[0]}`,
+//           sheetName: teachersLabel
+//         }}
+//         pagination={{
+//           page,
+//           totalPages: data?.pagination?.totalPages || 1,
+//           onPageChange: setPage,
+//           total,
+//           pageSize,
+//           onPageSizeChange: (newSize) => {
+//             setPageSize(newSize);
+//             setPage(1);
+//           }
+//         }}
+//         emptyMessage={`No ${teachersLabel.toLowerCase()} found`}
+//       />
+
+//       {/* Add/Edit Modal */}
+//       <AppModal
+//         open={modalState.isOpen && modalState.mode !== 'view'}
+//         onClose={closeModal}
+//         title={modalState.mode === 'edit' ? `Edit ${teacherLabel}` : `Add ${teacherLabel}`}
+//         size="xl"
 //       >
-//         <form id="teacher-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
-//           <div className="grid grid-cols-2 gap-4">
-//             <div className="space-y-1.5">
-//               <label className="text-sm font-medium">First Name *</label>
-//               <input {...register('first_name')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Muhammad" />
-//               {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
-//             </div>
-//             <div className="space-y-1.5">
-//               <label className="text-sm font-medium">Last Name *</label>
-//               <input {...register('last_name')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Ahmed" />
-//               {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
-//             </div>
-//           </div>
-//           <div className="grid grid-cols-2 gap-4">
-//             <div className="space-y-1.5">
-//               <label className="text-sm font-medium">Email *</label>
-//               <input {...register('email')} type="email" className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="email@inst.pk" />
-//               {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-//             </div>
-//             <div className="space-y-1.5">
-//               <label className="text-sm font-medium">Phone *</label>
-//               <input {...register('phone')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="0300-1234567" />
-//               {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
-//             </div>
-//           </div>
-//           <div className="grid grid-cols-2 gap-4">
-//             <SelectField label="Gender" name="gender" control={control} error={errors.gender} options={GENDER_OPTIONS} placeholder="Select gender" required />
-//             <DatePickerField label="Joining Date" name="joining_date" control={control} error={errors.joining_date} />
-//           </div>
-//           <div className="space-y-1.5">
-//             <label className="text-sm font-medium">Qualification</label>
-//             <input {...register('qualification')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="M.Sc Physics" />
-//           </div>
-//           <div className="space-y-1.5">
-//             <label className="text-sm font-medium">Specialization</label>
-//             <input {...register('specialization')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. Algebra, Mechanics" />
-//           </div>
-//           <SelectField label="Status" name="is_active" control={control} error={errors.is_active} options={STATUS_OPTIONS} />
-//         </form>
+//         <TeacherForm
+//           key={modalState.data?.id || 'new'}
+//           defaultValues={modalState.mode === 'edit' ? modalState.data : {}}
+//           onSubmit={handleSubmit}
+//           onCancel={closeModal}
+//           loading={createMutation.isPending || updateMutation.isPending}
+//           departmentOptions={[]} // Fetch from API
+//           subjectOptions={[]} // Fetch from API
+//           branchOptions={[]} // Fetch from API
+//           designationOptions={[]} // Fetch from API
+//           roleOptions={roleOptions} // Pass role options
+//           isEdit={modalState.mode === 'edit'}
+//         />
 //       </AppModal>
 
-//       {/* Delete Confirm */}
-//       <AppModal open={!!deleting} onClose={() => setDeleting(null)} title={`Delete ${label}`} size="sm"
-//         footer={
-//           <>
-//             <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-//             <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-//               {remove.isPending ? 'Deleting' : 'Delete'}
-//             </button>
-//           </>
-//         }>
-//         <p className="text-sm text-muted-foreground">Delete <strong>{deleting?.first_name} {deleting?.last_name}</strong>? This cannot be undone.</p>
+//       {/* View Modal */}
+//       <AppModal
+//         open={modalState.isOpen && modalState.mode === 'view'}
+//         onClose={closeModal}
+//         title={`${teacherLabel} Details`}
+//         size="xl"
+//       >
+//         {modalState.data && (
+//           <div className="space-y-6">
+//             {/* Header with Avatar */}
+//             <div className="flex items-start justify-between">
+//               <div className="flex items-center gap-4">
+//                 <Avatar className="h-16 w-16">
+//                   <AvatarFallback className="bg-primary/10 text-xl font-bold text-primary">
+//                     {modalState.data.first_name?.[0]}{modalState.data.last_name?.[0]}
+//                   </AvatarFallback>
+//                 </Avatar>
+//                 <div>
+//                   <h3 className="text-lg font-semibold">
+//                     {modalState.data.first_name} {modalState.data.last_name}
+//                   </h3>
+//                   <p className="text-sm text-muted-foreground">
+//                     {modalState.data.Role?.name} • {modalState.data.details?.teacherDetails?.department || 'No Department'}
+//                   </p>
+//                   <div className="flex gap-2 mt-1">
+//                     <Badge variant={modalState.data.is_active ? 'success' : 'secondary'}>
+//                       {modalState.data.is_active ? 'Active' : 'Inactive'}
+//                     </Badge>
+//                     <Badge variant="outline">
+//                       ID: {modalState.data.registration_no || 'N/A'}
+//                     </Badge>
+//                   </div>
+//                 </div>
+//               </div>
+              
+//               {/* QR Code */}
+//               {modalState.data.qr_code_url && (
+//                 <div className="text-center">
+//                   <img 
+//                     src={modalState.data.qr_code_url} 
+//                     alt="QR Code"
+//                     className="w-24 h-24 border rounded-lg p-1"
+//                   />
+//                   <Button
+//                     variant="ghost"
+//                     size="sm"
+//                     className="mt-1"
+//                     onClick={() => window.open(modalState.data.qr_code_url, '_blank')}
+//                   >
+//                     <Download className="h-3 w-3 mr-1" />
+//                     Download
+//                   </Button>
+//                 </div>
+//               )}
+//             </div>
+
+//             <Tabs defaultValue="personal" className="w-full">
+//               <TabsList className="grid grid-cols-4 mb-4">
+//                 <TabsTrigger value="personal">Personal</TabsTrigger>
+//                 <TabsTrigger value="professional">Professional</TabsTrigger>
+//                 <TabsTrigger value="employment">Employment</TabsTrigger>
+//                 <TabsTrigger value="documents">Documents</TabsTrigger>
+//               </TabsList>
+
+//               <TabsContent value="personal">
+//                 <Card>
+//                   <CardContent className="p-4">
+//                     <dl className="grid grid-cols-2 gap-4">
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Full Name</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.first_name} {modalState.data.last_name}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Gender</dt>
+//                         <dd className="font-medium capitalize">
+//                           {modalState.data.details?.teacherDetails?.gender || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Email</dt>
+//                         <dd className="font-medium">{modalState.data.email}</dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Phone</dt>
+//                         <dd className="font-medium">{modalState.data.phone}</dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">CNIC</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.cnic || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Date of Birth</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.date_of_birth 
+//                             ? new Date(modalState.data.details.teacherDetails.date_of_birth).toLocaleDateString() 
+//                             : '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Blood Group</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.blood_group || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Religion</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.religion || '—'}
+//                         </dd>
+//                       </div>
+//                     </dl>
+                    
+//                     <Separator className="my-4" />
+                    
+//                     <h4 className="text-sm font-semibold mb-2">Address</h4>
+//                     <p className="text-sm">
+//                       {modalState.data.details?.teacherDetails?.present_address || 'No address provided'}
+//                     </p>
+                    
+//                     {modalState.data.details?.teacherDetails?.emergency_contact_name && (
+//                       <>
+//                         <Separator className="my-4" />
+//                         <h4 className="text-sm font-semibold mb-2">Emergency Contact</h4>
+//                         <dl className="grid grid-cols-2 gap-2">
+//                           <div>
+//                             <dt className="text-xs text-muted-foreground">Name</dt>
+//                             <dd className="text-sm">
+//                               {modalState.data.details.teacherDetails.emergency_contact_name}
+//                             </dd>
+//                           </div>
+//                           <div>
+//                             <dt className="text-xs text-muted-foreground">Relation</dt>
+//                             <dd className="text-sm">
+//                               {modalState.data.details.teacherDetails.emergency_contact_relation}
+//                             </dd>
+//                           </div>
+//                           <div>
+//                             <dt className="text-xs text-muted-foreground">Phone</dt>
+//                             <dd className="text-sm">
+//                               {modalState.data.details.teacherDetails.emergency_contact_phone}
+//                             </dd>
+//                           </div>
+//                         </dl>
+//                       </>
+//                     )}
+//                   </CardContent>
+//                 </Card>
+//               </TabsContent>
+
+//               <TabsContent value="professional">
+//                 <Card>
+//                   <CardContent className="p-4">
+//                     <dl className="grid grid-cols-2 gap-4">
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Qualification</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.qualification || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Specialization</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.specialization || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Experience</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.experience_years 
+//                             ? `${modalState.data.details.teacherDetails.experience_years} years` 
+//                             : '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Previous Institution</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.previous_institution || '—'}
+//                         </dd>
+//                       </div>
+//                     </dl>
+
+//                     <Separator className="my-4" />
+                    
+//                     <h4 className="text-sm font-semibold mb-2">Subjects</h4>
+//                     {modalState.data.details?.teacherDetails?.subjects?.length > 0 ? (
+//                       <div className="flex flex-wrap gap-2">
+//                         {modalState.data.details.teacherDetails.subjects.map((subject, idx) => (
+//                           <Badge key={idx} variant="outline">{subject}</Badge>
+//                         ))}
+//                       </div>
+//                     ) : (
+//                       <p className="text-sm text-muted-foreground">No subjects assigned</p>
+//                     )}
+//                   </CardContent>
+//                 </Card>
+//               </TabsContent>
+
+//               <TabsContent value="employment">
+//                 <Card>
+//                   <CardContent className="p-4">
+//                     <dl className="grid grid-cols-2 gap-4">
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Role</dt>
+//                         <dd className="font-medium">{modalState.data.Role?.name || '—'}</dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Designation</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.designation || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Department</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.department || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Employment Type</dt>
+//                         <dd className="font-medium capitalize">
+//                           {modalState.data.details?.teacherDetails?.employment_type || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Joining Date</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.joining_date
+//                             ? new Date(modalState.data.details.teacherDetails.joining_date).toLocaleDateString()
+//                             : '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Salary</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.salary
+//                             ? `PKR ${Number(modalState.data.details.teacherDetails.salary).toLocaleString()}`
+//                             : '—'}
+//                         </dd>
+//                       </div>
+//                     </dl>
+
+//                     <Separator className="my-4" />
+                    
+//                     <h4 className="text-sm font-semibold mb-2">Bank Details</h4>
+//                     <dl className="grid grid-cols-2 gap-4">
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Bank Name</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.bank_name || '—'}
+//                         </dd>
+//                       </div>
+//                       <div>
+//                         <dt className="text-sm text-muted-foreground">Account No</dt>
+//                         <dd className="font-medium">
+//                           {modalState.data.details?.teacherDetails?.bank_account_no || '—'}
+//                         </dd>
+//                       </div>
+//                     </dl>
+//                   </CardContent>
+//                 </Card>
+//               </TabsContent>
+
+//               <TabsContent value="documents">
+//                 <Card>
+//                   <CardContent className="p-4">
+//                     {modalState.data.documents?.length > 0 ? (
+//                       <div className="space-y-3">
+//                         {modalState.data.documents.map((doc, idx) => (
+//                           <div key={doc.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
+//                             <div>
+//                               <p className="font-medium">{doc.title}</p>
+//                               <p className="text-xs text-muted-foreground">
+//                                 Type: {doc.type} • {new Date(doc.uploaded_at).toLocaleDateString()}
+//                               </p>
+//                             </div>
+//                             <div className="flex items-center gap-2">
+//                               {doc.verified && (
+//                                 <Badge variant="success" size="sm">Verified</Badge>
+//                               )}
+//                               {doc.file_url && (
+//                                 <Button
+//                                   variant="ghost"
+//                                   size="sm"
+//                                   onClick={() => window.open(doc.file_url, '_blank')}
+//                                 >
+//                                   View
+//                                 </Button>
+//                               )}
+//                             </div>
+//                           </div>
+//                         ))}
+//                       </div>
+//                     ) : (
+//                       <p className="text-center text-muted-foreground py-8">
+//                         No documents uploaded
+//                       </p>
+//                     )}
+//                   </CardContent>
+//                 </Card>
+//               </TabsContent>
+//             </Tabs>
+
+//             <div className="flex justify-end gap-3 pt-4 border-t">
+//               <Button variant="outline" onClick={closeModal}>
+//                 Close
+//               </Button>
+//               {canDo('teachers.update') && (
+//                 <Button onClick={() => {
+//                   closeModal();
+//                   openEditModal(modalState.data);
+//                 }}>
+//                   Edit {teacherLabel}
+//                 </Button>
+//               )}
+//             </div>
+//           </div>
+//         )}
 //       </AppModal>
+
+//       {/* Delete Confirmation */}
+//       <ConfirmDialog
+//         open={!!deleting}
+//         onClose={() => setDeleting(null)}
+//         onConfirm={() => deleteMutation.mutate(deleting.id)}
+//         loading={deleteMutation.isPending}
+//         title={`Delete ${teacherLabel}`}
+//         description={
+//           <>
+//             Are you sure you want to delete <strong>{deleting?.first_name} {deleting?.last_name}</strong>?
+//             This action cannot be undone.
+//           </>
+//         }
+//         confirmLabel="Delete"
+//         variant="destructive"
+//       />
+
+//       {/* QR Regeneration Confirmation */}
+//       <ConfirmDialog
+//         open={!!regeneratingQR}
+//         onClose={() => setRegeneratingQR(null)}
+//         onConfirm={() => regenerateQRMutation.mutate(regeneratingQR)}
+//         loading={regenerateQRMutation.isPending}
+//         title="Regenerate QR Code"
+//         description="Are you sure you want to regenerate the QR code? The old QR code will stop working."
+//         confirmLabel="Regenerate"
+//       />
 //     </div>
 //   );
 // }
+// src/components/pages/TeachersPage.jsx (COMPLETE FIXED VERSION)
 
 'use client';
 
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-/**
- * TeachersPage — Adaptive for all institute types
- * School → Teachers | Coaching → Instructors | Academy → Trainers
- * College → Lecturers | University → Faculty / Staff
- */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-<<<<<<< HEAD
+import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, GraduationCap, Phone, Mail } from 'lucide-react';
-=======
-import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, GraduationCap, Phone, Mail, Eye } from 'lucide-react';
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
+import { 
+  Plus, 
+  GraduationCap, 
+  Eye,
+  Pencil,
+  Trash2,
+  QrCode,
+  Download,
+  RefreshCw,
+  Filter,
+  Mail,
+  Phone,
+  Power // ✅ For active/deactivate
+} from 'lucide-react';
 
-import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
+import useInstituteStore from '@/store/instituteStore';
+import useInstituteConfig from '@/hooks/useInstituteConfig';
+
+// Components
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
-<<<<<<< HEAD
-import SelectField from '@/components/common/SelectField';
-import DatePickerField from '@/components/common/DatePickerField';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 import StatsCard from '@/components/common/StatsCard';
-import { cn } from '@/lib/utils';
-import { DUMMY_FLAT_TEACHERS } from '@/data/dummyData';
-
-// ─── Options ────────────────────────────────────────────────────────────────
-const GENDER_OPTIONS   = [{ value:'male', label:'Male' }, { value:'female', label:'Female' }, { value:'other', label:'Other' }];
-const STATUS_OPTIONS   = [{ value:'true', label:'Active' }, { value:'false', label:'Inactive' }];
-const SUBJECT_OPTIONS  = [
-  { value:'mathematics', label:'Mathematics' }, { value:'physics', label:'Physics' },
-  { value:'chemistry', label:'Chemistry' }, { value:'biology', label:'Biology' },
-  { value:'english', label:'English' }, { value:'computer', label:'Computer Science' },
-  { value:'urdu', label:'Urdu' }, { value:'islamiat', label:'Islamiat' },
-];
-
-// ─── Zod schema ─────────────────────────────────────────────────────────────
-const schema = z.object({
-  first_name:  z.string().min(2, 'First name required'),
-  last_name:   z.string().min(2, 'Last name required'),
-  email:       z.string().email('Valid email required'),
-  phone:       z.string().min(10, 'Phone required'),
-  gender:      z.string().min(1, 'Select gender'),
-  joining_date:z.string().optional(),
-  qualification:z.string().optional(),
-  specialization:z.string().optional(),
-  is_active:   z.string().optional(),
-});
-=======
+import TableRowActions from '@/components/common/TableRowActions';
+import ErrorAlert from '@/components/common/ErrorAlert';
+import PageLoader from '@/components/common/PageLoader';
 import TeacherForm from '@/components/forms/TeacherForm';
-import StatsCard from '@/components/common/StatsCard';
-import { cn } from '@/lib/utils';
-import { DUMMY_FLAT_TEACHERS } from '@/data/dummyData';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import SelectField from '@/components/common/SelectField';
+import StatusBadge from '@/components/common/StatusBadge';
+
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '../ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 
-// ─── Options ────────────────────────────────────────────────────────────────
-const STATUS_OPTIONS = [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }];
+import { teacherService } from '@/services/teacherService';
 
-// Dummy options (in real app, fetch from API)
-const DEPARTMENT_OPTIONS = [
-  { value: 'science', label: 'Science' },
-  { value: 'math', label: 'Mathematics' },
-  { value: 'english', label: 'English' },
-  { value: 'computer', label: 'Computer Science' },
-];
-
-const SUBJECT_OPTIONS = [
-  { value: 'mathematics', label: 'Mathematics' },
-  { value: 'physics', label: 'Physics' },
-  { value: 'chemistry', label: 'Chemistry' },
-  { value: 'biology', label: 'Biology' },
-  { value: 'english', label: 'English' },
-  { value: 'computer', label: 'Computer Science' },
-  { value: 'urdu', label: 'Urdu' },
-  { value: 'islamiat', label: 'Islamiat' },
-];
-
-const DESIGNATION_OPTIONS = [
-  { value: 'senior_teacher', label: 'Senior Teacher' },
-  { value: 'junior_teacher', label: 'Junior Teacher' },
-  { value: 'lecturer', label: 'Lecturer' },
-  { value: 'assistant_professor', label: 'Assistant Professor' },
-  { value: 'associate_professor', label: 'Associate Professor' },
-  { value: 'professor', label: 'Professor' },
-];
-
-const BRANCH_OPTIONS = [
-  { value: 'main', label: 'Main Campus' },
-  { value: 'city', label: 'City Campus' },
-  { value: 'north', label: 'North Branch' },
-];
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-
-// ─── Dummy fallback ──────────────────────────────────────────────────────────
-const genDummy = (type) => {
-  const base = DUMMY_FLAT_TEACHERS ?? [];
-  return base.length ? base : [
-<<<<<<< HEAD
-    { id:'t1', first_name:'Ahmed', last_name:'Raza', email:'ahmed@inst.pk', phone:'0300-1234567', gender:'male', qualification:'M.Sc Physics', joining_date:'2022-04-01', is_active:true },
-=======
-    { 
-      id: 't1', 
-      first_name: 'Ahmed', 
-      last_name: 'Raza', 
-      email: 'ahmed@inst.pk', 
-      phone: '0300-1234567', 
-      gender: 'male', 
-      qualification: 'M.Sc Physics',
-      specialization: 'Quantum Mechanics',
-      joining_date: '2022-04-01', 
-      is_active: true,
-      employee_id: 'EMP-001',
-      designation: 'Senior Teacher',
-      department: 'Science',
-      subjects: ['physics', 'mathematics'],
-      details: {
-        teacherDetails: {
-          basic_salary: 45000,
-          bank_name: 'HBL',
-          bank_account_no: '1234567890'
-        }
-      }
-    },
-    { 
-      id: 't2', 
-      first_name: 'Fatima', 
-      last_name: 'Ahmed', 
-      email: 'fatima@inst.pk', 
-      phone: '0301-7654321', 
-      gender: 'female', 
-      qualification: 'M.A English',
-      specialization: 'Linguistics',
-      joining_date: '2023-01-15', 
-      is_active: true,
-      employee_id: 'EMP-002',
-      designation: 'Lecturer',
-      department: 'English',
-      subjects: ['english', 'urdu'],
-      details: {
-        teacherDetails: {
-          basic_salary: 40000,
-          bank_name: 'UBL',
-          bank_account_no: '0987654321'
-        }
-      }
-    },
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-  ];
-};
+// ✅ Zod schema for filters
+const filterSchema = z.object({
+  status: z.string().optional(),
+});
 
 export default function TeachersPage({ type }) {
-<<<<<<< HEAD
-  const qc     = useQueryClient();
-  const canDo  = useAuthStore((s) => s.canDo);
+  const queryClient = useQueryClient();
+  const { canDo, user } = useAuthStore();
+  const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
-  const label  = terms.teacher ?? 'Teacher';
-  const labelP = terms.teachers ?? 'Teachers';
-
-  const [search,   setSearch]   = useState('');
-  const [status,   setStatus]   = useState('');
-  const [page,     setPage]     = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [modal,    setModal]    = useState(false);
-  const [editing,  setEditing]  = useState(null);
-  const [deleting, setDeleting] = useState(null);
-
-  // Form
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: { is_active: 'true', gender: '' },
-  });
-
-  // Fetch
-=======
-  const qc = useQueryClient();
-  const canDo = useAuthStore((s) => s.canDo);
-  const { terms } = useInstituteConfig();
-  const label = terms.teacher ?? 'Teacher';
-  const labelP = terms.teachers ?? 'Teachers';
-
+  
+  // State
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  
-  // Modal states
   const [modalState, setModalState] = useState({
     isOpen: false,
     mode: 'add', // 'add' | 'edit' | 'view'
     data: null
   });
-
   const [deleting, setDeleting] = useState(null);
+  const [togglingStatus, setTogglingStatus] = useState(null); // ✅ For active/deactivate
+  const [regeneratingQR, setRegeneratingQR] = useState(null);
 
-  // Fetch teachers
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-  const { data, isLoading } = useQuery({
-    queryKey: ['teachers', type, page, pageSize, search, status],
+  // ✅ FILTER FORM with react-hook-form
+  const {
+    control: filterControl,
+    watch: filterWatch,
+    reset: resetFilters
+  } = useForm({
+    resolver: zodResolver(filterSchema),
+    defaultValues: {
+      status: '',
+    }
+  });
+
+  // Watch filter values
+  const selectedStatus = filterWatch('status');
+
+  // Terms
+  const teacherLabel = terms?.teacher || 'Teacher';
+  const teachersLabel = terms?.teachers || 'Teachers';
+
+  // Fetch teachers with filters
+  const { 
+    data, 
+    isLoading, 
+    error, 
+    refetch,
+    isFetching 
+  } = useQuery({
+    queryKey: ['teachers', currentInstitute?.id, page, pageSize, search, selectedStatus],
     queryFn: async () => {
-      try {
-        const { teacherService } = await import('@/services');
-<<<<<<< HEAD
-        return await teacherService.getAll({ page, limit: pageSize, search, is_active: status });
-=======
-        return await teacherService.getAll({ 
-          page, 
-          limit: pageSize, 
-          search, 
-          is_active: status 
-        });
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-      } catch {
-        const dummy = genDummy(type).filter(t =>
-          (!search || `${t.first_name} ${t.last_name}`.toLowerCase().includes(search.toLowerCase())) &&
-          (!status || String(t.is_active) === status)
-        );
-        const slice = dummy.slice((page-1)*pageSize, page*pageSize);
-<<<<<<< HEAD
-        return { data: { rows: slice, total: dummy.length, totalPages: Math.max(1, Math.ceil(dummy.length / pageSize)) } };
-      }
+      console.log('📥 Fetching teachers with filters:', {
+        institute_id: currentInstitute?.id,
+        page,
+        limit: pageSize,
+        search: search || undefined,
+        status: selectedStatus || undefined
+      });
+      
+      const response = await teacherService.getAll({
+        institute_id: currentInstitute?.id,
+        page,
+        limit: pageSize,
+        search: search || undefined,
+        status: selectedStatus || undefined
+      });
+      
+      return response;
     },
-    placeholderData: (p) => p,
+    enabled: !!currentInstitute?.id,
   });
 
-  const teachers   = data?.data?.rows       ?? genDummy(type);
-  const total      = data?.data?.total      ?? teachers.length;
-=======
-        return { 
-          data: { 
-            rows: slice, 
-            total: dummy.length, 
-            totalPages: Math.max(1, Math.ceil(dummy.length / pageSize)) 
-          } 
-        };
-      }
-    },
-    placeholderData: (prev) => prev,
-  });
-
-  const teachers = data?.data?.rows ?? genDummy(type);
-  const total = data?.data?.total ?? teachers.length;
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-  const totalPages = data?.data?.totalPages ?? 1;
-
-  // Save mutation
-  const save = useMutation({
-<<<<<<< HEAD
-    mutationFn: async (vals) => {
-      try {
-        const { teacherService } = await import('@/services');
-        return editing
-          ? await teacherService.update(editing.id, vals)
-          : await teacherService.create(vals);
-      } catch { return { data: { ...vals, id: `t-${Date.now()}` } }; }
-    },
-    onSuccess: () => {
-      toast.success(editing ? `${label} updated` : `${label} added`);
-=======
-    mutationFn: async (formData) => {
-      try {
-        const { teacherService } = await import('@/services');
-        
-        // Prepare data for API
-        const apiData = {
-          ...formData,
-          user_type: 'TEACHER',
-          school_id: 'current-school-id', // Get from context/auth
-        };
-        
-        if (modalState.mode === 'edit' && modalState.data) {
-          return await teacherService.update(modalState.data.id, apiData);
-        } else {
-          return await teacherService.create(apiData);
-        }
-      } catch (error) {
-        console.error('Save error:', error);
-        // Fallback for development
-        return { 
-          data: { 
-            ...formData, 
-            id: modalState.mode === 'edit' ? modalState.data.id : `t-${Date.now()}` 
-          } 
-        };
-      }
-    },
-    onSuccess: () => {
-      toast.success(modalState.mode === 'edit' ? `${label} updated` : `${label} added`);
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-      qc.invalidateQueries({ queryKey: ['teachers'] });
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: (data) => teacherService.create(data),
+    onSuccess: (response) => {
+      toast.success(`${teacherLabel} created successfully`);
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
       closeModal();
     },
-    onError: () => toast.error('Save failed'),
-  });
-
-  const remove = useMutation({
-    mutationFn: async (id) => {
-<<<<<<< HEAD
-      try { const { teacherService } = await import('@/services'); return await teacherService.delete(id); }
-      catch { return { success: true }; }
+    onError: (error) => {
+      toast.error(error.message || `Failed to create ${teacherLabel.toLowerCase()}`);
     },
-    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['teachers'] }); setDeleting(null); },
-    onError: () => toast.error('Delete failed'),
   });
 
-  const openAdd  = () => { setEditing(null); reset({ is_active:'true', gender:'' }); setModal(true); };
-  const openEdit = (row) => {
-    setEditing(row);
-    reset({ ...row, is_active: String(row.is_active), gender: row.gender ?? '' });
-    setModal(true);
-  };
-  const closeModal = () => { setModal(false); setEditing(null); reset(); };
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => teacherService.update(id, data),
+    onSuccess: () => {
+      toast.success(`${teacherLabel} updated successfully`);
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      closeModal();
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to update ${teacherLabel.toLowerCase()}`);
+    },
+  });
 
-  // Columns
-=======
-      try { 
-        const { teacherService } = await import('@/services'); 
-        return await teacherService.delete(id); 
-      } catch { 
-        return { success: true }; 
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id) => teacherService.delete(id),
+    onSuccess: () => {
+      toast.success('Teacher deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      setDeleting(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete teacher');
+    },
+  });
+
+  // ✅ Toggle status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, is_active }) => teacherService.toggleStatus(id, is_active),
+    onSuccess: (_, variables) => {
+      toast.success(variables.is_active ? 'Teacher activated' : 'Teacher deactivated');
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      setTogglingStatus(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to toggle status');
+      setTogglingStatus(null);
+    },
+  });
+
+  // Regenerate QR mutation
+  const regenerateQRMutation = useMutation({
+    mutationFn: (id) => teacherService.regenerateQR(id),
+    onSuccess: (response) => {
+      toast.success('QR Code regenerated successfully');
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      setRegeneratingQR(null);
+      
+      // Update viewing teacher if in view mode
+      if (modalState.mode === 'view' && modalState.data) {
+        setModalState({
+          ...modalState,
+          data: {
+            ...modalState.data,
+            qr_code_url: response.data?.qr_code
+          }
+        });
       }
     },
-    onSuccess: () => { 
-      toast.success('Deleted'); 
-      qc.invalidateQueries({ queryKey: ['teachers'] }); 
-      setDeleting(null); 
+    onError: (error) => {
+      toast.error(error.message || 'Failed to regenerate QR code');
     },
-    onError: () => toast.error('Delete failed'),
   });
+
+  // Handle form submit
+  const handleSubmit = (formData) => {
+    console.log('📤 Form submitted:', formData);
+    
+    if (modalState.mode === 'edit' && modalState.data) {
+      updateMutation.mutate({ id: modalState.data.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
 
   // Modal handlers
   const openAddModal = () => {
-    setModalState({
-      isOpen: true,
-      mode: 'add',
-      data: null
-    });
+    setModalState({ isOpen: true, mode: 'add', data: null });
   };
 
   const openEditModal = (teacher) => {
-    setModalState({
-      isOpen: true,
-      mode: 'edit',
-      data: teacher
-    });
+    console.log('📝 Editing teacher:', teacher);
+    setModalState({ isOpen: true, mode: 'edit', data: teacher });
   };
 
   const openViewModal = (teacher) => {
-    setModalState({
-      isOpen: true,
-      mode: 'view',
-      data: teacher
-    });
+    console.log('👁️ Viewing teacher:', teacher);
+    setModalState({ isOpen: true, mode: 'view', data: teacher });
   };
 
   const closeModal = () => {
-    setModalState({
-      isOpen: false,
-      mode: 'add',
-      data: null
-    });
+    setModalState({ isOpen: false, mode: 'add', data: null });
   };
 
-  // Form submit handler
-  const handleFormSubmit = async (formData) => {
-    save.mutate(formData);
+  // Handle regenerate QR
+  const handleRegenerateQR = (teacherId) => {
+    setRegeneratingQR(teacherId);
+    regenerateQRMutation.mutate(teacherId);
   };
 
-  // Get modal title
-  const getModalTitle = () => {
-    if (modalState.mode === 'add') return `Add ${label}`;
-    if (modalState.mode === 'edit') return `Edit ${label}`;
-    return `View ${label}`;
+  // ✅ Handle toggle status
+  const handleToggleStatus = (teacher) => {
+    setTogglingStatus(teacher);
   };
 
-  // Columns for DataTable
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
+  // Handle clear filters
+  const handleClearFilters = () => {
+    resetFilters();
+    setSearch('');
+    setPage(1);
+  };
+
+  // Table columns
   const columns = useMemo(() => [
     {
       accessorKey: 'name',
       header: 'Name',
-      cell: ({ row: { original: t } }) => (
-<<<<<<< HEAD
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-            {t.first_name?.[0]}{t.last_name?.[0]}
+      cell: ({ row }) => {
+        const teacher = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                {teacher.first_name?.[0]}{teacher.last_name?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium leading-tight">
+                {teacher.first_name} {teacher.last_name}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {teacher.registration_no || 'No ID'}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-medium leading-tight">{t.first_name} {t.last_name}</p>
-            <p className="text-xs text-muted-foreground">{t.qualification}</p>
-=======
-        <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-              {t.first_name?.[0]}{t.last_name?.[0]}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium leading-tight">{t.first_name} {t.last_name}</p>
-            <p className="text-xs text-muted-foreground">{t.qualification || t.designation}</p>
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       accessorKey: 'contact',
       header: 'Contact',
-      cell: ({ row: { original: t } }) => (
-        <div className="space-y-0.5 text-xs">
-<<<<<<< HEAD
-          <div className="flex items-center gap-1"><Mail size={11} />{t.email}</div>
-          <div className="flex items-center gap-1"><Phone size={11} />{t.phone}</div>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const teacher = row.original;
+        return (
+          <div className="space-y-0.5 text-xs">
+            <div className="flex items-center gap-1">
+              <Mail size={11} className="text-muted-foreground" />
+              {teacher.email}
+            </div>
+            <div className="flex items-center gap-1">
+              <Phone size={11} className="text-muted-foreground" />
+              {teacher.phone}
+            </div>
+          </div>
+        );
+      },
     },
-    { accessorKey: 'gender', header: 'Gender', cell: ({ getValue }) => <span className="capitalize">{getValue()}</span> },
-    { accessorKey: 'joining_date', header: 'Joined', cell: ({ getValue }) => getValue() ? new Date(getValue()).toLocaleDateString('en-PK') : '—' },
-=======
-          <div className="flex items-center gap-1"><Mail size={11} className="text-muted-foreground" />{t.email}</div>
-          <div className="flex items-center gap-1"><Phone size={11} className="text-muted-foreground" />{t.phone}</div>
-        </div>
-      ),
-    },
-    { 
-      accessorKey: 'employee_id', 
-      header: 'Employee ID',
-      cell: ({ getValue }) => getValue() || '—'
-    },
-    { 
-      accessorKey: 'department', 
+    {
+      accessorKey: 'department',
       header: 'Department',
-      cell: ({ getValue }) => getValue() || '—'
+      cell: ({ row }) => row.original.details?.teacherDetails?.department || '—',
     },
-    { 
-      accessorKey: 'joining_date', 
-      header: 'Joined', 
-      cell: ({ getValue }) => getValue() ? new Date(getValue()).toLocaleDateString('en-PK') : '—' 
+    {
+      accessorKey: 'designation',
+      header: 'Designation',
+      cell: ({ row }) => row.original.details?.teacherDetails?.designation || '—',
     },
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
     {
       accessorKey: 'is_active',
       header: 'Status',
-      cell: ({ getValue }) => (
-<<<<<<< HEAD
-        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getValue() ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500')}>
-          {getValue() ? 'Active' : 'Inactive'}
-        </span>
-      ),
-    },
-    {
-      id: 'actions', header: 'Actions', enableHiding: false,
-      cell: ({ row }) => (
-        <div className="flex justify-end gap-1">
-          {canDo('teacher.update') && (
-            <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>
-          )}
-          {canDo('teacher.delete') && (
-            <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>
-=======
-        <Badge variant={getValue() ? 'success' : 'secondary'}>
-          {getValue() ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const isActive = row.original.is_active;
+        return (
+          <StatusBadge status={isActive ? 'active' : 'inactive'} />
+        );
+      },
     },
     {
       id: 'actions',
       header: 'Actions',
-      enableHiding: false,
-      cell: ({ row }) => (
-        <div className="flex justify-end gap-1">
-          <button 
-            onClick={() => openViewModal(row.original)} 
-            className="rounded p-1.5 hover:bg-accent" 
-            title="View Details"
-          >
-            <Eye size={13} />
-          </button>
-          {canDo('teachers.update') && (
-            <button 
-              onClick={() => openEditModal(row.original)} 
-              className="rounded p-1.5 hover:bg-accent" 
-              title="Edit"
-            >
-              <Pencil size={13} />
-            </button>
-          )}
-          {canDo('teachers.delete') && (
-            <button 
-              onClick={() => setDeleting(row.original)} 
-              className="rounded p-1.5 text-destructive hover:bg-destructive/10" 
-              title="Delete"
-            >
-              <Trash2 size={13} />
-            </button>
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-          )}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const teacher = row.original;
+        const canUpdate = canDo('teachers.update');
+        const canDelete = canDo('teachers.delete');
+        
+        const extraActions = [];
+        
+        if (canUpdate) {
+          extraActions.push({
+            label: 'Regenerate QR Code',
+            icon: <QrCode className="h-4 w-4" />,
+            onClick: () => handleRegenerateQR(teacher.id)
+          });
+          
+          // ✅ Add toggle status action
+          extraActions.push({
+            label: teacher.is_active ? 'Deactivate' : 'Activate',
+            icon: <Power className="h-4 w-4" />,
+            onClick: () => handleToggleStatus(teacher),
+            variant: teacher.is_active ? 'destructive' : 'default'
+          });
+        }
+        
+        return (
+          <TableRowActions
+            onView={() => openViewModal(teacher)}
+            onEdit={canUpdate ? () => openEditModal(teacher) : undefined}
+            onDelete={canDelete ? () => setDeleting(teacher) : undefined}
+            extra={extraActions}
+          />
+        );
+      },
     },
   ], [canDo]);
 
-<<<<<<< HEAD
-  const active   = teachers.filter(t => t.is_active).length;
-  const inactive = teachers.filter(t => !t.is_active).length;
-
-  return (
-    <div className="space-y-5">
-      <PageHeader title={labelP} description={`${total} total`} />
-
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label={`Total ${labelP}`} value={total} icon={<GraduationCap size={18} />} />
-        <StatsCard label="Active" value={active} icon={<GraduationCap size={18} />} trend={null} description="currently teaching" />
-        <StatsCard label="Inactive" value={inactive} icon={<GraduationCap size={18} />} />
-      </div>
-
-      {/* Table */}
-      <DataTable
-        columns={columns} data={teachers} loading={isLoading}
-        emptyMessage={`No ${labelP.toLowerCase()} found`}
-        search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder={`Search ${labelP.toLowerCase()}…`}
-        filters={[{ name:'status', label:'Status', value:status, onChange:(v)=>{ setStatus(v); setPage(1); }, options:STATUS_OPTIONS }]}
-        action={canDo('teacher.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add {label}</button> : null}
-        enableColumnVisibility
-        exportConfig={{ fileName: 'teachers' }}
-        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }}
-      />
-
-      {/* Add / Edit Modal */}
-      <AppModal open={modal} onClose={closeModal} title={editing ? `Edit ${label}` : `Add ${label}`} size="lg"
-        footer={<>
-          <button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-          <button type="submit" form="teacher-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">
-            {save.isPending ? 'Saving…' : editing ? 'Update' : 'Add'}
-          </button>
-        </>}
-      >
-        <form id="teacher-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">First Name *</label>
-              <input {...register('first_name')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Muhammad" />
-              {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Last Name *</label>
-              <input {...register('last_name')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Ahmed" />
-              {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Email *</label>
-              <input {...register('email')} type="email" className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="email@inst.pk" />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Phone *</label>
-              <input {...register('phone')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="0300-1234567" />
-              {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <SelectField label="Gender" name="gender" control={control} error={errors.gender} options={GENDER_OPTIONS} placeholder="Select gender" required />
-            <DatePickerField label="Joining Date" name="joining_date" control={control} error={errors.joining_date} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Qualification</label>
-            <input {...register('qualification')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="M.Sc Physics" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Specialization</label>
-            <input {...register('specialization')} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. Algebra, Mechanics" />
-          </div>
-          <SelectField label="Status" name="is_active" control={control} error={errors.is_active} options={STATUS_OPTIONS} />
-        </form>
-      </AppModal>
-
-      {/* Delete Confirm */}
-      <AppModal open={!!deleting} onClose={() => setDeleting(null)} title={`Delete ${label}`} size="sm"
-        footer={
-          <>
-            <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-            <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
-            </button>
-          </>
-        }>
-        <p className="text-sm text-muted-foreground">Delete <strong>{deleting?.first_name} {deleting?.last_name}</strong>? This cannot be undone.</p>
-=======
+  // Stats
+  const teachers = data?.data || [];
+  const total = data?.pagination?.total || 0;
   const active = teachers.filter(t => t.is_active).length;
   const inactive = teachers.filter(t => !t.is_active).length;
 
-  // Render view mode
-  const renderViewMode = () => {
-    const teacher = modalState.data;
-    if (!teacher) return null;
-
-    return (
-      <div className="space-y-6">
-        {/* Header with Avatar */}
-        <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarFallback className="bg-primary/10 text-xl font-bold text-primary">
-              {teacher.first_name?.[0]}{teacher.last_name?.[0]}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="text-lg font-semibold">{teacher.first_name} {teacher.last_name}</h3>
-            <p className="text-sm text-muted-foreground">{teacher.designation} • {teacher.department}</p>
-            <Badge variant={teacher.is_active ? 'success' : 'secondary'} className="mt-1">
-              {teacher.is_active ? 'Active' : 'Inactive'}
-            </Badge>
-          </div>
-        </div>
-
-        <Tabs defaultValue="personal" className="w-full">
-          <TabsList className="grid grid-cols-4 mb-4">
-            <TabsTrigger value="personal">Personal</TabsTrigger>
-            <TabsTrigger value="professional">Professional</TabsTrigger>
-            <TabsTrigger value="academic">Academic</TabsTrigger>
-            <TabsTrigger value="bank">Bank</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="personal">
-            <Card>
-              <CardContent className="p-4">
-                <dl className="grid grid-cols-2 gap-4">
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Full Name</dt>
-                    <dd className="font-medium">{teacher.first_name} {teacher.last_name}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Gender</dt>
-                    <dd className="font-medium capitalize">{teacher.gender || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Email</dt>
-                    <dd className="font-medium">{teacher.email}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Phone</dt>
-                    <dd className="font-medium">{teacher.phone}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">CNIC</dt>
-                    <dd className="font-medium">{teacher.cnic || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Date of Birth</dt>
-                    <dd className="font-medium">{teacher.dob ? new Date(teacher.dob).toLocaleDateString() : '—'}</dd>
-                  </div>
-                </dl>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="professional">
-            <Card>
-              <CardContent className="p-4">
-                <dl className="grid grid-cols-2 gap-4">
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Employee ID</dt>
-                    <dd className="font-medium">{teacher.employee_id || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Designation</dt>
-                    <dd className="font-medium">{teacher.designation || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Department</dt>
-                    <dd className="font-medium">{teacher.department || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Joining Date</dt>
-                    <dd className="font-medium">{teacher.joining_date ? new Date(teacher.joining_date).toLocaleDateString() : '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Employment Type</dt>
-                    <dd className="font-medium capitalize">{teacher.employment_type || 'Permanent'}</dd>
-                  </div>
-                </dl>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="academic">
-            <Card>
-              <CardContent className="p-4">
-                <dl className="grid grid-cols-2 gap-4">
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Qualification</dt>
-                    <dd className="font-medium">{teacher.qualification || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Specialization</dt>
-                    <dd className="font-medium">{teacher.specialization || '—'}</dd>
-                  </div>
-                  <div className="col-span-2">
-                    <dt className="text-sm text-muted-foreground mb-2">Subjects</dt>
-                    <dd>
-                      {teacher.subjects && teacher.subjects.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {teacher.subjects.map(subj => (
-                            <Badge key={subj} variant="outline">{subj}</Badge>
-                          ))}
-                        </div>
-                      ) : '—'}
-                    </dd>
-                  </div>
-                </dl>
-
-                {teacher.details?.teacherDetails?.qualifications?.length > 0 && (
-                  <>
-                    <Separator className="my-4" />
-                    <h4 className="text-sm font-semibold mb-3">Qualifications</h4>
-                    {teacher.details.teacherDetails.qualifications.map((qual, idx) => (
-                      <div key={idx} className="mb-3 p-3 border rounded-lg">
-                        <p className="font-medium">{qual.degree}</p>
-                        <p className="text-sm text-muted-foreground">{qual.institute} • {qual.year}</p>
-                        <p className="text-sm">Grade: {qual.grade}</p>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="bank">
-            <Card>
-              <CardContent className="p-4">
-                <dl className="grid grid-cols-2 gap-4">
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Basic Salary</dt>
-                    <dd className="font-medium">
-                      {teacher.details?.teacherDetails?.basic_salary ? 
-                        `PKR ${teacher.details.teacherDetails.basic_salary.toLocaleString()}` : '—'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Bank Name</dt>
-                    <dd className="font-medium">{teacher.details?.teacherDetails?.bank_name || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Account No</dt>
-                    <dd className="font-medium">{teacher.details?.teacherDetails?.bank_account_no || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Branch</dt>
-                    <dd className="font-medium">{teacher.details?.teacherDetails?.bank_branch || '—'}</dd>
-                  </div>
-                </dl>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={closeModal}>
-            Close
-          </Button>
-          {canDo('teachers.update') && (
-            <Button onClick={() => {
-              closeModal();
-              openEditModal(teacher);
-            }}>
-              Edit
-            </Button>
-          )}
-        </div>
-      </div>
-    );
-  };
+  // Loading
+  if (isLoading && !data) {
+    return <PageLoader message={`Loading ${teachersLabel.toLowerCase()}...`} />;
+  }
 
   return (
     <div className="space-y-5">
-      <PageHeader 
-        title={labelP} 
-        description={`Manage ${labelP.toLowerCase()} • ${total} total`} 
+      <PageHeader
+        title={teachersLabel}
+        description={`Manage ${teachersLabel.toLowerCase()} • ${total} total`}
+        action={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            {canDo('teachers.create') && (
+              <Button onClick={openAddModal} size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Add {teacherLabel}
+              </Button>
+            )}
+          </div>
+        }
       />
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard 
-          label={`Total ${labelP}`} 
-          value={total} 
-          icon={<GraduationCap size={18} />} 
+      {/* Error Alert */}
+      <ErrorAlert message={error?.message} onRetry={refetch} />
+
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-4">
+        <StatsCard
+          label={`Total ${teachersLabel}`}
+          value={total}
+          icon={<GraduationCap size={18} />}
         />
-        <StatsCard 
-          label="Active" 
-          value={active} 
-          icon={<GraduationCap size={18} />} 
-          description="currently teaching"
+        <StatsCard
+          label="Active"
+          value={active}
+          icon={<GraduationCap size={18} className="text-green-500" />}
         />
-        <StatsCard 
-          label="Inactive" 
-          value={inactive} 
-          icon={<GraduationCap size={18} />} 
+        <StatsCard
+          label="Inactive"
+          value={inactive}
+          icon={<GraduationCap size={18} className="text-gray-500" />}
+        />
+        <StatsCard
+          label="With QR"
+          value={teachers.filter(t => t.qr_code_url).length}
+          icon={<QrCode size={18} className="text-blue-500" />}
         />
       </div>
+
+      {/* Filters - WITH CONTROL from filter form */}
+      <Card>
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm font-medium flex items-center">
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="py-2">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Status Filter - WITH control */}
+            <div className="w-48">
+              <SelectField
+                label="Status"
+                name="status"
+                control={filterControl}
+                options={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                ]}
+                placeholder="Select Status"
+              />
+            </div>
+
+            {/* Clear Filters Button */}
+            {selectedStatus && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="mb-1"
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Data Table */}
       <DataTable
         columns={columns}
         data={teachers}
-        loading={isLoading}
-        emptyMessage={`No ${labelP.toLowerCase()} found`}
+        loading={isLoading || isFetching}
         search={search}
-        onSearch={(v) => { setSearch(v); setPage(1); }}
-        searchPlaceholder={`Search ${labelP.toLowerCase()}…`}
-        filters={[
-          { 
-            name: 'status', 
-            label: 'Status', 
-            value: status, 
-            onChange: (v) => { setStatus(v); setPage(1); }, 
-            options: STATUS_OPTIONS 
-          }
-        ]}
-        action={
-          canDo('teachers.create') ? (
-            <button 
-              onClick={openAddModal} 
-              className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-            >
-              <Plus size={14} /> Add {label}
-            </button>
-          ) : null
-        }
+        onSearch={(val) => {
+          setSearch(val);
+          setPage(1);
+        }}
+        searchPlaceholder={`Search ${teachersLabel.toLowerCase()}...`}
         enableColumnVisibility
-        exportConfig={{ 
+        exportConfig={{
           fileName: `${type}_teachers_${new Date().toISOString().split('T')[0]}`,
-          sheetName: labelP
+          sheetName: teachersLabel
         }}
         pagination={{
           page,
-          totalPages,
+          totalPages: data?.pagination?.totalPages || 1,
           onPageChange: setPage,
           total,
           pageSize,
-          onPageSizeChange: (s) => { setPageSize(s); setPage(1); }
+          onPageSizeChange: (newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }
         }}
+        emptyMessage={`No ${teachersLabel.toLowerCase()} found`}
       />
 
-      {/* Add / Edit Modal with TeacherForm */}
+      {/* Add/Edit Modal */}
       <AppModal
         open={modalState.isOpen && modalState.mode !== 'view'}
         onClose={closeModal}
-        title={getModalTitle()}
+        title={modalState.mode === 'edit' ? `Edit ${teacherLabel}` : `Add ${teacherLabel}`}
         size="xl"
       >
         <TeacherForm
+          key={modalState.data?.id || 'new'}
           defaultValues={modalState.mode === 'edit' ? modalState.data : {}}
-          onSubmit={handleFormSubmit}
+          onSubmit={handleSubmit}
           onCancel={closeModal}
-          loading={save.isPending}
-          departmentOptions={DEPARTMENT_OPTIONS}
-          subjectOptions={SUBJECT_OPTIONS}
-          branchOptions={BRANCH_OPTIONS}
-          designationOptions={DESIGNATION_OPTIONS}
+          loading={createMutation.isPending || updateMutation.isPending}
           isEdit={modalState.mode === 'edit'}
         />
       </AppModal>
 
-      {/* View Modal */}
+      {/* View Modal - REMOVED SUBJECTS */}
       <AppModal
         open={modalState.isOpen && modalState.mode === 'view'}
         onClose={closeModal}
-        title={getModalTitle()}
+        title={`${teacherLabel} Details`}
         size="xl"
       >
-        {renderViewMode()}
+        {modalState.data && (
+          <div className="space-y-6">
+            {/* Header with Avatar */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarFallback className="bg-primary/10 text-xl font-bold text-primary">
+                    {modalState.data.first_name?.[0]}{modalState.data.last_name?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {modalState.data.first_name} {modalState.data.last_name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {modalState.data.details?.teacherDetails?.designation || 'Teacher'} • {modalState.data.details?.teacherDetails?.department || 'No Department'}
+                  </p>
+                  <div className="flex gap-2 mt-1">
+                    <StatusBadge status={modalState.data.is_active ? 'active' : 'inactive'} />
+                    <Badge variant="outline">
+                      ID: {modalState.data.registration_no || 'N/A'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              
+              {/* QR Code */}
+              {modalState.data.qr_code_url && (
+                <div className="text-center">
+                  <img 
+                    src={modalState.data.qr_code_url} 
+                    alt="QR Code"
+                    className="w-24 h-24 border rounded-lg p-1"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1"
+                    onClick={() => window.open(modalState.data.qr_code_url, '_blank')}
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Download
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <Tabs defaultValue="personal" className="w-full">
+              <TabsList className="grid grid-cols-4 mb-4">
+                <TabsTrigger value="personal">Personal</TabsTrigger>
+                <TabsTrigger value="professional">Professional</TabsTrigger>
+                <TabsTrigger value="employment">Employment</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="personal">
+                <Card>
+                  <CardContent className="p-4">
+                    <dl className="grid grid-cols-2 gap-4">
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Full Name</dt>
+                        <dd className="font-medium">
+                          {modalState.data.first_name} {modalState.data.last_name}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Gender</dt>
+                        <dd className="font-medium capitalize">
+                          {modalState.data.details?.teacherDetails?.gender || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Email</dt>
+                        <dd className="font-medium">{modalState.data.email}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Phone</dt>
+                        <dd className="font-medium">{modalState.data.phone}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">CNIC</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.cnic || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Date of Birth</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.date_of_birth 
+                            ? new Date(modalState.data.details.teacherDetails.date_of_birth).toLocaleDateString() 
+                            : '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Blood Group</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.blood_group || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Religion</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.religion || '—'}
+                        </dd>
+                      </div>
+                    </dl>
+                    
+                    <Separator className="my-4" />
+                    
+                    <h4 className="text-sm font-semibold mb-2">Address</h4>
+                    <p className="text-sm">
+                      {modalState.data.details?.teacherDetails?.present_address || 'No address provided'}
+                    </p>
+                    
+                    {modalState.data.details?.teacherDetails?.emergency_contact_name && (
+                      <>
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-semibold mb-2">Emergency Contact</h4>
+                        <dl className="grid grid-cols-2 gap-2">
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Name</dt>
+                            <dd className="text-sm">
+                              {modalState.data.details.teacherDetails.emergency_contact_name}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Relation</dt>
+                            <dd className="text-sm">
+                              {modalState.data.details.teacherDetails.emergency_contact_relation}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-muted-foreground">Phone</dt>
+                            <dd className="text-sm">
+                              {modalState.data.details.teacherDetails.emergency_contact_phone}
+                            </dd>
+                          </div>
+                        </dl>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="professional">
+                <Card>
+                  <CardContent className="p-4">
+                    <dl className="grid grid-cols-2 gap-4">
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Qualification</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.qualification || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Specialization</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.specialization || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Experience</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.experience_years 
+                            ? `${modalState.data.details.teacherDetails.experience_years} years` 
+                            : '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Previous Institution</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.previous_institution || '—'}
+                        </dd>
+                      </div>
+                    </dl>
+                    
+                    {/* ✅ REMOVED SUBJECTS SECTION */}
+                    
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="employment">
+                <Card>
+                  <CardContent className="p-4">
+                    <dl className="grid grid-cols-2 gap-4">
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Designation</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.designation || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Department</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.department || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Employment Type</dt>
+                        <dd className="font-medium capitalize">
+                          {modalState.data.details?.teacherDetails?.employment_type || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Joining Date</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.joining_date
+                            ? new Date(modalState.data.details.teacherDetails.joining_date).toLocaleDateString()
+                            : '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Salary</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.salary
+                            ? `PKR ${Number(modalState.data.details.teacherDetails.salary).toLocaleString()}`
+                            : '—'}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <Separator className="my-4" />
+                    
+                    <h4 className="text-sm font-semibold mb-2">Bank Details</h4>
+                    <dl className="grid grid-cols-2 gap-4">
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Bank Name</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.bank_name || '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm text-muted-foreground">Account No</dt>
+                        <dd className="font-medium">
+                          {modalState.data.details?.teacherDetails?.bank_account_no || '—'}
+                        </dd>
+                      </div>
+                    </dl>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="documents">
+                <Card>
+                  <CardContent className="p-4">
+                    {modalState.data.documents?.length > 0 ? (
+                      <div className="space-y-3">
+                        {modalState.data.documents.map((doc, idx) => (
+                          <div key={doc.id || idx} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <p className="font-medium">{doc.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Type: {doc.type} • {new Date(doc.uploaded_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {doc.verified && (
+                                <StatusBadge status="verified" label="Verified" />
+                              )}
+                              {doc.file_url && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => window.open(doc.file_url, '_blank')}
+                                >
+                                  View
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">
+                        No documents uploaded
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={closeModal}>
+                Close
+              </Button>
+              {canDo('teachers.update') && (
+                <Button onClick={() => {
+                  closeModal();
+                  openEditModal(modalState.data);
+                }}>
+                  Edit {teacherLabel}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </AppModal>
 
-      {/* Delete Confirmation Modal */}
-      <AppModal
+      {/* Delete Confirmation */}
+      <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
-        title={`Delete ${label}`}
-        size="sm"
-        footer={
+        onConfirm={() => deleteMutation.mutate(deleting.id)}
+        loading={deleteMutation.isPending}
+        title={`Delete ${teacherLabel}`}
+        description={
           <>
-            <button 
-              onClick={() => setDeleting(null)} 
-              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={() => remove.mutate(deleting?.id)} 
-              disabled={remove.isPending} 
-              className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-            >
-              {remove.isPending ? 'Deleting...' : 'Delete'}
-            </button>
+            Are you sure you want to delete <strong>{deleting?.first_name} {deleting?.last_name}</strong>?
+            This action cannot be undone.
           </>
         }
-      >
-        <p className="text-sm text-muted-foreground">
-          Delete <strong>{deleting?.first_name} {deleting?.last_name}</strong>? 
-          This action cannot be undone.
-        </p>
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
-      </AppModal>
+        confirmLabel="Delete"
+        variant="destructive"
+      />
+
+      {/* ✅ Status Toggle Confirmation */}
+      <ConfirmDialog
+        open={!!togglingStatus}
+        onClose={() => setTogglingStatus(null)}
+        onConfirm={() => toggleStatusMutation.mutate({ 
+          id: togglingStatus.id, 
+          is_active: !togglingStatus.is_active 
+        })}
+        loading={toggleStatusMutation.isPending}
+        title={togglingStatus?.is_active ? `Deactivate ${teacherLabel}` : `Activate ${teacherLabel}`}
+        description={
+          <>
+            Are you sure you want to {togglingStatus?.is_active ? 'deactivate' : 'activate'} {' '}
+            <strong>{togglingStatus?.first_name} {togglingStatus?.last_name}</strong>?
+          </>
+        }
+        confirmLabel={togglingStatus?.is_active ? 'Deactivate' : 'Activate'}
+        variant={togglingStatus?.is_active ? 'destructive' : 'default'}
+      />
+
+      {/* QR Regeneration Confirmation */}
+      <ConfirmDialog
+        open={!!regeneratingQR}
+        onClose={() => setRegeneratingQR(null)}
+        onConfirm={() => regenerateQRMutation.mutate(regeneratingQR)}
+        loading={regenerateQRMutation.isPending}
+        title="Regenerate QR Code"
+        description="Are you sure you want to regenerate the QR code? The old QR code will stop working."
+        confirmLabel="Regenerate"
+      />
     </div>
   );
 }
-<<<<<<< HEAD
-=======
-
-
-
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
