@@ -27,7 +27,7 @@ export const useInstituteStore = create(
       // Set Current Institute
       // ─────────────────────────────────────────
       setCurrentInstitute: (institute) => {
-        console.log("🏢 Setting Current Institute:", institute);
+        // console.log("🏢 Setting Current Institute:", institute);
         set({ 
           currentInstitute: institute,
           error: null 
@@ -38,7 +38,7 @@ export const useInstituteStore = create(
       // Set Institutes List
       // ─────────────────────────────────────────
       setInstitutes: (institutes) => {
-        console.log("📋 Setting Institutes List:", institutes);
+        // console.log("📋 Setting Institutes List:", institutes);
         set({ institutes });
       },
 
@@ -46,7 +46,7 @@ export const useInstituteStore = create(
       // Loading State
       // ─────────────────────────────────────────
       setLoading: (val) => {
-        console.log("⏳ Institute Loading:", val);
+        // console.log("⏳ Institute Loading:", val);
         set({ isLoading: val });
       },
 
@@ -62,7 +62,7 @@ export const useInstituteStore = create(
       // Clear Institute Data
       // ─────────────────────────────────────────
       clearInstituteData: () => {
-        console.log("🧹 Clearing Institute Data");
+        // console.log("🧹 Clearing Institute Data");
         set({
           currentInstitute: null,
           institutes: [],
@@ -81,7 +81,7 @@ export const useInstituteStore = create(
           const institute = authUser.institute || authUser.school || null;
           
           if (institute) {
-            console.log("🔄 Initializing Institute from Auth:", institute);
+            // console.log("🔄 Initializing Institute from Auth:", institute);
             set({ currentInstitute: institute });
           }
           
@@ -218,7 +218,7 @@ export const useInstituteStore = create(
 
       // Runs when store loads from localStorage
       onRehydrateStorage: () => (state) => {
-        console.log("♻️ Institute Store Rehydrated");
+        // console.log("♻️ Institute Store Rehydrated");
         console.log("🏢 Current Institute:", state?.currentInstitute);
       },
     }

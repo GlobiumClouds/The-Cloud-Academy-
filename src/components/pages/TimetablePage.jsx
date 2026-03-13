@@ -1,1097 +1,23 @@
-<<<<<<< HEAD
+// src/components/pages/TimetablePage.jsx (FIXED PERIOD CONFIG MODAL)
+
 'use client';
-/**
- * TimetablePage — Weekly timetable grid view
- */
-import { useState, useMemo } from 'react';
+
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { toast } from 'sonner';
-import { Plus, Grid3X3, Pencil, Trash2 } from 'lucide-react';
-import useInstituteConfig from '@/hooks/useInstituteConfig';
-import useAuthStore from '@/store/authStore';
-import DataTable from '@/components/common/DataTable';
-import PageHeader from '@/components/common/PageHeader';
-import AppModal from '@/components/common/AppModal';
-import SelectField from '@/components/common/SelectField';
-import StatsCard from '@/components/common/StatsCard';
-import { DUMMY_TIMETABLE } from '@/data/dummyData';
-
-const DAYS   = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const DAY_OPTS = DAYS.map(d => ({ value: d.toLowerCase(), label: d }));
-const PERIOD_OPTS = [1,2,3,4,5,6,7,8].map(n => ({ value: String(n), label: `Period ${n}` }));
-
-const schema = z.object({
-  day:       z.string().min(1, 'Required'),
-  period:    z.string().min(1, 'Required'),
-  subject:   z.string().min(1, 'Required'),
-  teacher:   z.string().optional(),
-  class_name:z.string().optional(),
-  room:      z.string().optional(),
-  start_time:z.string().optional(),
-  end_time:  z.string().optional(),
-});
-
-
-
-export default function TimetablePage({ type }) {
-  const qc    = useQueryClient();
-  const canDo = useAuthStore((s) => s.canDo);
-  const { terms } = useInstituteConfig();
-  const [classFilter, setClassFilter] = useState('');
-  const [dayFilter,   setDayFilter]   = useState('');
-  const [page,        setPage]        = useState(1);
-  const [pageSize,    setPageSize]    = useState(10);
-  const [modal,       setModal]       = useState(false);
-  const [editing,     setEditing]     = useState(null);
-  const [deleting,    setDeleting]    = useState(null);
-
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema) });
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['timetable', type, page, pageSize, classFilter, dayFilter],
-    queryFn: async () => {
-      try { const { timetableService } = await import('@/services'); return await timetableService.getAll({ page, limit: pageSize, class_name:classFilter, day:dayFilter }); }
-      catch {
-        const d = DUMMY_TIMETABLE.filter(r => (!classFilter || r.class_name === classFilter) && (!dayFilter || r.day === dayFilter));
-        const slice = d.slice((page-1)*pageSize, page*pageSize);
-        return { data: { rows: slice, total: d.length, totalPages: Math.max(1, Math.ceil(d.length / pageSize)) } };
-      }
-    },
-    placeholderData: (p) => p,
-  });
-
-  const rows = data?.data?.rows ?? DUMMY_TIMETABLE;
-  const total = data?.data?.total ?? rows.length;
-  const totalPages = data?.data?.totalPages ?? 1;
-
-  const save = useMutation({
-    mutationFn: async (vals) => {
-      try { const { timetableService } = await import('@/services'); return editing ? await timetableService.update(editing.id, vals) : await timetableService.create(vals); }
-      catch { return { data: vals }; }
-    },
-    onSuccess: () => { toast.success(editing ? 'Updated' : 'Created'); qc.invalidateQueries({ queryKey: ['timetable'] }); closeModal(); },
-    onError: () => toast.error('Save failed'),
-  });
-
-  const remove = useMutation({
-    mutationFn: async (id) => {
-      try { const { timetableService } = await import('@/services'); return await timetableService.delete(id); }
-      catch { return { success: true }; }
-    },
-    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['timetable'] }); setDeleting(null); },
-    onError: () => toast.error('Delete failed'),
-  });
-
-  const openAdd  = () => { setEditing(null); reset({}); setModal(true); };
-  const openEdit = (row) => { setEditing(row); reset({ ...row }); setModal(true); };
-  const closeModal = () => { setModal(false); setEditing(null); reset(); };
-
-  const columns = useMemo(() => [
-    { accessorKey: 'day',        header: 'Day',     cell: ({ getValue }) => <span className="capitalize font-medium">{getValue()}</span> },
-    { accessorKey: 'period',     header: 'Period',  cell: ({ getValue }) => `Period ${getValue()}` },
-    { accessorKey: 'subject',    header: 'Subject', cell: ({ getValue }) => <span className="font-medium">{getValue()}</span> },
-    { accessorKey: 'teacher',    header: 'Teacher', cell: ({ getValue }) => getValue() || '—' },
-    { accessorKey: 'class_name', header: terms.primary_unit },
-    { accessorKey: 'room',       header: 'Room',    cell: ({ getValue }) => getValue() || '—' },
-    { accessorKey: 'start_time', header: 'Time',    cell: ({ row: { original: r } }) => r.start_time && r.end_time ? `${r.start_time} – ${r.end_time}` : '—' },
-    { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        {canDo('timetable.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
-        {canDo('timetable.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
-      </div>
-    )},
-  ], [canDo, terms.primary_unit]);
-
-  const daySubjectCount = useMemo(() => {
-    const counts = {};
-    DAYS.forEach(d => { counts[d.toLowerCase()] = rows.filter(r => r.day === d.toLowerCase()).length; });
-    return counts;
-  }, [rows]);
-
-  return (
-    <div className="space-y-5">
-      <PageHeader title="Timetable" description={`${total} slots configured`} />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label="Total Slots"      value={total}  icon={<Grid3X3 size={18} />} />
-        <StatsCard label="Days Configured"  value={Object.values(daySubjectCount).filter(c => c > 0).length} icon={<Grid3X3 size={18} />} />
-        <StatsCard label="Subjects / Day"   value={total ? Math.round(total / 5) : 0} icon={<Grid3X3 size={18} />} />
-      </div>
-
-      {/* Day filter chips */}
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => setDayFilter('')} className={`rounded-full px-3 py-1 text-xs font-medium border ${!dayFilter ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'}`}>All</button>
-        {DAYS.map(d => (
-          <button key={d} onClick={() => setDayFilter(d.toLowerCase())} className={`rounded-full px-3 py-1 text-xs font-medium border capitalize ${dayFilter === d.toLowerCase() ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'}`}>{d}</button>
-        ))}
-      </div>
-
-      <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No timetable slots found"
-        action={canDo('timetable.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add Slot</button> : null}
-        enableColumnVisibility
-        exportConfig={{ fileName: 'timetable' }}
-        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />
-
-      <AppModal open={modal} onClose={closeModal} title={editing ? 'Edit Slot' : 'New Timetable Slot'} size="md"
-        footer={<><button type="button" onClick={closeModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button><button type="submit" form="tt-form" disabled={save.isPending} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">{save.isPending ? 'Saving…' : editing ? 'Update' : 'Add'}</button></>}>
-        <form id="tt-form" onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <SelectField label="Day *"    name="day"    control={control} error={errors.day}    options={DAY_OPTS}    required />
-            <SelectField label="Period *" name="period" control={control} error={errors.period} options={PERIOD_OPTS} required />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Subject *</label><input {...register('subject')} className="input-base" />{errors.subject && <p className="text-xs text-destructive">{errors.subject.message}</p>}</div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Teacher</label><input {...register('teacher')} className="input-base" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">{terms.primary_unit}</label><input {...register('class_name')} className="input-base" /></div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">Room</label><input {...register('room')} className="input-base" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Start Time</label><input type="time" {...register('start_time')} className="input-base" /></div>
-            <div className="space-y-1.5"><label className="text-sm font-medium">End Time</label><input type="time" {...register('end_time')} className="input-base" /></div>
-          </div>
-        </form>
-      </AppModal>
-
-      {/* Delete Confirm */}
-      <AppModal open={!!deleting} onClose={() => setDeleting(null)} title="Delete Slot" size="sm"
-        footer={
-          <>
-            <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-            <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
-            </button>
-          </>
-        }>
-        <p className="text-sm text-muted-foreground">Delete <strong>{deleting?.subject}</strong> ({deleting?.day}, Period {deleting?.period})? This cannot be undone.</p>
-      </AppModal>
-    </div>
-  );
-}
-=======
-// // //src/components/pages/TimetablePage.jsx
-// // 'use client';
-
-// // import { useState, useMemo } from 'react';
-// // import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-// // import { useForm } from 'react-hook-form';
-// // import { zodResolver } from '@hookform/resolvers/zod';
-// // import { z } from 'zod';
-// // import { toast } from 'sonner';
-// // import { Plus, Pencil, Trash2 } from 'lucide-react';
-
-// // import PageHeader from '@/components/common/PageHeader';
-// // import AppModal from '@/components/common/AppModal';
-// // import SelectField from '@/components/common/SelectField';
-// // import useAuthStore from '@/store/authStore';
-// // import { DUMMY_TIMETABLE } from '@/data/dummyData';
-
-// // const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-// // const PERIODS = [1,2,3,4,5,6,7,8];
-
-// // const DAY_OPTS = DAYS.map(d => ({ value: d.toLowerCase(), label: d }));
-// // const PERIOD_OPTS = PERIODS.map(p => ({ value: String(p), label: `Period ${p}` }));
-
-// // const schema = z.object({
-// //   day: z.string(),
-// //   period: z.string(),
-// //   subject: z.string(),
-// //   teacher: z.string().optional(),
-// //   class_name: z.string().optional(),
-// //   room: z.string().optional(),
-// //   start_time: z.string().optional(),
-// //   end_time: z.string().optional(),
-// // });
-
-// // export default function TimetablePage({ type }) {
-
-// //   const qc = useQueryClient();
-// //   const canDo = useAuthStore((s)=>s.canDo);
-
-// //   const [modal,setModal] = useState(false);
-// //   const [editing,setEditing] = useState(null);
-// //   const [deleting,setDeleting] = useState(null);
-// //   const [addSlot,setAddSlot] = useState({});
-
-// //   const { register,handleSubmit,control,reset,formState:{errors} } = useForm({
-// //     resolver:zodResolver(schema)
-// //   });
-
-// //   const { data,isLoading } = useQuery({
-// //     queryKey:['timetable'],
-// //     queryFn: async ()=>{
-// //       try{
-// //         const { timetableService } = await import('@/services');
-// //         return await timetableService.getAll();
-// //       }catch{
-// //         return { data:{ rows:DUMMY_TIMETABLE }};
-// //       }
-// //     }
-// //   });
-
-// //   const rows = data?.data?.rows ?? DUMMY_TIMETABLE;
-
-// //   /* grid build */
-// //   const grid = useMemo(()=>{
-// //     const g={};
-// //     DAYS.forEach(d=>{ g[d.toLowerCase()] = {}; });
-
-// //     rows.forEach(r=>{
-// //       if(!g[r.day]) g[r.day]={};
-// //       g[r.day][r.period] = r;
-// //     });
-
-// //     return g;
-// //   },[rows]);
-
-// //   /* save mutation */
-
-// //   const save = useMutation({
-// //     mutationFn: async (vals)=>{
-// //       try{
-// //         const { timetableService } = await import('@/services');
-// //         return editing
-// //           ? timetableService.update(editing.id,vals)
-// //           : timetableService.create(vals);
-// //       }catch{
-// //         return { data:vals };
-// //       }
-// //     },
-// //     onSuccess:()=>{
-// //       toast.success(editing ? 'Updated' : 'Created');
-// //       qc.invalidateQueries({queryKey:['timetable']});
-// //       closeModal();
-// //     }
-// //   });
-
-// //   const remove = useMutation({
-// //     mutationFn: async (id)=>{
-// //       try{
-// //         const { timetableService } = await import('@/services');
-// //         return timetableService.delete(id);
-// //       }catch{
-// //         return true;
-// //       }
-// //     },
-// //     onSuccess:()=>{
-// //       toast.success('Deleted');
-// //       qc.invalidateQueries({queryKey:['timetable']});
-// //       setDeleting(null);
-// //     }
-// //   });
-
-// //   const openAdd=(day,period)=>{
-// //     setEditing(null);
-// //     setAddSlot({day,period:String(period)});
-// //     reset({day,period:String(period)});
-// //     setModal(true);
-// //   };
-
-// //   const openEdit=(slot)=>{
-// //     setEditing(slot);
-// //     reset({...slot,period:String(slot.period)});
-// //     setModal(true);
-// //   };
-
-// //   const closeModal=()=>{
-// //     setModal(false);
-// //     setEditing(null);
-// //     reset({});
-// //   };
-
-// //   return (
-// //     <div className="space-y-4">
-
-// //       <PageHeader
-// //         title="Timetable"
-// //         description={`${rows.length} slots configured`}
-// //         action={
-// //           canDo('timetable.create') && (
-// //             <button
-// //               onClick={()=>openAdd('monday',1)}
-// //               className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
-// //             >
-// //               <Plus size={14}/> Add Slot
-// //             </button>
-// //           )
-// //         }
-// //       />
-
-// //       {/* GRID */}
-
-// //       <div className="overflow-x-auto rounded-lg border">
-
-// //         <table className="w-full text-sm border-collapse">
-
-// //           <thead>
-// //             <tr className="bg-muted/50">
-// //               <th className="px-4 py-3 text-left border-r">Period</th>
-// //               {DAYS.map(day=>(
-// //                 <th key={day} className="px-4 py-3 text-center border-r">
-// //                   {day}
-// //                 </th>
-// //               ))}
-// //             </tr>
-// //           </thead>
-
-// //           <tbody>
-
-// //             {PERIODS.map(period=>(
-// //               <tr key={period} className="border-b">
-
-// //                 <td className="px-4 py-3 font-medium border-r">
-// //                   Period {period}
-// //                 </td>
-
-// //                 {DAYS.map(day=>{
-
-// //                   const slot = grid[day.toLowerCase()]?.[period];
-
-// //                   return (
-// //                     <td key={day} className="p-2 border-r text-center">
-
-// //                       {slot ? (
-
-// //                         <div className="relative rounded-md bg-primary/10 px-2 py-1 text-xs group">
-
-// //                           <div className="font-semibold">{slot.subject}</div>
-
-// //                           {slot.teacher && (
-// //                             <div className="text-[10px] opacity-70">
-// //                               {slot.teacher}
-// //                             </div>
-// //                           )}
-
-// //                           <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100">
-
-// //                             {canDo('timetable.update') && (
-// //                               <button
-// //                                 onClick={()=>openEdit(slot)}
-// //                                 className="hover:text-primary"
-// //                               >
-// //                                 <Pencil size={12}/>
-// //                               </button>
-// //                             )}
-
-// //                             {canDo('timetable.delete') && (
-// //                               <button
-// //                                 onClick={()=>setDeleting(slot)}
-// //                                 className="hover:text-destructive"
-// //                               >
-// //                                 <Trash2 size={12}/>
-// //                               </button>
-// //                             )}
-
-// //                           </div>
-
-// //                         </div>
-
-// //                       ) : (
-
-// //                         canDo('timetable.create') && (
-
-// //                           <button
-// //                             onClick={()=>openAdd(day.toLowerCase(),period)}
-// //                             className="w-full h-10 border-dashed border rounded-md text-muted-foreground hover:text-primary"
-// //                           >
-// //                             +
-// //                           </button>
-
-// //                         )
-
-// //                       )}
-
-// //                     </td>
-// //                   );
-
-// //                 })}
-
-// //               </tr>
-// //             ))}
-
-// //           </tbody>
-
-// //         </table>
-
-// //       </div>
-
-// //       {/* Modal */}
-
-// //       <AppModal
-// //         open={modal}
-// //         onClose={closeModal}
-// //         title={editing ? "Edit Slot":"New Slot"}
-// //       >
-
-// //         <form
-// //           onSubmit={handleSubmit((v)=>save.mutate(v))}
-// //           className="space-y-4"
-// //         >
-
-// //           <div className="grid grid-cols-2 gap-4">
-// //             <SelectField
-// //               label="Day"
-// //               name="day"
-// //               control={control}
-// //               options={DAY_OPTS}
-// //               error={errors.day}
-// //               required
-// //             />
-
-// //             <SelectField
-// //               label="Period"
-// //               name="period"
-// //               control={control}
-// //               options={PERIOD_OPTS}
-// //               error={errors.period}
-// //               required
-// //             />
-// //           </div>
-
-// //           <div className="grid grid-cols-2 gap-4">
-
-// //             <div className="space-y-1.5">
-// //               <label className="text-sm font-medium">Subject</label>
-// //               <input {...register('subject')} className="input-base"/>
-// //             </div>
-
-// //             <div className="space-y-1.5">
-// //               <label className="text-sm font-medium">Teacher</label>
-// //               <input {...register('teacher')} className="input-base"/>
-// //             </div>
-
-// //           </div>
-
-// //           <div className="grid grid-cols-2 gap-4">
-
-// //             <div className="space-y-1.5">
-// //               <label className="text-sm font-medium">Room</label>
-// //               <input {...register('room')} className="input-base"/>
-// //             </div>
-
-// //             <div className="space-y-1.5">
-// //               <label className="text-sm font-medium">Start Time</label>
-// //               <input type="time" {...register('start_time')} className="input-base"/>
-// //             </div>
-
-// //           </div>
-
-// //           <div className="flex justify-end gap-2 pt-3">
-
-// //             <button
-// //               type="button"
-// //               onClick={closeModal}
-// //               className="border px-4 py-2 rounded-md text-sm"
-// //             >
-// //               Cancel
-// //             </button>
-
-// //             <button
-// //               type="submit"
-// //               className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm"
-// //             >
-// //               {editing ? "Update":"Add"}
-// //             </button>
-
-// //           </div>
-
-// //         </form>
-
-// //       </AppModal>
-
-// //       {/* Delete */}
-
-// //       <AppModal
-// //         open={!!deleting}
-// //         onClose={()=>setDeleting(null)}
-// //         title="Delete Slot"
-// //       >
-
-// //         <p className="text-sm mb-4">
-// //           Delete {deleting?.subject} ({deleting?.day}, Period {deleting?.period}) ?
-// //         </p>
-
-// //         <div className="flex justify-end gap-2">
-
-// //           <button
-// //             onClick={()=>setDeleting(null)}
-// //             className="border px-4 py-2 rounded-md text-sm"
-// //           >
-// //             Cancel
-// //           </button>
-
-// //           <button
-// //             onClick={()=>remove.mutate(deleting.id)}
-// //             className="bg-destructive text-white px-4 py-2 rounded-md text-sm"
-// //           >
-// //             Delete
-// //           </button>
-
-// //         </div>
-
-// //       </AppModal>
-
-// //     </div>
-// //   );
-// // }
-
-
-
-
-
-// //src/componentts/pages/TimetablePage.jsx
-// 'use client';
-
-// import { useState, useMemo } from 'react';
-// import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-// import { useForm } from 'react-hook-form';
-// import { DndProvider, useDrag, useDrop } from 'react-dnd';
-// import { HTML5Backend } from 'react-dnd-html5-backend';
-// import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
-// import { toast } from 'sonner';
-
-// import PageHeader from '@/components/common/PageHeader';
-// import AppModal from '@/components/common/AppModal';
-// import ConfirmDialog from '@/components/common/ConfirmDialog';
-// import SelectField from '@/components/common/SelectField';
-// import InputField from '@/components/common/InputField';
-// import FormSubmitButton from '@/components/common/FormSubmitButton';
-// import ErrorAlert from '@/components/common/ErrorAlert';
-// import PageLoader from '@/components/common/PageLoader';
-// import { Button } from '@/components/ui/button';
-// import { Card, CardContent } from '@/components/ui/card';
-// import { Badge } from '@/components/ui/badge';
-// import { Separator } from '@/components/ui/separator';
-// import { cn } from '@/lib/utils';
-
-// // Constants
-// const DAYS = [
-//   { value: 'monday', label: 'Monday' },
-//   { value: 'tuesday', label: 'Tuesday' },
-//   { value: 'wednesday', label: 'Wednesday' },
-//   { value: 'thursday', label: 'Thursday' },
-//   { value: 'friday', label: 'Friday' },
-//   { value: 'saturday', label: 'Saturday' }
-// ];
-
-// const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
-
-// const PERIOD_OPTIONS = PERIODS.map(p => ({
-//   value: p,
-//   label: `Period ${p}`
-// }));
-
-// const TYPE = "TIMETABLE_SLOT";
-
-// // Colors for subjects
-// const SUBJECT_COLORS = {
-//   'Math': 'bg-blue-100 text-blue-700 border-blue-200',
-//   'English': 'bg-green-100 text-green-700 border-green-200',
-//   'Science': 'bg-purple-100 text-purple-700 border-purple-200',
-//   'Computer': 'bg-orange-100 text-orange-700 border-orange-200',
-//   'Physics': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-//   'Chemistry': 'bg-pink-100 text-pink-700 border-pink-200',
-//   'Biology': 'bg-emerald-100 text-emerald-700 border-emerald-200',
-//   'History': 'bg-amber-100 text-amber-700 border-amber-200',
-//   'Geography': 'bg-teal-100 text-teal-700 border-teal-200',
-//   'Urdu': 'bg-rose-100 text-rose-700 border-rose-200',
-//   'Islamiat': 'bg-cyan-100 text-cyan-700 border-cyan-200',
-//   'default': 'bg-gray-100 text-gray-700 border-gray-200'
-// };
-
-// /* ---------- Drag Cell Component ---------- */
-// function TimetableCell({ slot, day, period, onDropSlot, onEdit, onDelete }) {
-//   const [{ isDragging }, drag] = useDrag(() => ({
-//     type: TYPE,
-//     item: slot,
-//     canDrag: !!slot,
-//     collect: (monitor) => ({
-//       isDragging: monitor.isDragging()
-//     })
-//   }));
-
-//   const [{ isOver }, drop] = useDrop(() => ({
-//     accept: TYPE,
-//     drop: (item) => {
-//       onDropSlot(item, day, period);
-//     },
-//     collect: (monitor) => ({
-//       isOver: monitor.isOver()
-//     })
-//   }));
-
-//   const getSubjectColor = (subject) => {
-//     return SUBJECT_COLORS[subject] || SUBJECT_COLORS.default;
-//   };
-
-//   return (
-//     <div
-//       ref={(node) => drag(drop(node))}
-//       className={cn(
-//         'relative min-h-[80px] rounded-lg border-2 transition-all duration-200',
-//         isOver && 'border-primary bg-primary/5',
-//         isDragging && 'opacity-50',
-//         slot ? 'cursor-move hover:shadow-md' : 'cursor-pointer hover:border-dashed'
-//       )}
-//       onClick={() => !slot && onEdit({ day, period })}
-//     >
-//       {slot ? (
-//         <div className={cn(
-//           'h-full w-full rounded-lg p-2',
-//           getSubjectColor(slot.subject)
-//         )}>
-//           <div className="flex items-start justify-between">
-//             <GripVertical size={14} className="opacity-50" />
-//             <div className="flex gap-1">
-//               <button
-//                 onClick={(e) => {
-//                   e.stopPropagation();
-//                   onEdit(slot);
-//                 }}
-//                 className="rounded p-1 hover:bg-black/5"
-//               >
-//                 <Pencil size={12} />
-//               </button>
-//               <button
-//                 onClick={(e) => {
-//                   e.stopPropagation();
-//                   onDelete(slot);
-//                 }}
-//                 className="rounded p-1 hover:bg-black/5 text-destructive"
-//               >
-//                 <Trash2 size={12} />
-//               </button>
-//             </div>
-//           </div>
-          
-//           <div className="mt-1 space-y-1">
-//             <p className="font-semibold text-sm leading-tight">
-//               {slot.subject}
-//             </p>
-//             {slot.teacher && (
-//               <p className="text-xs opacity-75">
-//                 {slot.teacher}
-//               </p>
-//             )}
-//           </div>
-//         </div>
-//       ) : (
-//         <div className="flex h-full min-h-[80px] items-center justify-center text-muted-foreground hover:text-primary">
-//           <Plus size={20} />
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-// /* ---------- Teacher Conflict Check ---------- */
-// function checkTeacherConflict(slots, teacher, day, period, excludeId = null) {
-//   return slots.some(
-//     (s) =>
-//       s.teacher === teacher &&
-//       s.day === day &&
-//       Number(s.period) === Number(period) &&
-//       s.id !== excludeId
-//   );
-// }
-
-// /* ---------- Auto Generator ---------- */
-// function generateAutoTimetable(subjects, teachers) {
-//   const result = [];
-  
-//   DAYS.forEach(day => {
-//     PERIODS.forEach(period => {
-//       const randomSubject = subjects[Math.floor(Math.random() * subjects.length)];
-//       const randomTeacher = teachers[Math.floor(Math.random() * teachers.length)];
-      
-//       result.push({
-//         day: day.value,
-//         period,
-//         subject: randomSubject,
-//         teacher: randomTeacher
-//       });
-//     });
-//   });
-  
-//   return result;
-// }
-
-// export default function TimetablePage() {
-//   const qc = useQueryClient();
-  
-//   // State
-//   const [modalOpen, setModalOpen] = useState(false);
-//   const [editingSlot, setEditingSlot] = useState(null);
-//   const [deletingSlot, setDeletingSlot] = useState(null);
-//   const [error, setError] = useState(null);
-  
-//   // Form
-//   const {
-//     control,
-//     register,
-//     handleSubmit,
-//     reset,
-//     formState: { errors },
-//     watch
-//   } = useForm({
-//     defaultValues: {
-//       day: '',
-//       period: '',
-//       subject: '',
-//       teacher: ''
-//     }
-//   });
-
-//   // Watch form values for conflict checking
-//   const watchedDay = watch('day');
-//   const watchedPeriod = watch('period');
-//   const watchedTeacher = watch('teacher');
-
-//   // Fetch timetable data
-//   const { data, isLoading, error: queryError } = useQuery({
-//     queryKey: ['timetable'],
-//     queryFn: async () => {
-//       try {
-//         const { timetableService } = await import('@/services');
-//         const response = await timetableService.getAll();
-//         return response;
-//       } catch (err) {
-//         // Return dummy data for demo
-//         return {
-//           data: {
-//             rows: [
-//               { id: '1', day: 'monday', period: 1, subject: 'Math', teacher: 'Ali' },
-//               { id: '2', day: 'monday', period: 2, subject: 'English', teacher: 'Sara' },
-//               { id: '3', day: 'tuesday', period: 1, subject: 'Science', teacher: 'Ahmed' },
-//               { id: '4', day: 'tuesday', period: 2, subject: 'Computer', teacher: 'Fatima' },
-//             ]
-//           }
-//         };
-//       }
-//     }
-//   });
-
-//   const slots = data?.data?.rows ?? [];
-
-//   // Build grid for easy access
-//   const grid = useMemo(() => {
-//     const g = {};
-//     DAYS.forEach(d => { g[d.value] = {}; });
-//     slots.forEach(s => {
-//       g[s.day][s.period] = s;
-//     });
-//     return g;
-//   }, [slots]);
-
-//   // Mutations
-//   const createMutation = useMutation({
-//     mutationFn: async (data) => {
-//       const { timetableService } = await import('@/services');
-//       return timetableService.create(data);
-//     },
-//     onSuccess: () => {
-//       qc.invalidateQueries({ queryKey: ['timetable'] });
-//       toast.success('Slot added successfully');
-//       setModalOpen(false);
-//       reset();
-//     },
-//     onError: (err) => {
-//       toast.error(err.message || 'Failed to add slot');
-//     }
-//   });
-
-//   const updateMutation = useMutation({
-//     mutationFn: async (data) => {
-//       const { timetableService } = await import('@/services');
-//       return timetableService.update(data.id, data);
-//     },
-//     onSuccess: () => {
-//       qc.invalidateQueries({ queryKey: ['timetable'] });
-//       toast.success('Slot updated successfully');
-//       setModalOpen(false);
-//       setEditingSlot(null);
-//       reset();
-//     },
-//     onError: (err) => {
-//       toast.error(err.message || 'Failed to update slot');
-//     }
-//   });
-
-//   const deleteMutation = useMutation({
-//     mutationFn: async (id) => {
-//       const { timetableService } = await import('@/services');
-//       return timetableService.delete(id);
-//     },
-//     onSuccess: () => {
-//       qc.invalidateQueries({ queryKey: ['timetable'] });
-//       toast.success('Slot deleted successfully');
-//       setDeletingSlot(null);
-//     },
-//     onError: (err) => {
-//       toast.error(err.message || 'Failed to delete slot');
-//     }
-//   });
-
-//   // Handlers
-//   const handleMoveSlot = (draggedSlot, newDay, newPeriod) => {
-//     if (draggedSlot.day === newDay && draggedSlot.period === newPeriod) {
-//       return; // No change
-//     }
-
-//     if (checkTeacherConflict(slots, draggedSlot.teacher, newDay, newPeriod, draggedSlot.id)) {
-//       toast.error('Teacher is already assigned to another class at this time');
-//       return;
-//     }
-
-//     updateMutation.mutate({
-//       ...draggedSlot,
-//       day: newDay,
-//       period: newPeriod
-//     });
-//   };
-
-//   const handleEditSlot = (slot) => {
-//     setEditingSlot(slot);
-//     reset(slot);
-//     setModalOpen(true);
-//   };
-
-//   const handleDeleteSlot = (slot) => {
-//     setDeletingSlot(slot);
-//   };
-
-//   const handleAutoGenerate = () => {
-//     const subjects = ['Math', 'English', 'Science', 'Computer', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography'];
-//     const teachers = ['Ali', 'Ahmed', 'Sara', 'Fatima', 'Usman', 'Ayesha', 'Bilal', 'Zainab'];
-    
-//     const autoSlots = generateAutoTimetable(subjects, teachers);
-    
-//     // Clear existing slots first? Or just add?
-//     toast.info('Generating timetable...');
-    
-//     autoSlots.forEach(slot => {
-//       createMutation.mutate(slot);
-//     });
-//   };
-
-//   const onSubmit = (formData) => {
-//     // Check for teacher conflict
-//     if (checkTeacherConflict(
-//       slots,
-//       formData.teacher,
-//       formData.day,
-//       formData.period,
-//       editingSlot?.id
-//     )) {
-//       toast.error('Teacher is already assigned to another class at this time');
-//       return;
-//     }
-
-//     if (editingSlot) {
-//       updateMutation.mutate({ ...editingSlot, ...formData });
-//     } else {
-//       createMutation.mutate(formData);
-//     }
-//   };
-
-//   // Loading state
-//   if (isLoading) {
-//     return <PageLoader message="Loading timetable..." />;
-//   }
-
-//   return (
-//     <DndProvider backend={HTML5Backend}>
-//       <div className="space-y-6">
-//         {/* Header */}
-//         <PageHeader
-//           title="Weekly Timetable"
-//           description="Manage and organize class schedules"
-//           action={
-//             <div className="flex gap-2">
-//               <Button
-//                 onClick={() => {
-//                   setEditingSlot(null);
-//                   reset({ day: '', period: '', subject: '', teacher: '' });
-//                   setModalOpen(true);
-//                 }}
-//               >
-//                 <Plus className="h-4 w-4 mr-2" />
-//                 Add Slot
-//               </Button>
-//               <Button
-//                 variant="secondary"
-//                 onClick={handleAutoGenerate}
-//                 disabled={createMutation.isPending}
-//               >
-//                 Auto Generate
-//               </Button>
-//             </div>
-//           }
-//         />
-
-//         {/* Error Alert */}
-//         <ErrorAlert message={queryError?.message || error} />
-
-//         {/* Timetable Grid */}
-//         <Card>
-//           <CardContent className="p-4">
-//             <div className="overflow-x-auto">
-//               <table className="w-full min-w-[800px] border-collapse">
-//                 <thead>
-//                   <tr>
-//                     <th className="w-20 p-3 text-left font-semibold text-muted-foreground border-b">
-//                       Period
-//                     </th>
-//                     {DAYS.map(day => (
-//                       <th key={day.value} className="p-3 text-center font-semibold border-b">
-//                         {day.label}
-//                       </th>
-//                     ))}
-//                   </tr>
-//                 </thead>
-//                 <tbody>
-//                   {PERIODS.map(period => (
-//                     <tr key={period}>
-//                       <td className="p-2 font-medium text-muted-foreground border-r">
-//                         Period {period}
-//                       </td>
-//                       {DAYS.map(day => {
-//                         const slot = grid[day.value]?.[period];
-//                         return (
-//                           <td key={day.value} className="p-2">
-//                             <TimetableCell
-//                               slot={slot}
-//                               day={day.value}
-//                               period={period}
-//                               onDropSlot={handleMoveSlot}
-//                               onEdit={handleEditSlot}
-//                               onDelete={handleDeleteSlot}
-//                             />
-//                           </td>
-//                         );
-//                       })}
-//                     </tr>
-//                   ))}
-//                 </tbody>
-//               </table>
-//             </div>
-//           </CardContent>
-//         </Card>
-
-//         {/* Add/Edit Modal */}
-//         <AppModal
-//           open={modalOpen}
-//           onClose={() => {
-//             setModalOpen(false);
-//             setEditingSlot(null);
-//             reset();
-//           }}
-//           title={editingSlot ? 'Edit Timetable Slot' : 'Add Timetable Slot'}
-//           size="md"
-//         >
-//           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-//             <div className="grid grid-cols-2 gap-4">
-//               <SelectField
-//                 label="Day"
-//                 name="day"
-//                 control={control}
-//                 options={DAYS}
-//                 error={errors.day}
-//                 required
-//                 placeholder="Select day"
-//               />
-
-//               <SelectField
-//                 label="Period"
-//                 name="period"
-//                 control={control}
-//                 options={PERIOD_OPTIONS}
-//                 error={errors.period}
-//                 required
-//                 placeholder="Select period"
-//               />
-//             </div>
-
-//             <Separator />
-
-//             <InputField
-//               label="Subject"
-//               name="subject"
-//               register={register}
-//               error={errors.subject}
-//               required
-//               placeholder="e.g. Mathematics"
-//             />
-
-//             <InputField
-//               label="Teacher"
-//               name="teacher"
-//               register={register}
-//               error={errors.teacher}
-//               required
-//               placeholder="e.g. Mr. Ali"
-//             />
-
-//             {/* Show warning if teacher conflict */}
-//             {watchedDay && watchedPeriod && watchedTeacher && 
-//              checkTeacherConflict(slots, watchedTeacher, watchedDay, watchedPeriod, editingSlot?.id) && (
-//               <Badge variant="destructive" className="w-full justify-center">
-//                 This teacher is already assigned at this time
-//               </Badge>
-//             )}
-
-//             <div className="flex justify-end gap-3 pt-4">
-//               <Button
-//                 type="button"
-//                 variant="outline"
-//                 onClick={() => {
-//                   setModalOpen(false);
-//                   setEditingSlot(null);
-//                   reset();
-//                 }}
-//               >
-//                 Cancel
-//               </Button>
-//               <FormSubmitButton
-//                 loading={createMutation.isPending || updateMutation.isPending}
-//                 label={editingSlot ? 'Update Slot' : 'Add Slot'}
-//                 loadingLabel={editingSlot ? 'Updating...' : 'Adding...'}
-//               />
-//             </div>
-//           </form>
-//         </AppModal>
-
-//         {/* Delete Confirmation */}
-//         <ConfirmDialog
-//           open={!!deletingSlot}
-//           onClose={() => setDeletingSlot(null)}
-//           onConfirm={() => deleteMutation.mutate(deletingSlot.id)}
-//           loading={deleteMutation.isPending}
-//           title="Delete Timetable Slot"
-//           description={`Are you sure you want to delete ${deletingSlot?.subject} (Period ${deletingSlot?.period})? This action cannot be undone.`}
-//           confirmLabel="Delete"
-//           variant="destructive"
-//         />
-//       </div>
-//     </DndProvider>
-//   );
-// }
-
-
-
-// src/components/pages/TimetablePage.jsx
-'use client';
-
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
+import {
+  Plus, Pencil, Trash2, GripVertical, Calendar, Clock,
+  BookOpen, Users, DoorOpen, Copy, Power, Eye, Filter, Settings
+} from 'lucide-react';
 import { toast } from 'sonner';
+
+import useAuthStore from '@/store/authStore';
+import useInstituteStore from '@/store/instituteStore';
+import useInstituteConfig from '@/hooks/useInstituteConfig';
 
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -1101,11 +27,21 @@ import InputField from '@/components/common/InputField';
 import FormSubmitButton from '@/components/common/FormSubmitButton';
 import ErrorAlert from '@/components/common/ErrorAlert';
 import PageLoader from '@/components/common/PageLoader';
+import StatusBadge from '@/components/common/StatusBadge';
+
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+
+// Import services
+import { classService } from '@/services/classService';
+import { teacherService } from '@/services/teacherService';
+import { academicYearService } from '@/services/academicYearService';
+import { timetableService } from '@/services/timetableService';
 
 // Constants
 const DAYS = [
@@ -1114,59 +50,94 @@ const DAYS = [
   { value: 'wednesday', label: 'Wednesday' },
   { value: 'thursday', label: 'Thursday' },
   { value: 'friday', label: 'Friday' },
-  { value: 'saturday', label: 'Saturday' }
+  { value: 'saturday', label: 'Saturday' },
+  { value: 'sunday', label: 'Sunday' }
 ];
 
-const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
-const PERIOD_OPTIONS = PERIODS.map(p => ({ value: p, label: `Period ${p}` }));
-const TYPE = "TIMETABLE_SLOT";
+// Entity type mapping
+const getEntityTypeFromInstitute = (instituteType) => {
+  const mapping = {
+    school: 'school',
+    coaching: 'coaching',
+    academy: 'academy',
+    college: 'college',
+    university: 'university',
+    tuition_center: 'school'
+  };
+  return mapping[instituteType] || 'school';
+};
 
-// Colors for subjects
+const ENTITY_TYPE_LABELS = {
+  school: 'Class + Section',
+  coaching: 'Course + Batch',
+  academy: 'Program + Batch',
+  college: 'Department + Semester',
+  university: 'Faculty + Department'
+};
+
+const TYPE = 'TIMETABLE_SLOT';
+
+// Subject color mapping
 const SUBJECT_COLORS = {
-  'Math': 'bg-blue-100 text-blue-700 border-blue-200',
-  'English': 'bg-green-100 text-green-700 border-green-200',
-  'Science': 'bg-purple-100 text-purple-700 border-purple-200',
-  'Computer': 'bg-orange-100 text-orange-700 border-orange-200',
-  'Physics': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  'Chemistry': 'bg-pink-100 text-pink-700 border-pink-200',
+  'Mathematics': 'bg-blue-100 text-blue-700 border-blue-200',
+  'Physics': 'bg-purple-100 text-purple-700 border-purple-200',
+  'Chemistry': 'bg-green-100 text-green-700 border-green-200',
   'Biology': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'English': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  'Urdu': 'bg-orange-100 text-orange-700 border-orange-200',
+  'Islamiat': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  'Computer': 'bg-pink-100 text-pink-700 border-pink-200',
   'History': 'bg-amber-100 text-amber-700 border-amber-200',
   'Geography': 'bg-teal-100 text-teal-700 border-teal-200',
-  'Urdu': 'bg-rose-100 text-rose-700 border-rose-200',
-  'Islamiat': 'bg-cyan-100 text-cyan-700 border-cyan-200',
   'default': 'bg-gray-100 text-gray-700 border-gray-200'
 };
 
-/* ---------- Drag Cell Component ---------- */
-function TimetableCell({ slot, day, period, onDropSlot, onEdit, onDelete }) {
+/* ---------- Timetable Cell Component ---------- */
+function TimetableCell({ slot, day, period, periodConfig, onDrop, onEdit, onDelete }) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: TYPE,
     item: slot,
-    canDrag: !!slot,
+    canDrag: !!slot && !slot.is_break,
     collect: (monitor) => ({ isDragging: monitor.isDragging() })
   }));
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: TYPE,
-    drop: (item) => onDropSlot(item, day, period),
+    drop: (item) => onDrop(item, day, period),
     collect: (monitor) => ({ isOver: monitor.isOver() })
   }));
 
+  const periodInfo = periodConfig?.periods?.find(p => p.period === period);
   const getSubjectColor = (subject) => SUBJECT_COLORS[subject] || SUBJECT_COLORS.default;
+
+  if (slot?.is_break) {
+    return (
+      <div className="h-24 rounded-lg border-2 border-dashed border-amber-200 bg-amber-50 p-2">
+        <div className="text-center">
+          <p className="font-medium text-amber-700">{slot.break_name || 'Break'}</p>
+          {periodInfo && (
+            <p className="text-xs text-amber-600">
+              {periodInfo.start_time} - {periodInfo.end_time}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       ref={(node) => drag(drop(node))}
       className={cn(
-        'relative min-h-[80px] rounded-lg border-2 transition-all duration-200',
+        'relative h-24 rounded-lg border-2 transition-all duration-200',
         isOver && 'border-primary bg-primary/5',
         isDragging && 'opacity-50',
-        slot ? 'cursor-move hover:shadow-md' : 'cursor-pointer hover:border-dashed'
+        slot ? 'cursor-move hover:shadow-md' : 'cursor-pointer hover:border-dashed hover:border-primary'
       )}
       onClick={() => !slot && onEdit({ day, period })}
     >
       {slot ? (
-        <div className={cn('h-full w-full rounded-lg p-2', getSubjectColor(slot.subject))}>
+        <div className={cn('h-full w-full rounded-lg p-2', getSubjectColor(slot.subject_name))}>
           <div className="flex items-start justify-between">
             <GripVertical size={14} className="opacity-50" />
             <div className="flex gap-1">
@@ -1179,215 +150,1046 @@ function TimetableCell({ slot, day, period, onDropSlot, onEdit, onDelete }) {
             </div>
           </div>
           <div className="mt-1 space-y-1">
-            <p className="font-semibold text-sm">{slot.subject}</p>
-            {slot.teacher && <p className="text-xs opacity-75">{slot.teacher}</p>}
+            <p className="font-semibold text-sm truncate">{slot.subject_name}</p>
+            <p className="text-xs opacity-75 truncate">{slot.teacher_name}</p>
+            {slot.room_no && (
+              <p className="text-xs opacity-50 flex items-center gap-1">
+                <DoorOpen size={10} /> {slot.room_no}
+              </p>
+            )}
           </div>
         </div>
       ) : (
-        <div className="flex h-full min-h-[80px] items-center justify-center text-muted-foreground hover:text-primary">
-          <Plus size={20} />
+        <div className="flex h-full items-center justify-center text-muted-foreground hover:text-primary">
+          <Plus size={24} />
         </div>
       )}
     </div>
   );
 }
 
-/* ---------- Teacher Conflict Check ---------- */
-function checkTeacherConflict(slots, teacher, day, period, excludeId = null) {
-  return slots.some(
-    (s) => s.teacher === teacher && s.day === day && Number(s.period) === Number(period) && s.id !== excludeId
+/* ---------- Period Config Modal Component (FIXED) ---------- */
+function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, loading }) {
+  const [periods, setPeriods] = useState([]);
+  const [breaks, setBreaks] = useState([]);
+  const [totalPeriods, setTotalPeriods] = useState(8);
+
+  // Initialize form when modal opens or initialConfig changes
+  useEffect(() => {
+    if (open) {
+      if (initialConfig) {
+        // Edit mode - use existing config
+        setTotalPeriods(initialConfig.total_periods || 8);
+        setPeriods(initialConfig.periods || []);
+        setBreaks(initialConfig.breaks || [
+          { name: 'Break', start_time: '10:00', end_time: '10:30' },
+          { name: 'Lunch', start_time: '12:30', end_time: '13:30' }
+        ]);
+      } else {
+        // Create mode - default config
+        setTotalPeriods(8);
+        setPeriods([
+          { period: 1, start_time: '08:00', end_time: '08:40', name: 'Period 1', type: 'study' },
+          { period: 2, start_time: '08:40', end_time: '09:20', name: 'Period 2', type: 'study' },
+          { period: 3, start_time: '09:20', end_time: '10:00', name: 'Period 3', type: 'study' },
+          { period: 4, start_time: '10:30', end_time: '11:10', name: 'Period 4', type: 'study' },
+          { period: 5, start_time: '11:10', end_time: '11:50', name: 'Period 5', type: 'study' },
+          { period: 6, start_time: '11:50', end_time: '12:30', name: 'Period 6', type: 'study' },
+          { period: 7, start_time: '13:30', end_time: '14:10', name: 'Period 7', type: 'study' },
+          { period: 8, start_time: '14:10', end_time: '14:50', name: 'Period 8', type: 'study' }
+        ]);
+        setBreaks([
+          { name: 'Break', start_time: '10:00', end_time: '10:30' },
+          { name: 'Lunch', start_time: '12:30', end_time: '13:30' }
+        ]);
+      }
+    }
+  }, [open, initialConfig]);
+
+  // Update periods when totalPeriods changes
+  const handleTotalPeriodsChange = (e) => {
+    const newTotal = parseInt(e.target.value) || 1;
+    setTotalPeriods(newTotal);
+
+    // Adjust periods array
+    const newPeriods = [];
+    for (let i = 1; i <= newTotal; i++) {
+      const existing = periods.find(p => p.period === i);
+      if (existing) {
+        newPeriods.push(existing);
+      } else {
+        newPeriods.push({
+          period: i,
+          start_time: '08:00',
+          end_time: '08:40',
+          name: `Period ${i}`,
+          type: 'study'
+        });
+      }
+    }
+    setPeriods(newPeriods);
+  };
+
+  // Update period field
+  const handlePeriodChange = (index, field, value) => {
+    const updatedPeriods = [...periods];
+    updatedPeriods[index] = { ...updatedPeriods[index], [field]: value };
+    setPeriods(updatedPeriods);
+  };
+
+  // Update break field
+  const handleBreakChange = (index, field, value) => {
+    const updatedBreaks = [...breaks];
+    updatedBreaks[index] = { ...updatedBreaks[index], [field]: value };
+    setBreaks(updatedBreaks);
+  };
+
+  // Add new break
+  const handleAddBreak = () => {
+    setBreaks([...breaks, { name: '', start_time: '', end_time: '' }]);
+  };
+
+  // Remove break
+  const handleRemoveBreak = (index) => {
+    const updatedBreaks = breaks.filter((_, i) => i !== index);
+    setBreaks(updatedBreaks);
+  };
+
+  // Validate form
+  const validateForm = () => {
+    // Check periods
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i];
+      if (!p.start_time || !p.end_time) {
+        toast.error(`Period ${p.period} timing required`);
+        return false;
+      }
+      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(p.start_time)) {
+        toast.error(`Period ${p.period} start time invalid`);
+        return false;
+      }
+      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(p.end_time)) {
+        toast.error(`Period ${p.period} end time invalid`);
+        return false;
+      }
+    }
+
+    // Check breaks
+    for (let i = 0; i < breaks.length; i++) {
+      const b = breaks[i];
+      if (!b.name || !b.start_time || !b.end_time) {
+        toast.error(`Break ${i + 1} incomplete`);
+        return false;
+      }
+      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(b.start_time)) {
+        toast.error(`Break ${i + 1} start time invalid`);
+        return false;
+      }
+      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(b.end_time)) {
+        toast.error(`Break ${i + 1} end time invalid`);
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleSubmit = () => {
+    if (!validateForm()) return;
+
+    const config = {
+      total_periods: totalPeriods,
+      periods: periods,
+      breaks: breaks
+    };
+
+    onSubmit(config);
+  };
+
+  return (
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title={initialConfig ? "Edit Timetable Periods" : "Configure Timetable Periods"}
+      size="lg"
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? 'Saving...' : initialConfig ? 'Update Timetable' : 'Create Timetable'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {/* Total Periods */}
+        <div className="space-y-2">
+          <Label>Total Periods Per Day</Label>
+          <input
+            type="number"
+            value={totalPeriods}
+            onChange={handleTotalPeriodsChange}
+            min="1"
+            max="12"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          />
+        </div>
+
+        {/* Periods List */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold">Period Timings</h3>
+          <div className="space-y-3">
+            {periods.map((period, index) => (
+              <div key={period.period} className="grid grid-cols-4 gap-2 items-center">
+                <span className="text-sm font-medium">Period {period.period}</span>
+                <input
+                  type="text"
+                  value={period.start_time}
+                  onChange={(e) => handlePeriodChange(index, 'start_time', e.target.value)}
+                  placeholder="09:00"
+                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                />
+                <span className="text-center">to</span>
+                <input
+                  type="text"
+                  value={period.end_time}
+                  onChange={(e) => handlePeriodChange(index, 'end_time', e.target.value)}
+                  placeholder="09:45"
+                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Break Periods */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-semibold">Break Periods</h3>
+            <Button type="button" variant="outline" size="sm" onClick={handleAddBreak}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Break
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {breaks.map((breakPeriod, index) => (
+              <div key={index} className="grid grid-cols-6 gap-2 items-center">
+                <input
+                  type="text"
+                  value={breakPeriod.name}
+                  onChange={(e) => handleBreakChange(index, 'name', e.target.value)}
+                  placeholder="Break name"
+                  className="col-span-2 flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                />
+                <input
+                  type="text"
+                  value={breakPeriod.start_time}
+                  onChange={(e) => handleBreakChange(index, 'start_time', e.target.value)}
+                  placeholder="10:00"
+                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                />
+                <span className="text-center">to</span>
+                <input
+                  type="text"
+                  value={breakPeriod.end_time}
+                  onChange={(e) => handleBreakChange(index, 'end_time', e.target.value)}
+                  placeholder="10:30"
+                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveBreak(index)}
+                  className="text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </AppModal>
   );
 }
 
-/* ---------- AI Smart Generator ---------- */
-function generateAutoTimetable(subjects, teachers) {
-  const result = [];
-  DAYS.forEach(day => {
-    PERIODS.forEach(period => {
-      const randomSubject = subjects[Math.floor(Math.random() * subjects.length)];
-      const randomTeacher = teachers[Math.floor(Math.random() * teachers.length)];
-      result.push({ id: crypto.randomUUID(), day: day.value, period, subject: randomSubject, teacher: randomTeacher });
-    });
-  });
-  return result;
-}
+/* ---------- Main Component ---------- */
+export default function TimetablePage({ type }) {
+  const queryClient = useQueryClient();
+  const { canDo } = useAuthStore();
+  const { currentInstitute } = useInstituteStore();
+  const { terms } = useInstituteConfig();
 
-export default function TimetablePage() {
-  const qc = useQueryClient();
+  const entityType = getEntityTypeFromInstitute(type);
+
+  // State
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState(null);
   const [deletingSlot, setDeletingSlot] = useState(null);
-  const [generatorModal, setGeneratorModal] = useState(false);
-  const [generatedSlots, setGeneratedSlots] = useState([]);
+  const [periodConfig, setPeriodConfig] = useState(null);
 
-  const { control, register, handleSubmit, reset, watch, formState: { errors } } = useForm({
-    defaultValues: { day: '', period: '', subject: '', teacher: '' }
+  // Data states
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedClassData, setSelectedClassData] = useState(null);
+
+  // Filter Form
+  const filterSchema = z.object({
+    academic_year: z.string().optional(),
+    class: z.string().optional(),
+    section: z.string().optional(),
+  });
+
+  const {
+    control: filterControl,
+    watch: filterWatch,
+    setValue: setFilterValue,
+    reset: resetFilters
+  } = useForm({
+    resolver: zodResolver(filterSchema),
+    defaultValues: {
+      academic_year: '',
+      class: '',
+      section: '',
+    }
+  });
+
+  const watchedAcademicYear = filterWatch('academic_year');
+  const watchedClass = filterWatch('class');
+  const watchedSection = filterWatch('section');
+
+  // Update selected values
+  useEffect(() => {
+    setSelectedAcademicYear(watchedAcademicYear || '');
+  }, [watchedAcademicYear]);
+
+  useEffect(() => {
+    setSelectedClass(watchedClass || '');
+    setSelectedSection('');
+    setFilterValue('section', '');
+
+    if (watchedClass) {
+      const classData = classes.find(c => c.id === watchedClass);
+      setSelectedClassData(classData);
+      console.log('Class Data', classData);
+
+      setSections(classData?.sections || []);
+
+      // Extract subjects from courses/materials (JSONB safe)
+      // Extract subjects from courses/materials
+      const extractedSubjects = [];
+
+      if (classData?.courses?.length) {
+        classData.courses.forEach(course => {
+
+          // SUBJECT NAME = COURSE NAME
+          if (course?.name) {
+            extractedSubjects.push({
+              id: course.id,
+              name: course.name,
+              code: course.course_code || ''
+            });
+          }
+
+        });
+      }
+
+      // remove duplicates
+      const uniqueSubjects = Array.from(
+        new Map(extractedSubjects.map(s => [s.id, s])).values()
+      );
+
+      setSubjects(uniqueSubjects);
+    } else {
+      setSelectedClassData(null);
+      setSections([]);
+      setSubjects([]);
+    }
+  }, [watchedClass, classes, setFilterValue]);
+
+  useEffect(() => {
+    setSelectedSection(watchedSection || '');
+  }, [watchedSection]);
+
+  // Fetch Academic Years
+  const { data: academicYearsData, isLoading: academicYearsLoading } = useQuery({
+    queryKey: ['academic-years', currentInstitute?.id],
+    queryFn: () => academicYearService.getAll({ institute_id: currentInstitute?.id, is_active: true }),
+    enabled: !!currentInstitute?.id,
+  });
+
+  useEffect(() => {
+    if (academicYearsData?.data) {
+      setAcademicYears(academicYearsData.data);
+    }
+  }, [academicYearsData]);
+
+  // Fetch Classes
+  const { data: classesData, isLoading: classesLoading } = useQuery({
+    queryKey: ['classes', currentInstitute?.id, selectedAcademicYear],
+    queryFn: () => classService.getAll({
+      institute_id: currentInstitute?.id,
+      academic_year_id: selectedAcademicYear,
+      is_active: true
+    }),
+    enabled: !!currentInstitute?.id && !!selectedAcademicYear,
+  });
+
+  useEffect(() => {
+    if (classesData?.data) {
+      setClasses(classesData.data);
+    }
+  }, [classesData]);
+
+  // Fetch Teachers
+  const { data: teachersData, isLoading: teachersLoading } = useQuery({
+    queryKey: ['teachers', currentInstitute?.id],
+    queryFn: () => teacherService.getAll({
+      institute_id: currentInstitute?.id,
+      is_active: true,
+      limit: 200
+    }),
+    enabled: !!currentInstitute?.id,
+  });
+
+  useEffect(() => {
+    if (teachersData?.data) {
+      setTeachers(teachersData.data);
+    }
+  }, [teachersData]);
+
+  // Fetch timetables
+  const {
+    data: timetablesData,
+    isLoading,
+    error,
+    refetch
+  } = useQuery({
+    queryKey: ['timetables', currentInstitute?.id, selectedAcademicYear, entityType, selectedClass, selectedSection],
+    queryFn: () => timetableService.getAll({
+      academic_year_id: selectedAcademicYear,
+      entity_type: entityType,
+      class_id: selectedClass || undefined,
+      section_id: selectedSection || undefined
+    }),
+    enabled: !!currentInstitute?.id && !!selectedAcademicYear,
+  });
+
+  const timetables = timetablesData?.data || [];
+
+  // Current timetable
+  const currentTimetable = useMemo(() => {
+    if (!timetables.length) return null;
+    const entityIds = {};
+    if (selectedClass) entityIds.class_id = selectedClass;
+    if (selectedSection) entityIds.section_id = selectedSection;
+    return timetables.find(t =>
+      t.entity_type === entityType &&
+      Object.keys(entityIds).every(key => t.entity_ids?.[key] === entityIds[key])
+    );
+  }, [timetables, entityType, selectedClass, selectedSection]);
+
+  // Grid
+  const grid = useMemo(() => {
+    const g = {};
+    DAYS.forEach(d => { g[d.value] = {}; });
+    if (currentTimetable?.slots) {
+      currentTimetable.slots.forEach(slot => {
+        if (slot.period) {
+          g[slot.day][slot.period] = slot;
+        }
+      });
+    }
+    return g;
+  }, [currentTimetable]);
+
+  // Mutations
+  const createTimetableMutation = useMutation({
+    mutationFn: (data) => timetableService.create(data),
+    onSuccess: () => {
+      toast.success('Timetable created successfully');
+      queryClient.invalidateQueries({ queryKey: ['timetables'] });
+      setConfigModalOpen(false);
+    },
+    onError: (error) => toast.error(error.message || 'Failed to create timetable')
+  });
+
+  const updateTimetableMutation = useMutation({
+    mutationFn: ({ id, data }) => timetableService.update(id, data),
+    onSuccess: () => {
+      toast.success('Timetable updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['timetables'] });
+      setConfigModalOpen(false);
+      setPeriodConfig(null);
+    },
+    onError: (error) => toast.error(error.message || 'Failed to update timetable')
+  });
+
+  const addSlotMutation = useMutation({
+    mutationFn: ({ id, data }) => timetableService.update(id, data),
+    onSuccess: () => {
+      toast.success('Slot added successfully');
+      queryClient.invalidateQueries({ queryKey: ['timetables'] });
+      setModalOpen(false);
+      setEditingSlot(null);
+    },
+    onError: (error) => toast.error(error.message || 'Failed to add slot')
+  });
+
+  const deleteSlotMutation = useMutation({
+    mutationFn: ({ id, data }) => timetableService.update(id, data),
+    onSuccess: () => {
+      toast.success('Slot deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['timetables'] });
+      setDeletingSlot(null);
+    },
+    onError: (error) => toast.error(error.message || 'Failed to delete slot')
+  });
+
+  // Slot Form
+  const { control, register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
+    defaultValues: {
+      day: '',
+      period: '',
+      subject_id: '',
+      teacher_id: '',
+      room_no: '',
+      is_break: false,
+      break_name: ''
+    }
   });
 
   const watchedDay = watch('day');
   const watchedPeriod = watch('period');
-  const watchedTeacher = watch('teacher');
+  const watchedTeacher = watch('teacher_id');
+  const watchedIsBreak = watch('is_break');
 
-  const { data, isLoading, error: queryError } = useQuery({
-    queryKey: ['timetable'],
-    queryFn: async () => {
-      try {
-        const { timetableService } = await import('@/services');
-        return await timetableService.getAll();
-      } catch {
-        return { data: { rows: [] } };
+  // Auto-fill room number
+  useEffect(() => {
+    if (selectedSection && selectedClassData) {
+      const section = selectedClassData.sections?.find(s => s.id === selectedSection);
+      if (section?.room_no) {
+        setValue('room_no', section.room_no);
       }
     }
-  });
-
-  const slots = data?.data?.rows ?? [];
-
-  const grid = useMemo(() => {
-    const g = {}; DAYS.forEach(d => { g[d.value] = {}; });
-    slots.forEach(s => { g[s.day][s.period] = s; });
-    return g;
-  }, [slots]);
-
-  // Mutations
-  const createMutation = useMutation({ mutationFn: async (d) => (await import('@/services')).timetableService.create(d), onSuccess: () => { qc.invalidateQueries(['timetable']); toast.success('Slot added'); }});
-  const updateMutation = useMutation({ mutationFn: async (d) => (await import('@/services')).timetableService.update(d.id, d), onSuccess: () => { qc.invalidateQueries(['timetable']); toast.success('Slot updated'); }});
-  const deleteMutation = useMutation({ mutationFn: async (id) => (await import('@/services')).timetableService.delete(id), onSuccess: () => { qc.invalidateQueries(['timetable']); toast.success('Slot deleted'); }});
+  }, [selectedSection, selectedClassData, setValue]);
 
   // Handlers
-  const handleMoveSlot = (draggedSlot, newDay, newPeriod) => {
-    if (draggedSlot.day === newDay && draggedSlot.period === newPeriod) return;
-    if (checkTeacherConflict(slots, draggedSlot.teacher, newDay, newPeriod, draggedSlot.id)) { toast.error('Teacher conflict'); return; }
-    updateMutation.mutate({ ...draggedSlot, day: newDay, period: newPeriod });
-  };
-
-  const handleEditSlot = (slot) => { setEditingSlot(slot); reset(slot); setModalOpen(true); };
-  const handleDeleteSlot = (slot) => setDeletingSlot(slot);
-
-  const handleAutoGenerate = () => {
-    const subjects = ['Math','English','Science','Computer','Physics','Chemistry','Biology','History','Geography'];
-    const teachers = ['Ali','Ahmed','Sara','Fatima','Usman','Ayesha','Bilal','Zainab'];
-    const generated = generateAutoTimetable(subjects, teachers);
-    setGeneratedSlots(generated);
-    setGeneratorModal(true);
-  };
-
-  const finalizeGeneratedSlots = () => {
-    generatedSlots.forEach(slot => createMutation.mutate(slot));
-    setGeneratorModal(false);
-  };
-
-  const onSubmit = (formData) => {
-    if (checkTeacherConflict(slots, formData.teacher, formData.day, formData.period, editingSlot?.id)) {
-      toast.error('Teacher conflict at this slot');
+  const handleDropSlot = async (draggedSlot, newDay, newPeriod) => {
+    if (!currentTimetable) {
+      toast.error('Please select/create a timetable first');
       return;
     }
-    if (editingSlot) updateMutation.mutate({ ...editingSlot, ...formData });
-    else createMutation.mutate(formData);
-    setModalOpen(false); reset();
+    if (draggedSlot.day === newDay && draggedSlot.period === newPeriod) return;
+
+    const conflictCheck = await timetableService.checkConflict({
+      teacher_id: draggedSlot.teacher_id,
+      day: newDay,
+      period: newPeriod,
+      exclude_id: draggedSlot.id
+    });
+
+    if (conflictCheck.data?.hasConflict) {
+      toast.error('Teacher already assigned at this time');
+      return;
+    }
+
+    const updatedSlots = currentTimetable.slots.map(slot =>
+      slot.id === draggedSlot.id
+        ? { ...slot, day: newDay, period: newPeriod, updated_at: new Date().toISOString() }
+        : slot
+    );
+
+    addSlotMutation.mutate({
+      id: currentTimetable.id,
+      data: { slots: updatedSlots }
+    });
   };
 
-  if (isLoading) return <PageLoader message="Loading timetable..." />;
+  const handleEditSlot = (slotData) => {
+    if (!currentTimetable) {
+      toast.error('Please select/create a timetable first');
+      return;
+    }
+
+    // Existing slot edit
+    if (slotData?.id) {
+      setEditingSlot(slotData);
+
+      reset({
+        day: slotData.day,
+        period: String(slotData.period), // FIX
+        subject_id: slotData.subject_id || '',
+        teacher_id: slotData.teacher_id || '',
+        room_no: slotData.room_no || '',
+        is_break: slotData.is_break || false,
+        break_name: slotData.break_name || ''
+      });
+
+    } else {
+
+      // NEW SLOT (table click)
+      setEditingSlot(null);
+
+      const sectionRoom =
+        selectedSection && selectedClassData
+          ? selectedClassData.sections?.find(s => s.id === selectedSection)?.room_no
+          : '';
+
+      reset({
+        day: slotData.day,
+        period: String(slotData.period), // FIX
+        subject_id: '',
+        teacher_id: '',
+        room_no: sectionRoom || '',
+        is_break: false,
+        break_name: ''
+      });
+    }
+
+    setModalOpen(true);
+  };
+
+  const handleDeleteSlot = (slot) => {
+    setDeletingSlot(slot);
+  };
+
+  const handleCreateTimetable = () => {
+    if (!selectedClass) {
+      toast.error('Please select a class');
+      return;
+    }
+    setPeriodConfig(null); // Reset for create mode
+    setConfigModalOpen(true);
+  };
+
+  const handleEditConfig = () => {
+    if (currentTimetable) {
+      setPeriodConfig(currentTimetable.period_config);
+      setConfigModalOpen(true);
+    }
+  };
+
+  const handleConfigSubmit = (config) => {
+    const entityIds = {};
+    let name = '';
+
+    if (entityType === 'school') {
+      entityIds.class_id = selectedClass;
+      const classObj = classes.find(c => c.id === selectedClass);
+      name = classObj?.name || 'Class';
+
+      if (selectedSection) {
+        entityIds.section_id = selectedSection;
+        const section = classObj?.sections?.find(s => s.id === selectedSection);
+        name += ` - ${section?.name || 'Section'}`;
+      }
+    }
+
+    if (currentTimetable) {
+      // Update existing timetable config
+      updateTimetableMutation.mutate({
+        id: currentTimetable.id,
+        data: { period_config: config }
+      });
+    } else {
+      // Create new timetable
+      createTimetableMutation.mutate({
+        name: `${name} Timetable`,
+        academic_year_id: selectedAcademicYear,
+        entity_type: entityType,
+        entity_ids: entityIds,
+        period_config: config,
+        slots: []
+      });
+    }
+  };
+
+  const onSubmitSlot = async (formData) => {
+    if (!currentTimetable) return;
+
+    if (formData.teacher_id && !formData.is_break) {
+      const conflictCheck = await timetableService.checkConflict({
+        teacher_id: formData.teacher_id,
+        day: formData.day,
+        period: formData.period,
+        exclude_id: editingSlot?.id
+      });
+
+      if (conflictCheck.data?.hasConflict) {
+        toast.error('Teacher already assigned at this time');
+        return;
+      }
+    }
+
+    let updatedSlots = [...(currentTimetable.slots || [])];
+
+    if (formData.is_break) {
+      const newSlot = {
+        id: editingSlot?.id || `temp-${Date.now()}`,
+        day: formData.day,
+        period: parseInt(formData.period),
+        is_break: true,
+        break_name: formData.break_name || 'Break',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      updatedSlots = editingSlot
+        ? updatedSlots.map(s => s.id === editingSlot.id ? newSlot : s)
+        : [...updatedSlots, newSlot];
+    } else {
+      const subject = subjects.find(s => s.id === formData.subject_id);
+      const teacher = teachers.find(t => t.id === formData.teacher_id);
+      const newSlot = {
+        id: editingSlot?.id || `temp-${Date.now()}`,
+        day: formData.day,
+        period: parseInt(formData.period),
+        subject_id: formData.subject_id,
+        subject_name: subject?.name || '',
+        teacher_id: formData.teacher_id,
+        teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : '',
+        room_no: formData.room_no,
+        is_break: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      updatedSlots = editingSlot
+        ? updatedSlots.map(s => s.id === editingSlot.id ? newSlot : s)
+        : [...updatedSlots, newSlot];
+    }
+
+    addSlotMutation.mutate({
+      id: currentTimetable.id,
+      data: { slots: updatedSlots }
+    });
+  };
+
+  const confirmDeleteSlot = () => {
+    if (!currentTimetable || !deletingSlot) return;
+    const updatedSlots = currentTimetable.slots.filter(s => s.id !== deletingSlot.id);
+    deleteSlotMutation.mutate({
+      id: currentTimetable.id,
+      data: { slots: updatedSlots }
+    });
+  };
+
+  const handleClearFilters = () => {
+    resetFilters();
+    setSelectedClass('');
+    setSelectedSection('');
+  };
+
+  if (isLoading || academicYearsLoading || classesLoading || teachersLoading) {
+    return <PageLoader message="Loading timetable..." />;
+  }
 
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="space-y-6">
         <PageHeader
           title="Weekly Timetable"
-          description="Manage class schedules"
+          description="Manage class schedules and periods"
           action={
             <div className="flex gap-2">
-              <Button onClick={() => { setEditingSlot(null); reset({ day:'',period:'',subject:'',teacher:'' }); setModalOpen(true); }}><Plus className="mr-2 h-4 w-4"/>Add Slot</Button>
-              <Button variant="secondary" onClick={handleAutoGenerate}>Auto Generate</Button>
+              {currentTimetable && canDo('timetable.update') && (
+                <Button
+                  variant="outline"
+                  onClick={handleEditConfig}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configure Periods
+                </Button>
+              )}
+              {canDo('timetable.create') && (
+                <Button
+                  onClick={handleCreateTimetable}
+                  disabled={!selectedAcademicYear || !selectedClass}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create New Timetable
+                </Button>
+              )}
             </div>
           }
         />
 
-        <ErrorAlert message={queryError} />
+        <ErrorAlert message={error?.message} />
 
+        {/* Filters */}
         <Card>
-          <CardContent className="p-4 overflow-x-auto">
-            <table className="w-full min-w-[800px] border-collapse">
-              <thead>
-                <tr>
-                  <th className="p-3 w-20 text-left font-semibold border-b">Period</th>
-                  {DAYS.map(d => <th key={d.value} className="p-3 text-center font-semibold border-b">{d.label}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {PERIODS.map(period => (
-                  <tr key={period}>
-                    <td className="p-2 font-medium text-muted-foreground border-r">Period {period}</td>
-                    {DAYS.map(day => {
-                      const slot = grid[day.value]?.[period];
-                      return <td key={day.value} className="p-2">
-                        <TimetableCell slot={slot} day={day.value} period={period} onDropSlot={handleMoveSlot} onEdit={handleEditSlot} onDelete={handleDeleteSlot}/>
-                      </td>;
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <Filter className="h-4 w-4 mr-2" />
+              Select Timetable
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <SelectField
+                label="Academic Year"
+                name="academic_year"
+                control={filterControl}
+                options={[
+                  { value: 'all', label: 'Select Academic Year' },
+                  ...academicYears.map(y => ({ value: y.id, label: y.name }))
+                ]}
+                placeholder="Select Academic Year"
+              />
+
+              <SelectField
+                label="Class"
+                name="class"
+                control={filterControl}
+                options={[
+                  { value: 'all', label: 'Select Class' },
+                  ...classes.map(c => ({ value: c.id, label: c.name }))
+                ]}
+                placeholder="Select Class"
+                disabled={!selectedAcademicYear}
+              />
+
+              {watchedClass && (
+                <SelectField
+                  label="Section"
+                  name="section"
+                  control={filterControl}
+                  options={[
+                    { value: 'all', label: 'All Sections' },
+                    ...sections.map(s => ({ value: s.id, label: s.name }))
+                  ]}
+                  placeholder="Select Section"
+                />
+              )}
+            </div>
+
+            {currentTimetable && (
+              <div className="mt-4 flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
+                <Badge variant="outline" className="text-sm">
+                  {currentTimetable.name}
+                </Badge>
+                <StatusBadge status={currentTimetable.is_active ? 'active' : 'inactive'} />
+                <span className="text-sm text-muted-foreground">
+                  Periods: {currentTimetable.period_config?.total_periods || 8}
+                </span>
+              </div>
+            )}
+
+            {(watchedClass || selectedAcademicYear) && (
+              <div className="mt-4 flex justify-end">
+                <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                  Clear All Filters
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Add/Edit Modal */}
-        <AppModal open={modalOpen} onClose={() => { setModalOpen(false); setEditingSlot(null); reset(); }} title={editingSlot ? 'Edit Slot' : 'Add Slot'} size="md">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Timetable Grid */}
+        {currentTimetable ? (
+          <Card>
+            <CardContent className="p-4 overflow-x-auto">
+              <table className="w-full min-w-[800px] border-collapse">
+                <thead>
+                  <tr>
+                    <th className="p-3 w-24 text-left font-semibold border-b">Period / Day</th>
+                    {DAYS.map(day => (
+                      <th key={day.value} className="p-3 text-center font-semibold border-b">
+                        {day.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentTimetable.period_config?.periods?.map(period => (
+                    <tr key={period.period}>
+                      <td className="p-2 font-medium border-r">
+                        <div>
+                          <p>Period {period.period}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {period.start_time} - {period.end_time}
+                          </p>
+                        </div>
+                      </td>
+                      {DAYS.map(day => {
+                        const slot = grid[day.value]?.[period.period];
+                        return (
+                          <td key={day.value} className="p-2">
+                            <TimetableCell
+                              slot={slot}
+                              day={day.value}
+                              period={period.period}
+                              periodConfig={currentTimetable.period_config}
+                              onDrop={handleDropSlot}
+                              onEdit={handleEditSlot}
+                              onDelete={handleDeleteSlot}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Timetable Selected</h3>
+              <p className="text-muted-foreground mb-4">
+                Please select an academic year and class to view or create a timetable
+              </p>
+              {selectedAcademicYear && selectedClass && (
+                <Button onClick={handleCreateTimetable}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create New Timetable
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Period Config Modal */}
+        <PeriodConfigModal
+          open={configModalOpen}
+          onClose={() => {
+            setConfigModalOpen(false);
+            setPeriodConfig(null);
+          }}
+          onSubmit={handleConfigSubmit}
+          initialConfig={periodConfig}
+          loading={createTimetableMutation.isPending || updateTimetableMutation.isPending}
+        />
+
+        {/* Add/Edit Slot Modal */}
+        <AppModal
+          open={modalOpen}
+          onClose={() => { setModalOpen(false); setEditingSlot(null); reset(); }}
+          title={editingSlot ? 'Edit Slot' : 'Add Slot'}
+          size="md"
+        >
+          <form onSubmit={handleSubmit(onSubmitSlot)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <SelectField label="Day" name="day" control={control} options={DAYS} error={errors.day} required/>
-              <SelectField label="Period" name="period" control={control} options={PERIOD_OPTIONS} error={errors.period} required/>
+              <SelectField
+                label="Day"
+                name="day"
+                control={control}
+                options={DAYS}
+                error={errors.day}
+                required
+              />
+              <SelectField
+                label="Period"
+                name="period"
+                control={control}
+                options={currentTimetable?.period_config?.periods?.map(p => ({
+                  value: p.period,
+                  label: `Period ${p.period} (${p.start_time} - ${p.end_time})`
+                })) || []}
+                error={errors.period}
+                required
+              />
             </div>
-            <Separator/>
-            <InputField label="Subject" name="subject" register={register} error={errors.subject} required placeholder="e.g. Mathematics"/>
-            <InputField label="Teacher" name="teacher" register={register} error={errors.teacher} required placeholder="e.g. Mr. Ali"/>
-            {watchedDay && watchedPeriod && watchedTeacher && checkTeacherConflict(slots, watchedTeacher, watchedDay, watchedPeriod, editingSlot?.id) && (
-              <Badge variant="destructive" className="w-full justify-center">This teacher is already assigned at this time</Badge>
+
+            <Separator />
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="is_break"
+                {...register('is_break')}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="is_break">This is a break period</Label>
+            </div>
+
+            {watchedIsBreak ? (
+              <InputField
+                label="Break Name"
+                name="break_name"
+                register={register}
+                error={errors.break_name}
+                placeholder="e.g. Lunch, Madani Channel, Prayer Break"
+                required
+              />
+            ) : (
+              <>
+                <SelectField
+                  label="Subject"
+                  name="subject_id"
+                  control={control}
+                  options={[
+                    { value: 'all', label: 'Select Subject' },
+                    ...subjects.map(s => ({
+                      value: s.id,
+                      label: s.name
+                    }))
+                  ]}
+                  error={errors.subject_id}
+                  required
+                />
+
+                <SelectField
+                  label="Teacher"
+                  name="teacher_id"
+                  control={control}
+                  options={[
+                    { value: 'all', label: 'Select Teacher' },
+                    ...teachers.map(t => ({
+                      value: t.id,
+                      label: `${t.first_name} ${t.last_name}`
+                    }))
+                  ]}
+                  error={errors.teacher_id}
+                  required
+                />
+
+                <InputField
+                  label="Room No."
+                  name="room_no"
+                  register={register}
+                  error={errors.room_no}
+                  placeholder="e.g. 101, Lab 2"
+                />
+              </>
             )}
+
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => { setModalOpen(false); setEditingSlot(null); reset(); }}>Cancel</Button>
-              <FormSubmitButton loading={createMutation.isPending || updateMutation.isPending} label={editingSlot ? 'Update Slot' : 'Add Slot'} loadingLabel={editingSlot ? 'Updating...' : 'Adding...'}/>
+              <Button type="button" variant="outline" onClick={() => { setModalOpen(false); reset(); }}>
+                Cancel
+              </Button>
+              <FormSubmitButton
+                loading={addSlotMutation.isPending}
+                label={editingSlot ? 'Update Slot' : 'Add Slot'}
+                loadingLabel="Saving..."
+              />
             </div>
           </form>
-        </AppModal>
-
-        {/* Generated Timetable Modal */}
-        <AppModal open={generatorModal} onClose={() => setGeneratorModal(false)} title="Generated Timetable" size="lg">
-          <div className="overflow-x-auto max-h-[500px]">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="p-2 border-b">Day</th>
-                  <th className="p-2 border-b">Period</th>
-                  <th className="p-2 border-b">Subject</th>
-                  <th className="p-2 border-b">Teacher</th>
-                </tr>
-              </thead>
-              <tbody>
-                {generatedSlots.map(slot => (
-                  <tr key={slot.id} className="hover:bg-muted/10">
-                    <td className="p-2">{slot.day}</td>
-                    <td className="p-2">{slot.period}</td>
-                    <td className="p-2">{slot.subject}</td>
-                    <td className="p-2">{slot.teacher}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={() => setGeneratorModal(false)}>Cancel</Button>
-            <Button onClick={finalizeGeneratedSlots}>Add All to Timetable</Button>
-          </div>
         </AppModal>
 
         {/* Delete Confirmation */}
         <ConfirmDialog
           open={!!deletingSlot}
           onClose={() => setDeletingSlot(null)}
-          onConfirm={() => deleteMutation.mutate(deletingSlot.id)}
-          loading={deleteMutation.isPending}
+          onConfirm={confirmDeleteSlot}
+          loading={deleteSlotMutation.isPending}
           title="Delete Timetable Slot"
-          description={`Are you sure you want to delete ${deletingSlot?.subject} (Period ${deletingSlot?.period})?`}
+          description={
+            deletingSlot?.is_break
+              ? `Are you sure you want to delete the break "${deletingSlot.break_name}"?`
+              : `Are you sure you want to delete ${deletingSlot?.subject_name} (Period ${deletingSlot?.period})?`
+          }
           confirmLabel="Delete"
           variant="destructive"
         />
@@ -1395,4 +1197,12 @@ export default function TimetablePage() {
     </DndProvider>
   );
 }
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
+
+
+
+
+
+
+
+
+
