@@ -42,17 +42,19 @@ import { classService } from '@/services/classService';
 import { teacherService } from '@/services/teacherService';
 import { academicYearService } from '@/services/academicYearService';
 import { timetableService } from '@/services/timetableService';
+import TimePickerField from '@/components/common/TimePickerField';
+import { DAYS } from '@/constants';
 
-// Constants
-const DAYS = [
-  { value: 'monday', label: 'Monday' },
-  { value: 'tuesday', label: 'Tuesday' },
-  { value: 'wednesday', label: 'Wednesday' },
-  { value: 'thursday', label: 'Thursday' },
-  { value: 'friday', label: 'Friday' },
-  { value: 'saturday', label: 'Saturday' },
-  { value: 'sunday', label: 'Sunday' }
-];
+// // Constants
+// const DAYS = [
+//   { value: 'monday', label: 'Monday' },
+//   { value: 'tuesday', label: 'Tuesday' },
+//   { value: 'wednesday', label: 'Wednesday' },
+//   { value: 'thursday', label: 'Thursday' },
+//   { value: 'friday', label: 'Friday' },
+//   { value: 'saturday', label: 'Saturday' },
+//   { value: 'sunday', label: 'Sunday' }
+// ];
 
 // Entity type mapping
 const getEntityTypeFromInstitute = (instituteType) => {
@@ -344,20 +346,17 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
             {periods.map((period, index) => (
               <div key={period.period} className="grid grid-cols-4 gap-2 items-center">
                 <span className="text-sm font-medium">Period {period.period}</span>
-                <input
-                  type="text"
+                <TimePickerField
+                  mode="google"
                   value={period.start_time}
-                  onChange={(e) => handlePeriodChange(index, 'start_time', e.target.value)}
-                  placeholder="09:00"
-                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  onChange={(value) => handlePeriodChange(index, 'start_time', value)}
                 />
                 <span className="text-center">to</span>
-                <input
-                  type="text"
+                
+                <TimePickerField
+                  mode="google"
                   value={period.end_time}
-                  onChange={(e) => handlePeriodChange(index, 'end_time', e.target.value)}
-                  placeholder="09:45"
-                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  onChange={(value) => handlePeriodChange(index, 'end_time', value)}
                 />
               </div>
             ))}
@@ -383,20 +382,16 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
                   placeholder="Break name"
                   className="col-span-2 flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 />
-                <input
-                  type="text"
+                <TimePickerField
+                  mode="google"
                   value={breakPeriod.start_time}
-                  onChange={(e) => handleBreakChange(index, 'start_time', e.target.value)}
-                  placeholder="10:00"
-                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  onChange={(value) => handleBreakChange(index, 'start_time', value)}
                 />
                 <span className="text-center">to</span>
-                <input
-                  type="text"
+                <TimePickerField
+                  mode="google"
                   value={breakPeriod.end_time}
-                  onChange={(e) => handleBreakChange(index, 'end_time', e.target.value)}
-                  placeholder="10:30"
-                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  onChange={(value) => handleBreakChange(index, 'end_time', value)}
                 />
                 <Button
                   type="button"
