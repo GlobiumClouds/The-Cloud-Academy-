@@ -40,6 +40,8 @@ export default function SelectField({
   label,
   name,
   control,
+  value,
+  onChange,
   error,
   options = [],
   placeholder = 'Select…',
@@ -47,6 +49,11 @@ export default function SelectField({
   disabled,
   className,
 }) {
+  const normalizedOptions = (options || []).filter((opt) => {
+    const value = String(opt?.value ?? '').trim();
+    return value !== '';
+  });
+
   return (
     <div className={cn('space-y-1.5', className)}>
       {label && (
@@ -56,28 +63,47 @@ export default function SelectField({
         </Label>
       )}
 
-      <Controller
-        name={name}
-        control={control}
-        render={({ field }) => (
-          <Select
-            value={field.value ?? ''}
-            onValueChange={field.onChange}
-            disabled={disabled}
-          >
-            <SelectTrigger id={name} aria-invalid={!!error}>
-              <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((opt) => (
-                <SelectItem key={opt.value} value={String(opt.value)}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      />
+      {control ? (
+        <Controller
+          name={name}
+          control={control}
+          render={({ field }) => (
+            <Select
+              value={field.value ?? ''}
+              onValueChange={field.onChange}
+              disabled={disabled}
+            >
+              <SelectTrigger id={name} aria-invalid={!!error}>
+                <SelectValue placeholder={placeholder} />
+              </SelectTrigger>
+              <SelectContent>
+                {normalizedOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      ) : (
+        <Select
+          value={value ?? ''}
+          onValueChange={onChange}
+          disabled={disabled}
+        >
+          <SelectTrigger id={name} aria-invalid={!!error}>
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {normalizedOptions.map((opt) => (
+              <SelectItem key={opt.value} value={String(opt.value)}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       {error && <p className="text-xs text-destructive">{error.message}</p>}
     </div>

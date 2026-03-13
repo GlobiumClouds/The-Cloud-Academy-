@@ -302,6 +302,14 @@ export default function StudentForm({
           concession_percentage: data.concession_percentage,
           admission_date: data.admission_date,
           previous_school: data.previous_school,
+          // academic_sessions:[
+          //   class_info{
+          //     academic_year_id: data.academic_year_id,
+          //     class_id: data.class_id,
+          //     section_id: data.section_id,
+          //     roll_no: data.roll_no,
+          //   }
+          // ]
         }
       },
       documents: documents,

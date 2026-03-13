@@ -45,17 +45,6 @@ import { timetableService } from '@/services/timetableService';
 import TimePickerField from '@/components/common/TimePickerField';
 import { DAYS } from '@/constants';
 
-// // Constants
-// const DAYS = [
-//   { value: 'monday', label: 'Monday' },
-//   { value: 'tuesday', label: 'Tuesday' },
-//   { value: 'wednesday', label: 'Wednesday' },
-//   { value: 'thursday', label: 'Thursday' },
-//   { value: 'friday', label: 'Friday' },
-//   { value: 'saturday', label: 'Saturday' },
-//   { value: 'sunday', label: 'Sunday' }
-// ];
-
 // Entity type mapping
 const getEntityTypeFromInstitute = (instituteType) => {
   const mapping = {
@@ -1192,12 +1181,3 @@ export default function TimetablePage({ type }) {
     </DndProvider>
   );
 }
-
-
-
-
-
-
-
-
-

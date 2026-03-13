@@ -15,10 +15,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { Plus, Eye, Pencil, Trash2 } from 'lucide-react';
-<<<<<<< HEAD
-=======
 import { toast } from 'sonner';
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
@@ -26,11 +23,8 @@ import { studentService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
-<<<<<<< HEAD
-=======
 import StudentForm from '@/components/forms/StudentForm';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
 import { cn } from '@/lib/utils';
 import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
 
@@ -75,41 +69,24 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete) {
             className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
             title="View"
           >
-<<<<<<< HEAD
-            <Eye size={13} /> View
-          </button>
-          {canDo('student.update') && (
-=======
             <Eye size={13} />
           </button>
           {canDo('students.update') && (
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
             <button
               onClick={() => router.push(`/${type}/students/${stu.id}/edit`)}
               className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
               title="Edit"
             >
-<<<<<<< HEAD
-              <Pencil size={13} /> Edit
-            </button>
-          )}
-          {canDo('student.delete') && (
-=======
               <Pencil size={13} />
             </button>
           )}
           {canDo('students.delete') && (
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
             <button
               onClick={() => onDelete(stu)}
               className="flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
               title="Delete"
             >
-<<<<<<< HEAD
-              <Trash2 size={13} /> Delete
-=======
               <Trash2 size={13} />
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
             </button>
           )}
         </div>
@@ -133,15 +110,6 @@ export default function StudentsPage({ type }) {
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleting, setDeleting] = useState(null);
-<<<<<<< HEAD
-
-  const remove = useMutation({
-    mutationFn: async (id) => {
-      try { return await studentService.delete(id, type); }
-      catch { return { success: true }; }
-    },
-    onSuccess: () => { toast && toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['students'] }); setDeleting(null); },
-=======
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Fetch classes/sections etc for form
@@ -232,7 +200,6 @@ export default function StudentsPage({ type }) {
       qc.invalidateQueries({ queryKey: ['students', type] }); 
       setDeleting(null); 
     },
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
   });
 
   const filters = useMemo(() => ({
@@ -242,14 +209,9 @@ export default function StudentsPage({ type }) {
   const { data, isLoading } = useQuery({
     queryKey: ['students', type, filters],
     queryFn:  async () => {
-<<<<<<< HEAD
-      try { return await studentService.getAll(filters, type); }
-      catch {
-=======
       try { 
         return await studentService.getAll(filters, type); 
       } catch {
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
         const d = DUMMY_FLAT_STUDENTS.filter(r =>
           (!filters.search || `${r.first_name} ${r.last_name}`.toLowerCase().includes(filters.search.toLowerCase()))
         );
@@ -274,11 +236,6 @@ export default function StudentsPage({ type }) {
     { value: 'false', label: 'Inactive' },
   ];
 
-<<<<<<< HEAD
-  const addButton = canDo('student.create') ? (
-    <button
-      onClick={() => router.push(`/${type}/students/add`)}
-=======
   const handleAddStudent = (formData) => {
     addStudent.mutate(formData);
   };
@@ -286,7 +243,6 @@ export default function StudentsPage({ type }) {
   const addButton = canDo('students.create') ? (
     <button
       onClick={() => setIsAddModalOpen(true)}
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
       className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
     >
       <Plus size={14} /> Add {terms.student}
@@ -331,20 +287,6 @@ export default function StudentsPage({ type }) {
         }}
       />
 
-<<<<<<< HEAD
-      {/* Delete Confirm */}
-      <AppModal open={!!deleting} onClose={() => setDeleting(null)} title="Delete Student" size="sm"
-        footer={
-          <>
-            <button onClick={() => setDeleting(null)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Cancel</button>
-            <button onClick={() => remove.mutate(deleting.id)} disabled={remove.isPending} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
-              {remove.isPending ? 'Deleting\u2026' : 'Delete'}
-            </button>
-          </>
-        }>
-        <p className="text-sm text-muted-foreground">Delete <strong>{deleting?.first_name} {deleting?.last_name}</strong>? This cannot be undone.</p>
-      </AppModal>
-=======
       {/* Add Student Modal */}
       <AppModal
         open={isAddModalOpen}
@@ -375,7 +317,6 @@ export default function StudentsPage({ type }) {
         confirmLabel="Delete"
         variant="destructive"
       />
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
     </div>
   );
 }
@@ -433,10 +374,7 @@ function StudentCell({ student: s, columnKey }) {
       return <span className="text-sm">{s[columnKey] ?? '—'}</span>;
   }
 }
-<<<<<<< HEAD
-=======
 
 
 
 
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
