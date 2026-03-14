@@ -20,7 +20,7 @@ export const useAuthStore = create(
       // Set User (Login)
       // ─────────────────────────────────────────
       setUser: (user, accessToken) => {
-        console.log("🔐 Setting User:", user);
+        // console.log("🔐 Setting User:", user);
 
         if (accessToken) setAccessToken(accessToken);
         if (user?.school?.code) setSchoolCode(user.school.code);
@@ -35,7 +35,7 @@ export const useAuthStore = create(
       // Loading State
       // ─────────────────────────────────────────
       setLoading: (val) => {
-        console.log("⏳ Auth Loading:", val);
+        // console.log("⏳ Auth Loading:", val);
         set({ isLoading: val });
       },
 
@@ -43,7 +43,7 @@ export const useAuthStore = create(
       // Logout
       // ─────────────────────────────────────────
       logout: () => {
-        console.log("🚪 User Logged Out:", get().user);
+        // console.log("🚪 User Logged Out:", get().user);
 
         clearAuthData();
 
@@ -93,48 +93,24 @@ export const useAuthStore = create(
         return codes.some((code) => perms.includes(code));
       },
 
-      // // 🔥 UPDATED: settings.has_branches check karo
-      // schoolHasBranches: () => {
-      //   const u = get().user;
-        
-      //   // Institute object mein settings.has_branches check karo
-      //   const hasBranchesFromInstitute = u?.institute?.settings?.has_branches === true;
-        
-      //   // School object mein settings.has_branches check karo (backward compatibility)
-      //   const hasBranchesFromSchool = u?.school?.settings?.has_branches === true;
-        
-      //   // Debug log
-      //   if (u) {
-      //     console.log("🏢 Checking hasBranches:", {
-      //       instituteSettings: u?.institute?.settings,
-      //       schoolSettings: u?.school?.settings,
-      //       hasBranches: hasBranchesFromInstitute || hasBranchesFromSchool
-      //     });
-      //   }
-        
-      //   return hasBranchesFromInstitute || hasBranchesFromSchool;
-      // },
+      schoolHasBranches: () => {
+        const u = get().user;
 
-      // authStore.js - schoolHasBranches function update karo
+        console.log("🔍 Debug - Full user object:", u);
+        console.log("🔍 Debug - Institute object:", u?.institute);
+        console.log("🔍 Debug - Settings object:", u?.institute?.settings);
 
-schoolHasBranches: () => {
-  const u = get().user;
-  
-  console.log("🔍 Debug - Full user object:", u);
-  console.log("🔍 Debug - Institute object:", u?.institute);
-  console.log("🔍 Debug - Settings object:", u?.institute?.settings);
-  
-  // Institute object mein settings.has_branches check karo
-  const hasBranchesFromInstitute = u?.institute?.settings?.has_branches === true;
-  
-  // School object mein settings.has_branches check karo (backward compatibility)
-  const hasBranchesFromSchool = u?.school?.settings?.has_branches === true;
-  
-  console.log("🔍 Debug - hasBranchesFromInstitute:", hasBranchesFromInstitute);
-  console.log("🔍 Debug - hasBranchesFromSchool:", hasBranchesFromSchool);
-  
-  return hasBranchesFromInstitute || hasBranchesFromSchool;
-},
+        // Institute object mein settings.has_branches check karo
+        const hasBranchesFromInstitute = u?.institute?.settings?.has_branches === true;
+
+        // School object mein settings.has_branches check karo (backward compatibility)
+        const hasBranchesFromSchool = u?.school?.settings?.has_branches === true;
+
+        console.log("🔍 Debug - hasBranchesFromInstitute:", hasBranchesFromInstitute);
+        console.log("🔍 Debug - hasBranchesFromSchool:", hasBranchesFromSchool);
+
+        return hasBranchesFromInstitute || hasBranchesFromSchool;
+      },
 
       // institute type
       instituteType: () => {
@@ -174,13 +150,13 @@ schoolHasBranches: () => {
 
         return PATHS[type] ?? "/dashboard";
       },
-      
+
       // Helper: get full institute object
       institute: () => {
         const u = get().user;
         return u?.institute || u?.school || null;
       },
-      
+
       // Helper: get settings object
       settings: () => {
         const u = get().user;

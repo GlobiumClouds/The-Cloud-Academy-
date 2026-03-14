@@ -32,8 +32,6 @@ const schema = z.object({
   password:   z.string().optional(),
 });
 
-
-
 export default function UsersPage({ type }) {
   const qc    = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);

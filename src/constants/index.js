@@ -464,7 +464,6 @@ export const EMPLOYMENT_TYPE_OPTIONS = [
   { value: 'probation', label: 'Probation' },
 ];
 
-
 // Constants
 export const DAYS = [
   { value: 'monday', label: 'Monday' },
@@ -474,4 +473,13 @@ export const DAYS = [
   { value: 'friday', label: 'Friday' },
   { value: 'saturday', label: 'Saturday' },
   { value: 'sunday', label: 'Sunday' }
+];
+
+// Constants (same as TeacherForm)
+
+export const STAFF_TYPES = ['Accountant', 'Clerk', 'Librarian', 'Peon', 'Other', 'GateKeeper'];
+
+export const STATUS_OPTS = [
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' }
 ];
