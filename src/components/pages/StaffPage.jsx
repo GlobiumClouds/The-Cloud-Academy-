@@ -119,15 +119,6 @@ const staffSchema = z.object({
     })).default([]),
 });
 
-// Section Label Component
-function SectionLabel({ children }) {
-    return (
-        <p className="mt-4 mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground border-b pb-1">
-            {children}
-        </p>
-    );
-}
-
 // Status Badge Component
 function StatusBadge({ status }) {
     return (
@@ -571,10 +562,23 @@ export default function StaffManagementPage({ instituteType }) {
                 fd.append('avatar', avatarFile);
             }
 
-            // Add all fields
+            // Separate docs with new file attachments from already-saved docs
+            const docsWithFiles = (formData.documents || []).filter(doc => doc.file instanceof File);
+            const savedDocs = formattedDocuments.filter((_, idx) => !(formData.documents?.[idx]?.file instanceof File));
+
+            // Metadata for new docs (type, title) so backend can enrich the upload result
+            const newDocsMeta = docsWithFiles.map(doc => ({
+                type: doc.type === 'other' ? doc.customType : doc.type,
+                title: doc.title,
+                file_name: doc.file.name,
+                verified: doc.verified || false,
+            }));
+
+            // Add all scalar/JSON fields — skip 'documents', handled below
             Object.entries(submitData).forEach(([k, v]) => {
+                if (k === 'documents') return;
                 if (v !== undefined && v !== null && v !== '') {
-                    if (k === 'staff_details' || k === 'permissions' || k === 'documents') {
+                    if (k === 'staff_details' || k === 'permissions') {
                         fd.append(k, JSON.stringify(v));
                     } else {
                         fd.append(k, String(v));
@@ -582,11 +586,17 @@ export default function StaffManagementPage({ instituteType }) {
                 }
             });
 
-            // Add document files
-            formData.documents?.forEach((doc, index) => {
-                if (doc.file) {
-                    fd.append(`document_${index}`, doc.file);
-                }
+            // Send existing saved docs as JSON metadata
+            fd.append('documents', JSON.stringify(savedDocs));
+
+            // Send new doc metadata so backend can merge type/title with upload results
+            if (newDocsMeta.length > 0) {
+                fd.append('new_documents_meta', JSON.stringify(newDocsMeta));
+            }
+
+            // Append actual files under 'documents' field (multer.fields accepts up to 10)
+            docsWithFiles.forEach((doc) => {
+                fd.append('documents', doc.file, doc.file.name);
             });
 
             if (editingStaff) {

@@ -38,6 +38,7 @@ export default function InputField({
   disabled,
   className,
   hint,
+  ...props
 }) {
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -50,11 +51,12 @@ export default function InputField({
 
       <Input
         id={name}
+        name={name}
         type={type}
         placeholder={placeholder}
         disabled={disabled}
         aria-invalid={!!error}
-        {...(register ? register(name) : {})}
+        {...(register ? register(name) : props)}
       />
 
       {hint && !error && (

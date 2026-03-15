@@ -29,6 +29,7 @@ export default function TextareaField({
   required,
   disabled,
   className,
+  ...props
 }) {
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -41,11 +42,12 @@ export default function TextareaField({
 
       <Textarea
         id={name}
+        name={name}
         rows={rows}
         placeholder={placeholder}
         disabled={disabled}
         aria-invalid={!!error}
-        {...(register ? register(name) : {})}
+        {...(register ? register(name) : props)}
       />
 
       {error && <p className="text-xs text-destructive">{error.message}</p>}
