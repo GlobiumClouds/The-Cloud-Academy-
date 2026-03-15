@@ -1,3 +1,5 @@
+//src/app/portal-login/page.jsx
+
 'use client';
 
 import { useState } from 'react';
@@ -16,9 +18,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import usePortalStore from '@/store/portalStore';
-import { dummyPortalLogin, PORTAL_DEMO_ACCOUNTS } from '@/data/portalDummyData';
+import useAuthStore from '@/store/authStore'; // ✅ Use auth store
+import { authService } from '@/services'; // ✅ Real auth service
 
 const schema = z.object({
   email:    z.string().email('Enter a valid email'),
@@ -37,7 +39,6 @@ const PORTAL_TYPES = [
     ic: 'text-indigo-600',
     border: 'border-indigo-200',
     activeBg: 'bg-gradient-to-r from-indigo-600 to-violet-600',
-    demoHint: `parent@tca.edu.pk / parent@123`,
     redirectTo: '/parent',
     features: ['Child attendance', 'Fee status', 'Exam results', 'Announcements'],
   },
@@ -52,7 +53,6 @@ const PORTAL_TYPES = [
     ic: 'text-emerald-600',
     border: 'border-emerald-200',
     activeBg: 'bg-gradient-to-r from-emerald-600 to-teal-600',
-    demoHint: `ali@student.tca / student@123`,
     redirectTo: '/student',
     features: ['My attendance', 'My fee record', 'My exam results', 'Class timetable'],
   },
@@ -67,10 +67,37 @@ const PORTAL_TYPES = [
     ic: 'text-blue-600',
     border: 'border-blue-200',
     activeBg: 'bg-gradient-to-r from-blue-600 to-sky-600',
-    demoHint: `hassan@teacher.tca / teacher@123`,
     redirectTo: '/teacher',
     features: ['My classes & subjects', 'Upload notes', 'Assign homework', 'Mark attendance'],
   },
+];
+
+// 🔥 Demo accounts for quick login (will be removed in production)
+const DEMO_ACCOUNTS = [
+  // School
+  { role: 'STUDENT', email: 'ali.khan@student.tca', password: 'student123', name: 'Ali Khan', institute_type: 'school' },
+  { role: 'PARENT', email: 'father.ali@parent.tca', password: 'parent123', name: 'Mr. Khan', institute_type: 'school' },
+  { role: 'TEACHER', email: 'shoaibrazamemon160@gmail.com', password: '123456', name: 'Hassan Ahmed', institute_type: 'school' },
+  
+  // Coaching
+  { role: 'STUDENT', email: 'sara@coaching.tca', password: 'student123', name: 'Sara Khan', institute_type: 'coaching' },
+  { role: 'PARENT', email: 'mother.sara@parent.tca', password: 'parent123', name: 'Mrs. Khan', institute_type: 'coaching' },
+  { role: 'TEACHER', email: 'usman@coaching.tca', password: 'teacher123', name: 'Usman Ali', institute_type: 'coaching' },
+  
+  // Academy
+  { role: 'STUDENT', email: 'ahmed@academy.tca', password: 'student123', name: 'Ahmed Raza', institute_type: 'academy' },
+  { role: 'PARENT', email: 'father.ahmed@parent.tca', password: 'parent123', name: 'Mr. Raza', institute_type: 'academy' },
+  { role: 'TEACHER', email: 'fatima@academy.tca', password: 'teacher123', name: 'Fatima Ali', institute_type: 'academy' },
+  
+  // College
+  { role: 'STUDENT', email: 'bilal@college.tca', password: 'student123', name: 'Bilal Ahmed', institute_type: 'college' },
+  { role: 'PARENT', email: 'father.bilal@parent.tca', password: 'parent123', name: 'Mr. Ahmed', institute_type: 'college' },
+  { role: 'TEACHER', email: 'zainab@college.tca', password: 'teacher123', name: 'Zainab Ali', institute_type: 'college' },
+  
+  // University
+  { role: 'STUDENT', email: 'omar@uni.tca', password: 'student123', name: 'Omar Farooq', institute_type: 'university' },
+  { role: 'PARENT', email: 'father.omar@parent.tca', password: 'parent123', name: 'Mr. Farooq', institute_type: 'university' },
+  { role: 'TEACHER', email: 'dr.kamran@uni.tca', password: 'teacher123', name: 'Dr. Kamran', institute_type: 'university' },
 ];
 
 const INSTITUTE_TABS = [
@@ -90,10 +117,11 @@ const ROLE_STYLES = {
 export default function PortalLoginPage() {
   const router = useRouter();
   const setPortalUser = usePortalStore((s) => s.setPortalUser);
-  const [activeType, setActiveType] = useState('PARENT');
+  const setAuthUser = useAuthStore((s) => s.setUser); // ✅ Also set auth store
+  const [activeType, setActiveType] = useState('STUDENT'); // Default to student
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
-  const [demoInstitute, setDemoInstitute] = useState('academy');
+  const [demoInstitute, setDemoInstitute] = useState('school');
 
   const activePt = PORTAL_TYPES.find((p) => p.type === activeType);
 
@@ -104,17 +132,63 @@ export default function PortalLoginPage() {
   const onSubmit = async (data) => {
     try {
       setLoading(true);
-      const result = dummyPortalLogin({ ...data, type: activeType });
-      setPortalUser(result.user, result.portal_type, result.institute_type);
-      Cookies.set('portal_token', result.token, { expires: 1 });
-      Cookies.set('portal_type', result.portal_type, { expires: 1 });
-      toast.success(`Welcome, ${result.user.name || result.user.first_name}!`);
-      router.replace(activePt.redirectTo);
+      
+      // 🔥 Use real auth service
+      const response = await authService.login({
+        email: data.email,
+        password: data.password
+      });
+
+      const user = response.user;
+
+      // Verify user type matches selected portal
+      if (user.user_type !== activeType) {
+        toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
+        setLoading(false);
+        return;
+      }
+
+      // Set in auth store (for token management)
+      setAuthUser(user, response.access_token);
+
+      // Set in portal store
+      setPortalUser(
+        user, 
+        user.user_type, 
+        user.institute?.institute_type || 'school'
+      );
+
+      // Set cookies
+      Cookies.set('portal_token', response.access_token, { expires: 1 });
+      Cookies.set('portal_type', user.user_type, { expires: 1 });
+      Cookies.set('access_token', response.access_token, { expires: 7 });
+      Cookies.set('user_type', user.user_type, { expires: 7 });
+
+      toast.success(`Welcome, ${user.first_name}!`);
+
+      // Redirect based on user type
+      const redirectPaths = {
+        STUDENT: '/student',
+        PARENT: '/parent',
+        TEACHER: '/teacher'
+      };
+      
+      router.replace(redirectPaths[user.user_type] || '/portal');
+
     } catch (err) {
-      toast.error(err?.message || 'Login failed. Check your credentials.');
+      console.error('Login error:', err);
+      toast.error(err?.response?.data?.message || err?.message || 'Login failed. Check your credentials.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Quick fill demo account
+  const fillDemoAccount = (account) => {
+    setActiveType(account.role);
+    setValue('email', account.email);
+    setValue('password', account.password);
+    toast.success(`${account.role.toLowerCase()} account filled!`);
   };
 
   return (
@@ -170,7 +244,11 @@ export default function PortalLoginPage() {
 
             <div className="mt-8 p-4 bg-white/10 rounded-xl border border-white/20">
               <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">Demo Credentials</p>
-              <p className="text-sm font-mono text-white/90">{activePt.demoHint}</p>
+              <p className="text-sm font-mono text-white/90">
+                {activeType === 'STUDENT' ? 'ali@student.tca / student123' : 
+                 activeType === 'PARENT' ? 'parent@tca.edu.pk / parent123' : 
+                 'hassan@teacher.tca / teacher123'}
+              </p>
             </div>
           </div>
 
@@ -203,7 +281,9 @@ export default function PortalLoginPage() {
               <div className="mb-6">
                 <h2 className="text-xl font-bold text-slate-900">Sign in to {activePt.label}</h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  {activeType === 'PARENT' ? 'Enter your registered parent account credentials' : activeType === 'TEACHER' ? 'Enter your teacher account credentials' : 'Enter your student login credentials'}
+                  {activeType === 'PARENT' ? 'Enter your registered parent account credentials' : 
+                   activeType === 'TEACHER' ? 'Enter your teacher account credentials' : 
+                   'Enter your student login credentials'}
                 </p>
               </div>
 
@@ -217,7 +297,9 @@ export default function PortalLoginPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder={activeType === 'PARENT' ? 'parent@tca.edu.pk' : activeType === 'TEACHER' ? 'hassan@teacher.tca' : 'ali@student.tca'}
+                      placeholder={activeType === 'PARENT' ? 'parent@tca.edu.pk' : 
+                                 activeType === 'TEACHER' ? 'teacher@tca.edu' : 
+                                 'student@tca.edu'}
                       className="pl-10"
                       {...register('email')}
                     />
@@ -288,30 +370,27 @@ export default function PortalLoginPage() {
 
                 {/* Account cards — 3 per institute type */}
                 <div className="grid grid-cols-3 gap-2">
-                  {PORTAL_DEMO_ACCOUNTS.filter((a) => a.institute_type === demoInstitute).map((acc) => {
-                    const rs = ROLE_STYLES[acc.role];
-                    const Icon = rs.icon;
-                    return (
-                      <button
-                        key={acc.email}
-                        type="button"
-                        onClick={() => {
-                          setActiveType(acc.role);
-                          setValue('email', acc.email);
-                          setValue('password', acc.password);
-                          toast.success(`${acc.role.charAt(0) + acc.role.slice(1).toLowerCase()} account filled!`);
-                        }}
-                        className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-slate-200 hover:border-slate-400 bg-slate-50 hover:bg-white hover:shadow-sm transition-all text-center group"
-                      >
-                        <div className={`w-8 h-8 rounded-lg ${rs.bg} flex items-center justify-center`}>
-                          <Icon className={`w-4 h-4 ${rs.ic}`} />
-                        </div>
-                        <p className="text-[11px] font-bold text-slate-800 leading-tight">{acc.name.split(' ')[0]}</p>
-                        <p className="text-[10px] text-slate-400 capitalize leading-none">{acc.role.toLowerCase()}</p>
-                        <p className="text-[9px] text-slate-300 leading-none font-mono">{acc.password}</p>
-                      </button>
-                    );
-                  })}
+                  {DEMO_ACCOUNTS
+                    .filter((a) => a.institute_type === demoInstitute)
+                    .map((acc) => {
+                      const rs = ROLE_STYLES[acc.role];
+                      const Icon = rs.icon;
+                      return (
+                        <button
+                          key={acc.email}
+                          type="button"
+                          onClick={() => fillDemoAccount(acc)}
+                          className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-slate-200 hover:border-slate-400 bg-slate-50 hover:bg-white hover:shadow-sm transition-all text-center group"
+                        >
+                          <div className={`w-8 h-8 rounded-lg ${rs.bg} flex items-center justify-center`}>
+                            <Icon className={`w-4 h-4 ${rs.ic}`} />
+                          </div>
+                          <p className="text-[11px] font-bold text-slate-800 leading-tight">{acc.name.split(' ')[0]}</p>
+                          <p className="text-[10px] text-slate-400 capitalize leading-none">{acc.role.toLowerCase()}</p>
+                          <p className="text-[9px] text-slate-300 leading-none font-mono">{acc.password}</p>
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
 

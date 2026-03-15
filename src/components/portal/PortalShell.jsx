@@ -1,53 +1,55 @@
+//src/components/portal/PortalShell.jsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 import {
   GraduationCap, LayoutDashboard, Calendar, DollarSign,
-  BookOpen, Bell, Clock, LogOut, Menu, X, ChevronDown, Users,
+  BookOpen, Bell, Clock, LogOut, Menu, X, Users,
   Briefcase, FileText, ClipboardList, NotebookPen, UserCheck, BookMarked,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePortalStore from '@/store/portalStore';
+import useAuthStore from '@/store/authStore'; // To clear auth
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 
-// ─── Nav helpers ─────────────────────────────────────────────────────────────
+// ─── Nav helpers with permission checks ────────────────────────────────────
 function buildParentNav(t) {
   return [
-    { label: t.nav.overview,      href: '/parent',               icon: LayoutDashboard },
-    { label: t.attendanceLabel,   href: '/parent/attendance',    icon: Calendar },
-    { label: t.feesLabel,         href: '/parent/fees',          icon: DollarSign },
-    { label: t.resultsLabel,      href: '/parent/results',       icon: BookOpen },
-    { label: t.nav.announcements, href: '/parent/announcements', icon: Bell },
+    { label: t.nav.overview,      href: '/parent',               icon: LayoutDashboard, permission: 'dashboard.view' },
+    { label: t.attendanceLabel,   href: '/parent/attendance',    icon: Calendar,        permission: 'attendance.view' },
+    { label: t.feesLabel,         href: '/parent/fees',          icon: DollarSign,      permission: 'fees.view' },
+    { label: t.resultsLabel,      href: '/parent/results',       icon: BookOpen,        permission: 'results.view' },
+    { label: t.nav.announcements, href: '/parent/announcements', icon: Bell,            permission: 'announcements.view' },
   ];
 }
 
 function buildStudentNav(t) {
   return [
-    { label: t.nav.overview,      href: '/student',               icon: LayoutDashboard },
-    { label: t.nav.myAttend,      href: '/student/attendance',    icon: Calendar },
-    { label: t.nav.exams,         href: '/student/exams',         icon: BookOpen },
-    { label: t.nav.timetable,     href: '/student/timetable',     icon: Clock },
-    { label: t.nav.syllabus,      href: '/student/syllabus',      icon: BookMarked },
-    { label: t.nav.assignments,   href: '/student/assignments',   icon: ClipboardList },
-    { label: t.nav.homework,      href: '/student/homework',      icon: NotebookPen },
-    { label: t.nav.announcements, href: '/student/announcements', icon: Bell },
+    { label: t.nav.overview,      href: '/student',               icon: LayoutDashboard, permission: 'dashboard.view.self' },
+    { label: t.nav.myAttend,      href: '/student/attendance',    icon: Calendar,        permission: 'attendance.view.self' },
+    { label: t.nav.exams,         href: '/student/exams',         icon: BookOpen,        permission: 'results.view.self' },
+    { label: t.nav.timetable,     href: '/student/timetable',     icon: Clock,           permission: 'timetable.view.self' },
+    { label: t.nav.syllabus,      href: '/student/syllabus',      icon: BookMarked,      permission: 'syllabus.view' },
+    { label: t.nav.assignments,   href: '/student/assignments',   icon: ClipboardList,   permission: 'assignments.view' },
+    { label: t.nav.homework,      href: '/student/homework',      icon: NotebookPen,     permission: 'homework.view' },
+    { label: t.nav.announcements, href: '/student/announcements', icon: Bell,            permission: 'announcements.view' },
   ];
 }
 
 function buildTeacherNav(t) {
   return [
-    { label: t.nav.overview,      href: '/teacher',               icon: LayoutDashboard },
-    { label: t.nav.classes,       href: '/teacher/classes',       icon: Briefcase },
-    { label: t.nav.students,      href: '/teacher/students',      icon: Users },
-    { label: t.notesLabel,        href: '/teacher/notes',         icon: FileText },
-    { label: t.nav.assignments,   href: '/teacher/assignments',   icon: ClipboardList },
-    { label: t.nav.homework,      href: '/teacher/homework',      icon: NotebookPen },
-    { label: t.nav.attendance,    href: '/teacher/attendance',    icon: UserCheck },
-    { label: t.nav.announcements, href: '/teacher/announcements', icon: Bell },
+    { label: t.nav.overview,      href: '/teacher',               icon: LayoutDashboard, permission: 'dashboard.view' },
+    { label: t.nav.classes,       href: '/teacher/classes',       icon: Briefcase,       permission: 'classes.read' },
+    { label: t.nav.students,      href: '/teacher/students',      icon: Users,           permission: 'students.read' },
+    { label: t.notesLabel,        href: '/teacher/notes',         icon: FileText,        permission: 'notes.create' },
+    { label: t.nav.assignments,   href: '/teacher/assignments',   icon: ClipboardList,   permission: 'assignments.create' },
+    { label: t.nav.homework,      href: '/teacher/homework',      icon: NotebookPen,     permission: 'homework.create' },
+    { label: t.nav.attendance,    href: '/teacher/attendance',    icon: UserCheck,       permission: 'attendance.mark' },
+    { label: t.nav.announcements, href: '/teacher/announcements', icon: Bell,            permission: 'announcements.create' },
   ];
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,16 +57,35 @@ function buildTeacherNav(t) {
 export default function PortalShell({ children, type }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { portalUser, clearPortal, getInstituteType } = usePortalStore();
+  const { portalUser, clearPortal, getInstituteType, canDo } = usePortalStore();
+  const logout = useAuthStore((s) => s.logout);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const instituteType = getInstituteType ? getInstituteType() : (portalUser?.institute_type || 'school');
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (mounted && !portalUser) {
+      router.replace('/portal-login');
+    }
+  }, [portalUser, mounted, router]);
+
+  if (!mounted || !portalUser) {
+    return null; // or loading spinner
+  }
+
+  const instituteType = getInstituteType();
   const t = getPortalTerms(instituteType);
 
   const isParent  = type === 'PARENT';
   const isTeacher = type === 'TEACHER';
 
-  const navItems = isParent ? buildParentNav(t) : isTeacher ? buildTeacherNav(t) : buildStudentNav(t);
+  // Build and filter nav items by permissions
+  const allNavItems = isParent ? buildParentNav(t) : isTeacher ? buildTeacherNav(t) : buildStudentNav(t);
+  const navItems = allNavItems.filter(item => canDo(item.permission));
 
   const themeClasses = isParent
     ? { accent: 'indigo', activeBg: 'bg-indigo-50 text-indigo-700 border-l-2 border-indigo-600', sidebarHeader: 'bg-gradient-to-b from-indigo-700 to-indigo-800', badge: 'bg-indigo-100 text-indigo-700' }
@@ -73,16 +94,16 @@ export default function PortalShell({ children, type }) {
     : { accent: 'emerald', activeBg: 'bg-emerald-50 text-emerald-700 border-l-2 border-emerald-600', sidebarHeader: 'bg-gradient-to-b from-emerald-700 to-emerald-800', badge: 'bg-emerald-100 text-emerald-700' };
 
   const displayName = isTeacher
-    ? (portalUser ? `${portalUser.first_name} ${portalUser.last_name}` : t.teacherLabel)
+    ? `${portalUser.first_name || ''} ${portalUser.last_name || ''}`.trim() || t.teacherLabel
     : isParent
-    ? (portalUser?.name || 'Parent')
-    : (portalUser ? `${portalUser.first_name} ${portalUser.last_name}` : t.studentLabel);
+    ? portalUser?.name || 'Parent'
+    : `${portalUser.first_name || ''} ${portalUser.last_name || ''}`.trim() || t.studentLabel;
 
   const displaySub = isTeacher
-    ? (portalUser?.designation || t.teacherLabel)
+    ? (portalUser?.details?.designation || portalUser?.staff_type || t.teacherLabel)
     : isParent
-    ? (portalUser?.relation ? `${portalUser.relation} · ${portalUser?.children?.length || 0} child(ren)` : 'Parent Account')
-    : (portalUser?.class_name || t.studentLabel);
+    ? (portalUser?.details?.relation ? `${portalUser.details.relation} · ${portalUser?.children?.length || 0} child(ren)` : 'Parent Account')
+    : (portalUser?.details?.class_name || portalUser?.class_name || t.studentLabel);
 
   const portalLabel = isTeacher
     ? `${t.teacherLabel} Portal`
@@ -92,8 +113,11 @@ export default function PortalShell({ children, type }) {
 
   const handleLogout = () => {
     clearPortal();
+    logout(); // Clear auth store
     Cookies.remove('portal_token');
     Cookies.remove('portal_type');
+    Cookies.remove('access_token');
+    Cookies.remove('user_type');
     toast.success('Logged out successfully');
     router.replace('/portal-login');
   };
@@ -127,25 +151,29 @@ export default function PortalShell({ children, type }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                isActive
-                  ? themeClasses.activeBg
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? '' : 'opacity-70'}`} />
-              {item.label}
-            </Link>
-          );
-        })}
+        {navItems.length === 0 ? (
+          <p className="text-center text-sm text-slate-500 py-4">No menu items available</p>
+        ) : (
+          navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  isActive
+                    ? themeClasses.activeBg
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? '' : 'opacity-70'}`} />
+                {item.label}
+              </Link>
+            );
+          })
+        )}
       </nav>
 
       {/* Footer */}
