@@ -441,3 +441,9 @@ export default {
   getInstituteConfig,
   getTypeFromPath,
 };
+
+
+
+
+
+
