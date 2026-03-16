@@ -45,6 +45,7 @@ function buildTeacherNav(t) {
     { label: t.nav.overview,      href: '/teacher',               icon: LayoutDashboard, permission: 'dashboard.view' },
     { label: t.nav.classes,       href: '/teacher/classes',       icon: Briefcase,       permission: 'classes.read' },
     { label: t.nav.students,      href: '/teacher/students',      icon: Users,           permission: 'students.read' },
+    { label: t.nav.timetable,     href: '/teacher/timetable',     icon: Clock,           permission: 'timetable.view' },
     { label: t.notesLabel,        href: '/teacher/notes',         icon: FileText,        permission: 'notes.create' },
     { label: t.nav.assignments,   href: '/teacher/assignments',   icon: ClipboardList,   permission: 'assignments.create' },
     { label: t.nav.homework,      href: '/teacher/homework',      icon: NotebookPen,     permission: 'homework.create' },

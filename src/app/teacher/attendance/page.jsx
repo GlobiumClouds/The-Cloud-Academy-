@@ -1,13 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { UserCheck, CheckCircle2, XCircle, Clock, Save, AlertCircle } from 'lucide-react';
-import usePortalStore from '@/store/portalStore';
-import { DUMMY_TEACHER_PORTAL_USERS, getTeacherStudents } from '@/data/portalDummyData';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { useTeacherAttendance, useTeacherClasses, useTeacherStudents } from '@/hooks/useTeacherPortal';
 
 const STATUS_OPTIONS = [
   { value: 'present', label: 'P', icon: CheckCircle2, color: 'text-white bg-emerald-500 hover:bg-emerald-600 border-emerald-500' },
@@ -18,23 +17,48 @@ const STATUS_OPTIONS = [
 const UNSET_BTN = 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50';
 
 export default function TeacherAttendancePage() {
-  const { portalUser } = usePortalStore();
-  const teacher    = portalUser || DUMMY_TEACHER_PORTAL_USERS[0];
-  const t = getPortalTerms(teacher?.institute_type);
-  const classes    = teacher.assigned_classes || [];
+  const t = getPortalTerms('school');
+  const { classes, loading: classesLoading } = useTeacherClasses();
+  const { students, filterByClass } = useTeacherStudents();
+  const { markAttendance, getClassAttendance } = useTeacherAttendance();
   const today      = new Date().toISOString().split('T')[0];
 
-  const [selectedClass, setSelectedClass] = useState(classes[0]?.class_id || 'class-001');
-  const students   = getTeacherStudents(teacher);
-  const classStudents = students.filter((s, i) => i < (selectedClass === 'class-001' ? 4 : 4)); // Simulate
+  const [selectedClass, setSelectedClass] = useState('');
 
-  const [attendance, setAttendance] = useState(() => {
-    const init = {};
-    students.forEach((s, i) => { init[s.id || `s-${i}`] = s.attendance_today || ''; });
-    return init;
-  });
+  const [attendance, setAttendance] = useState({});
 
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!selectedClass && classes.length > 0) {
+      const firstClass = classes[0].class_id;
+      setSelectedClass(firstClass);
+      filterByClass(firstClass);
+    }
+  }, [classes, selectedClass, filterByClass]);
+
+  useEffect(() => {
+    if (!selectedClass) return;
+    filterByClass(selectedClass);
+    setSaved(false);
+  }, [selectedClass, filterByClass]);
+
+  useEffect(() => {
+    const hydrateAttendance = async () => {
+      if (!selectedClass) return;
+      try {
+        const records = await getClassAttendance(selectedClass, today);
+        const next = {};
+        (records || []).forEach((row) => {
+          next[row.student_id] = row.status;
+        });
+        setAttendance(next);
+      } catch {
+        setAttendance({});
+      }
+    };
+    hydrateAttendance();
+  }, [selectedClass, today, getClassAttendance]);
 
   const setStatus = (studentId, status) => {
     if (saved) return;
@@ -51,20 +75,35 @@ export default function TeacherAttendancePage() {
     setAttendance(next);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const unmarked = students.filter((s, i) => !attendance[s.id || `s-${i}`]);
     if (unmarked.length > 0) {
       toast.warning(`${unmarked.length} student(s) still not marked. Please mark all students.`);
       return;
     }
-    setSaved(true);
-    toast.success('Attendance saved successfully!');
+    try {
+      await markAttendance({
+        class_id: selectedClass,
+        date: today,
+        attendance: students.map((s, i) => ({
+          student_id: s.id || `s-${i}`,
+          status: attendance[s.id || `s-${i}`]
+        }))
+      });
+      setSaved(true);
+    } catch {
+      setSaved(false);
+    }
   };
 
   const presentCount = Object.values(attendance).filter((v) => v === 'present').length;
   const absentCount  = Object.values(attendance).filter((v) => v === 'absent').length;
   const lateCount    = Object.values(attendance).filter((v) => v === 'late').length;
   const unmarked     = students.length - Object.values(attendance).filter(Boolean).length;
+
+  if (classesLoading) {
+    return <div className="max-w-3xl mx-auto text-sm text-slate-500">Loading attendance...</div>;
+  }
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -147,10 +186,10 @@ export default function TeacherAttendancePage() {
               <div key={sid} className="flex items-center gap-4 px-5 py-3">
                 <span className="text-xs font-bold text-slate-400 w-5 text-center">{i + 1}</span>
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-sky-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {s.first_name?.[0]}
+                  {s.first_name?.[0] || s.name?.[0] || 'S'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800">{s.first_name} {s.last_name}</p>
+                  <p className="text-sm font-semibold text-slate-800">{s.name || `${s.first_name || ''} ${s.last_name || ''}`.trim()}</p>
                 </div>
                 {/* Status buttons */}
                 <div className="flex gap-1.5 flex-shrink-0">

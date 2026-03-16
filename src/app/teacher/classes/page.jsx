@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Briefcase, Users, BookOpen, ChevronRight } from 'lucide-react';
+import { Briefcase, Users, BookOpen, ChevronRight, FileText, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import usePortalStore from '@/store/portalStore';
-import { DUMMY_TEACHER_PORTAL_USERS } from '@/data/portalDummyData';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
-import { Badge } from '@/components/ui/badge';
+import { useTeacherClasses } from '@/hooks/useTeacherPortal';
+import AppModal from '@/components/common/AppModal';
+import { Button } from '@/components/ui/button';
 
 const SUBJECT_COLORS = [
   'bg-blue-100 text-blue-700',
@@ -18,10 +18,43 @@ const SUBJECT_COLORS = [
 ];
 
 export default function TeacherClassesPage() {
-  const { portalUser } = usePortalStore();
-  const teacher = portalUser || DUMMY_TEACHER_PORTAL_USERS[0];
-  const t = getPortalTerms(teacher?.institute_type);
-  const classes = teacher.assigned_classes || [];
+  const { classes, loading } = useTeacherClasses();
+  const t = getPortalTerms('school');
+  const [activeSubject, setActiveSubject] = useState(null);
+  const [isSyllabusOpen, setIsSyllabusOpen] = useState(false);
+
+  const openSyllabusModal = (cls, subjectName) => {
+    const details = (cls.subject_details || []).find(
+      (subject) => (subject?.name || '').toLowerCase() === String(subjectName).toLowerCase()
+    );
+
+    const materials = (details?.materials || []).map((item, idx) => {
+      if (typeof item === 'string') return { id: `${idx}`, name: item, url: null, type: null };
+      return {
+        id: item?.id || `${idx}`,
+        name: item?.name || item?.title || item?.file_name || `Material ${idx + 1}`,
+        type: item?.type || null,
+        url: item?.url || item?.file_url || item?.download_url || null
+      };
+    });
+
+    const pdf = materials.find(
+      (m) => String(m?.type || '').toLowerCase().includes('pdf') || String(m?.url || '').toLowerCase().endsWith('.pdf')
+    );
+
+    setActiveSubject({
+      className: cls.class_name || cls.name,
+      subjectName,
+      syllabus: details?.syllabus || null,
+      materials,
+      pdfUrl: pdf?.url || null
+    });
+    setIsSyllabusOpen(true);
+  };
+
+  if (loading) {
+    return <div className="max-w-3xl mx-auto text-sm text-slate-500">Loading classes...</div>;
+  }
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -40,7 +73,7 @@ export default function TeacherClassesPage() {
       ) : (
         <div className="space-y-4">
           {classes.map((cls, i) => (
-            <div key={cls.class_id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div key={cls.class_id || cls.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               {/* Header */}
               <div className="bg-gradient-to-r from-blue-600 to-sky-700 p-5 text-white flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -48,8 +81,11 @@ export default function TeacherClassesPage() {
                     {i + 1}
                   </div>
                   <div>
-                    <h2 className="text-base font-extrabold">{cls.class_name}</h2>
-                    <p className="text-white/70 text-xs mt-0.5">{cls.total_students} enrolled {t.studentsLabel.toLowerCase()}</p>
+                    <h2 className="text-base font-extrabold">{cls.class_name || cls.name}</h2>
+                    <p className="text-white/80 text-[11px] mt-0.5">
+                      Sections: {(cls.sections || []).map((s) => s.name).join(', ') || cls.section_name || 'N/A'}
+                    </p>
+                    <p className="text-white/70 text-xs mt-0.5">{cls.total_students || cls.student_count || 0} enrolled {t.studentsLabel.toLowerCase()}</p>
                   </div>
                 </div>
                 <Users className="w-6 h-6 text-white/50" />
@@ -59,12 +95,38 @@ export default function TeacherClassesPage() {
               <div className="p-5">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t.subjectsLabel} I Teach</p>
                 <div className="flex flex-wrap gap-2">
-                  {cls.subjects.map((sub, j) => (
-                    <span key={sub} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${SUBJECT_COLORS[j % SUBJECT_COLORS.length]}`}>
+                  {(cls.subjects || []).map((sub, j) => (
+                    <button
+                      key={sub}
+                      type="button"
+                      onClick={() => openSyllabusModal(cls, sub)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] ${SUBJECT_COLORS[j % SUBJECT_COLORS.length]}`}
+                    >
                       {sub}
-                    </span>
+                    </button>
                   ))}
                 </div>
+
+                {(cls.subject_details || []).length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    {(cls.subject_details || []).map((subject) => (
+                      <div key={subject.id || subject.name} className="text-[11px] text-slate-500">
+                        <p>
+                          <span className="font-semibold text-slate-700">{subject.name}</span>
+                          {subject.syllabus ? ` - ${subject.syllabus}` : ' - Syllabus pending'}
+                        </p>
+                        {Array.isArray(subject.materials) && subject.materials.length > 0 && (
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            Materials: {subject.materials
+                              .map((m) => m?.name)
+                              .filter(Boolean)
+                              .join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Quick actions */}
                 <div className="grid grid-cols-3 gap-2 mt-4">
@@ -87,6 +149,82 @@ export default function TeacherClassesPage() {
           ))}
         </div>
       )}
+
+      <AppModal
+        open={isSyllabusOpen}
+        onClose={() => {
+          setIsSyllabusOpen(false);
+          setActiveSubject(null);
+        }}
+        title={activeSubject ? `${activeSubject.subjectName} Syllabus` : 'Syllabus'}
+        description={activeSubject ? `${activeSubject.className} - Subject Outline and Materials` : 'Subject details'}
+        size="xl"
+        footer={
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsSyllabusOpen(false);
+              setActiveSubject(null);
+            }}
+          >
+            Close
+          </Button>
+        }
+      >
+        {!activeSubject ? null : (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs text-slate-500 mb-1">Syllabus Summary</p>
+              <p className="text-sm text-slate-800">
+                {activeSubject.syllabus || 'Syllabus pending'}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Materials</p>
+              {activeSubject.materials.length === 0 ? (
+                <p className="text-sm text-slate-500">No material uploaded for this subject yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {activeSubject.materials.map((material) => (
+                    <div key={material.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <p className="text-sm text-slate-700 truncate">{material.name}</p>
+                      </div>
+                      {material.url ? (
+                        <a
+                          href={material.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
+                        >
+                          Open <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">No file URL</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {activeSubject.pdfUrl && (
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2 bg-slate-50 border-b text-xs font-semibold text-slate-600">
+                  PDF Preview
+                </div>
+                <iframe
+                  title="Syllabus PDF Preview"
+                  src={activeSubject.pdfUrl}
+                  className="w-full h-[60vh]"
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </AppModal>
     </div>
   );
 }

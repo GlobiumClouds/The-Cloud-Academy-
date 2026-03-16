@@ -2,11 +2,8 @@
 
 import { useState } from 'react';
 import { Bell, ChevronDown, ChevronUp, Calendar, User } from 'lucide-react';
-import { DUMMY_ANNOUNCEMENTS } from '@/data/portalDummyData';
-import usePortalStore from '@/store/portalStore';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
-
-const CATEGORIES = ['All', 'Exam', 'Fee', 'Event', 'Meeting', 'Holiday', 'General'];
+import { useTeacherNotices } from '@/hooks/useTeacherPortal';
 
 const CATEGORY_COLORS = {
   Exam:     'bg-violet-100 text-violet-700',
@@ -24,14 +21,16 @@ const PRIORITY_COLORS = {
 };
 
 export default function TeacherAnnouncementsPage() {
-  const { portalUser } = usePortalStore();
-  const t = getPortalTerms(portalUser?.institute_type);
+  const t = getPortalTerms('school');
+  const { notices, loading } = useTeacherNotices(50);
   const [activeCategory, setActiveCategory] = useState('All');
   const [expanded, setExpanded] = useState(null);
 
+  const categoryOptions = ['All', ...new Set(notices.map((n) => n.category || 'General'))];
+
   const filtered = activeCategory === 'All'
-    ? DUMMY_ANNOUNCEMENTS
-    : DUMMY_ANNOUNCEMENTS.filter((a) => a.category === activeCategory);
+    ? notices
+    : notices.filter((a) => (a.category || 'General') === activeCategory);
 
   const toggle = (id) => setExpanded((prev) => (prev === id ? null : id));
 
@@ -46,7 +45,7 @@ export default function TeacherAnnouncementsPage() {
 
       {/* Category filters */}
       <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((cat) => (
+        {categoryOptions.map((cat) => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
@@ -60,6 +59,8 @@ export default function TeacherAnnouncementsPage() {
           </button>
         ))}
       </div>
+
+      {loading && <div className="text-sm text-slate-500">Loading announcements...</div>}
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400">

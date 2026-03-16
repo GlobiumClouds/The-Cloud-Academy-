@@ -6,10 +6,10 @@ import {
   NotebookPen, UserCheck, Bell, BookOpen,
   TrendingUp, CheckCircle2, AlertCircle,
 } from 'lucide-react';
-import usePortalStore from '@/store/portalStore';
-import { DUMMY_TEACHER_PORTAL_USERS } from '@/data/portalDummyData';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { Badge } from '@/components/ui/badge';
+import { useTeacherDashboard } from '@/hooks/useTeacherPortal';
+import useAuthStore from '@/store/authStore';
 
 const QUICK_LINK_DEFS = [
   { key: 'classes',     href: '/teacher/classes',       icon: Briefcase,     bg: 'bg-blue-50',    ic: 'text-blue-600' },
@@ -22,15 +22,25 @@ const QUICK_LINK_DEFS = [
 ];
 
 export default function TeacherOverview() {
-  const { portalUser } = usePortalStore();
-  const teacher = portalUser || DUMMY_TEACHER_PORTAL_USERS[0];
-  const t = getPortalTerms(teacher?.institute_type);
-
+  const { data, loading } = useTeacherDashboard();
+  const user = useAuthStore((state) => state.user);
+  const teacher = data?.teacher || {};
+  const classes = data?.my_classes || [];
+  const students = data?.my_students || [];
+  const assignments = data?.recent_assignments || [];
+  const notes = data?.recent_notes || [];
+  const t = getPortalTerms(user?.institute_type || 'school');
+  
+  console.log('Dashboard data:', user?.institute_type);
   const QUICK_LINKS = QUICK_LINK_DEFS.map((ql) => ({ ...ql, label: t.nav[ql.key] || ql.key }));
 
-  const stats = teacher.stats || {};
-  const activeAssignments = (teacher.assignments || []).filter((a) => a.status === 'active');
-  const recentHomework    = (teacher.homework || []).slice(0, 3);
+  const stats = data?.statistics || {};
+  const activeAssignments = assignments.filter((a) => a.is_published || a.status === 'published');
+  const recentHomework = assignments.filter((a) => a.type === 'homework').slice(0, 3);
+
+  if (loading) {
+    return <div className="max-w-5xl mx-auto text-sm text-slate-500">Loading dashboard...</div>;
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -47,15 +57,15 @@ export default function TeacherOverview() {
             <p className="text-white/70 text-xs mb-1">Welcome back,</p>
             <h1 className="text-2xl font-extrabold">{teacher.first_name} {teacher.last_name}</h1>
             <div className="flex flex-wrap gap-2 mt-2">
-              <Badge className="bg-white/20 text-white border-0 text-xs">{teacher.designation}</Badge>
-              <Badge className="bg-white/20 text-white border-0 text-xs">{teacher.department}</Badge>
-              <Badge className="bg-white/20 text-white border-0 text-xs">{teacher.branch}</Badge>
+              <Badge className="bg-white/20 text-white border-0 text-xs">{teacher.details?.designation || teacher.role || 'Teacher'}</Badge>
+              <Badge className="bg-white/20 text-white border-0 text-xs">{teacher.details?.department || 'Academics'}</Badge>
+              <Badge className="bg-white/20 text-white border-0 text-xs">{teacher.details?.branch || 'Main Campus'}</Badge>
             </div>
           </div>
         </div>
         {/* Attendance status */}
         <div className={`relative mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold ${teacher.attendance_marked_today ? 'bg-emerald-500/30 text-white' : 'bg-amber-500/30 text-white'}`}>
-          {teacher.attendance_marked_today
+          {(data?.today_schedule?.length || 0) > 0
             ? <><CheckCircle2 className="w-3.5 h-3.5" /> Student attendance marked today</>
             : <><AlertCircle className="w-3.5 h-3.5" /> Student attendance not marked yet today</>
           }
@@ -65,9 +75,9 @@ export default function TeacherOverview() {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: t.nav.classes,     value: stats.classes || teacher.assigned_classes?.length || 0, icon: Briefcase,  color: 'text-blue-600',   bg: 'bg-blue-50' },
-          { label: `Total ${t.studentsLabel}`, value: stats.total_students || 0, icon: Users, color: 'text-sky-600', bg: 'bg-sky-50' },
-          { label: `${t.notesLabel} Uploaded`, value: stats.notes_uploaded || (teacher.notes?.length || 0), icon: FileText, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: t.nav.classes,     value: stats.total_classes || classes.length || 0, icon: Briefcase,  color: 'text-blue-600',   bg: 'bg-blue-50' },
+          { label: `Total ${t.studentsLabel}`, value: stats.total_students || students.length || 0, icon: Users, color: 'text-sky-600', bg: 'bg-sky-50' },
+          { label: `${t.notesLabel} Uploaded`, value: stats.total_assignments || assignments.length || 0, icon: FileText, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: `Active ${t.assignmentsLabel}`, value: activeAssignments.length, icon: ClipboardList, color: 'text-violet-600', bg: 'bg-violet-50' },
         ].map((s) => {
           const Icon = s.icon;
@@ -107,16 +117,16 @@ export default function TeacherOverview() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <h2 className="text-base font-bold text-slate-800 mb-4">My Assigned {t.classesLabel}</h2>
         <div className="grid sm:grid-cols-2 gap-3">
-          {(teacher.assigned_classes || []).map((cls) => (
-            <div key={cls.class_id} className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+          {(classes || []).map((cls) => (
+            <div key={cls.id || cls.class_id} className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
               <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0">
-                {cls.class_name.split(' ')[1]}
+                {(cls.class_name || cls.name || 'C').split(' ')[1] || 'C'}
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-800">{cls.class_name}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{cls.total_students} {t.studentsLabel.toLowerCase()}</p>
+                <p className="text-sm font-bold text-slate-800">{cls.class_name || cls.name}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{cls.total_students || cls.student_count || 0} {t.studentsLabel.toLowerCase()}</p>
                 <div className="flex flex-wrap gap-1 mt-1.5">
-                  {cls.subjects.map((sub) => (
+                  {(cls.subjects || []).map((sub) => (
                     <span key={sub} className="text-[10px] bg-white text-blue-700 px-2 py-0.5 rounded-full border border-blue-200 font-medium">{sub}</span>
                   ))}
                 </div>
@@ -139,7 +149,7 @@ export default function TeacherOverview() {
                 <NotebookPen className="w-4 h-4 text-cyan-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">{hw.title}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{hw.class_name} · {hw.subject} · Due {hw.due_date}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{hw.class_name || hw.class || 'Class'} · {hw.subject} · Due {hw.due_date}</p>
                 </div>
               </div>
             ))}
@@ -153,9 +163,9 @@ export default function TeacherOverview() {
         <div className="grid sm:grid-cols-2 gap-3">
           {[
             { label: 'Full Name',    value: `${teacher.first_name} ${teacher.last_name}` },
-            { label: 'Designation', value: teacher.designation },
-            { label: 'Department',  value: teacher.department },
-            { label: 'Campus',      value: teacher.branch },
+            { label: 'Designation', value: teacher.details?.designation || teacher.role },
+            { label: 'Department',  value: teacher.details?.department },
+            { label: 'Campus',      value: teacher.details?.branch || 'Main Campus' },
             { label: 'Phone',       value: teacher.phone },
             { label: 'Email',       value: teacher.email },
           ].map((info) => (
