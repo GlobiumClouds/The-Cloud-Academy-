@@ -7,6 +7,7 @@ import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { useTeacherClasses } from '@/hooks/useTeacherPortal';
 import AppModal from '@/components/common/AppModal';
 import { Button } from '@/components/ui/button';
+import useAuthStore from '@/store/authStore';
 
 const SUBJECT_COLORS = [
   'bg-blue-100 text-blue-700',
@@ -19,7 +20,8 @@ const SUBJECT_COLORS = [
 
 export default function TeacherClassesPage() {
   const { classes, loading } = useTeacherClasses();
-  const t = getPortalTerms('school');
+  const user = useAuthStore((state) => state.user);
+  const t = getPortalTerms(user?.institute_type || 'school');
   const [activeSubject, setActiveSubject] = useState(null);
   const [isSyllabusOpen, setIsSyllabusOpen] = useState(false);
 
@@ -131,9 +133,9 @@ export default function TeacherClassesPage() {
                 {/* Quick actions */}
                 <div className="grid grid-cols-3 gap-2 mt-4">
                   {[
-                    { label: 'Notes',       href: '/teacher/notes',       color: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
+                    { label: 'Notes', href: '/teacher/notes', color: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
                     { label: 'Assignments', href: '/teacher/assignments', color: 'bg-violet-50 text-violet-700 hover:bg-violet-100' },
-                    { label: 'Attendance',  href: '/teacher/attendance',  color: 'bg-teal-50   text-teal-700   hover:bg-teal-100' },
+                    { label: 'Attendance', href: '/teacher/attendance', color: 'bg-teal-50   text-teal-700   hover:bg-teal-100' },
                   ].map((a) => (
                     <Link
                       key={a.label}

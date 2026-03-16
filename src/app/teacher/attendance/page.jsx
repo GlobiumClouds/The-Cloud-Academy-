@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { useTeacherAttendance, useTeacherClasses, useTeacherStudents } from '@/hooks/useTeacherPortal';
+import useAuthStore from '@/store/authStore';
 
 const STATUS_OPTIONS = [
   { value: 'present', label: 'P', icon: CheckCircle2, color: 'text-white bg-emerald-500 hover:bg-emerald-600 border-emerald-500' },
@@ -17,8 +18,9 @@ const STATUS_OPTIONS = [
 const UNSET_BTN = 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50';
 
 export default function TeacherAttendancePage() {
-  const t = getPortalTerms('school');
-  const { classes, loading: classesLoading } = useTeacherClasses();
+const user = useAuthStore((state) => state.user);
+  const t = getPortalTerms(user?.institute_type || 'school');
+    const { classes, loading: classesLoading } = useTeacherClasses();
   const { students, filterByClass } = useTeacherStudents();
   const { markAttendance, getClassAttendance } = useTeacherAttendance();
   const today      = new Date().toISOString().split('T')[0];

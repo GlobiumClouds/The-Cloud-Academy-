@@ -18,11 +18,12 @@ import TextareaField from '@/components/common/TextareaField';
 import { useTeacherAssignments, useTeacherClasses } from '@/hooks/useTeacherPortal';
 import { teacherPortalService } from '@/services/teacherPortalService';
 import TimePickerField from '@/components/common/TimePickerField';
+import useAuthStore from '@/store/authStore';
 
 const STATUS_MAP = {
-  active:    { label: 'Active',    icon: Clock,         classes: 'bg-blue-100   text-blue-700' },
-  submitted: { label: 'Submitted', icon: CheckCircle2,  classes: 'bg-amber-100  text-amber-700' },
-  graded:    { label: 'Graded',    icon: Award,         classes: 'bg-emerald-100 text-emerald-700' },
+  active: { label: 'Active', icon: Clock, classes: 'bg-blue-100   text-blue-700' },
+  submitted: { label: 'Submitted', icon: CheckCircle2, classes: 'bg-amber-100  text-amber-700' },
+  graded: { label: 'Graded', icon: Award, classes: 'bg-emerald-100 text-emerald-700' },
 };
 
 const SUBJECT_COLORS = [
@@ -42,7 +43,8 @@ const EMPTY_FORM = {
 };
 
 export default function TeacherAssignmentsPage() {
-  const t = getPortalTerms('school');
+  const user = useAuthStore((state) => state.user);
+  const t = getPortalTerms(user?.institute_type || 'school');
   const { classes } = useTeacherClasses();
   const {
     assignments,
@@ -54,8 +56,8 @@ export default function TeacherAssignmentsPage() {
 
   const [filterStatus, setFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm]           = useState(EMPTY_FORM);
-  const [saving, setSaving]       = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [publishNow, setPublishNow] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -295,7 +297,7 @@ export default function TeacherAssignmentsPage() {
                 options={subjectOptions.map((s) => ({ value: s, label: s }))}
               />
             </div>
-            
+
           </div>
 
           {/* Section row */}
@@ -387,7 +389,7 @@ export default function TeacherAssignmentsPage() {
 
       {/* Filter buttons */}
       <div className="flex gap-2 flex-wrap">
-        {[['all','All'],['active','Active'],['submitted','Submitted'],['graded','Graded']].map(([v, l]) => (
+        {[['all', 'All'], ['active', 'Active'], ['submitted', 'Submitted'], ['graded', 'Graded']].map(([v, l]) => (
           <button
             key={v}
             onClick={() => setFilter(v)}

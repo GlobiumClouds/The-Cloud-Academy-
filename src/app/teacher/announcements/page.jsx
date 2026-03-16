@@ -4,24 +4,26 @@ import { useState } from 'react';
 import { Bell, ChevronDown, ChevronUp, Calendar, User } from 'lucide-react';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { useTeacherNotices } from '@/hooks/useTeacherPortal';
+import useAuthStore from '@/store/authStore';
 
 const CATEGORY_COLORS = {
-  Exam:     'bg-violet-100 text-violet-700',
-  Fee:      'bg-emerald-100 text-emerald-700',
-  Event:    'bg-blue-100   text-blue-700',
-  Meeting:  'bg-amber-100  text-amber-700',
-  Holiday:  'bg-pink-100   text-pink-700',
-  General:  'bg-slate-100  text-slate-600',
+  Exam: 'bg-violet-100 text-violet-700',
+  Fee: 'bg-emerald-100 text-emerald-700',
+  Event: 'bg-blue-100   text-blue-700',
+  Meeting: 'bg-amber-100  text-amber-700',
+  Holiday: 'bg-pink-100   text-pink-700',
+  General: 'bg-slate-100  text-slate-600',
 };
 
 const PRIORITY_COLORS = {
-  high:   'bg-red-100   text-red-700',
+  high: 'bg-red-100   text-red-700',
   medium: 'bg-amber-100 text-amber-700',
-  low:    'bg-slate-100 text-slate-500',
+  low: 'bg-slate-100 text-slate-500',
 };
 
 export default function TeacherAnnouncementsPage() {
-  const t = getPortalTerms('school');
+  const user = useAuthStore((state) => state.user);
+  const t = getPortalTerms(user?.institute_type || 'school');
   const { notices, loading } = useTeacherNotices(50);
   const [activeCategory, setActiveCategory] = useState('All');
   const [expanded, setExpanded] = useState(null);
@@ -49,11 +51,10 @@ export default function TeacherAnnouncementsPage() {
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              activeCategory === cat
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeCategory === cat
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700'
-            }`}
+              }`}
           >
             {cat}
           </button>

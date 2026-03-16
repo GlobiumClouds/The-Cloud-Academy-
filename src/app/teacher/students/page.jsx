@@ -5,19 +5,21 @@ import { Users } from 'lucide-react';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import DataTable from '@/components/common/DataTable';
 import { useTeacherStudents, useTeacherClasses } from '@/hooks/useTeacherPortal';
+import useAuthStore from '@/store/authStore';
 
 const ATTENDANCE_COLORS = {
   present: 'bg-emerald-100 text-emerald-700',
-  absent:  'bg-red-100    text-red-700',
-  late:    'bg-amber-100  text-amber-700',
+  absent: 'bg-red-100    text-red-700',
+  late: 'bg-amber-100  text-amber-700',
 };
 
 export default function TeacherStudentsPage() {
-  const t = getPortalTerms('school');
+  const user = useAuthStore((state) => state.user);
+  const t = getPortalTerms(user?.institute_type || 'school');
   const { students, loading, search: searchStudents, filterByClass } = useTeacherStudents();
   const { classes } = useTeacherClasses();
 
-  const [search, setSearch]      = useState('');
+  const [search, setSearch] = useState('');
   const [filterClass, setFilter] = useState('');
 
   const classNameById = useMemo(
@@ -44,7 +46,7 @@ export default function TeacherStudentsPage() {
       cell: ({ row: { original: s }, getValue }) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-sky-600 flex items-center justify-center text-white text-sm font-extrabold flex-shrink-0">
-                {(s.first_name?.[0] || s.name?.[0] || 'S')}
+            {(s.first_name?.[0] || s.name?.[0] || 'S')}
           </div>
           <div>
             <p className="text-sm font-bold text-slate-800">{getValue()}</p>

@@ -18,12 +18,13 @@ import TextareaField from '@/components/common/TextareaField';
 import { useTeacherAssignments, useTeacherClasses } from '@/hooks/useTeacherPortal';
 import { teacherPortalService } from '@/services/teacherPortalService';
 import TimePickerField from '@/components/common/TimePickerField';
+import useAuthStore from '@/store/authStore';
 
 const SUBJECT_COLORS = {
   'Mathematics': 'bg-blue-100   text-blue-700   border-blue-200',
-  'English':     'bg-violet-100 text-violet-700 border-violet-200',
-  'Science':     'bg-teal-100   text-teal-700   border-teal-200',
-  'Urdu':        'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'English': 'bg-violet-100 text-violet-700 border-violet-200',
+  'Science': 'bg-teal-100   text-teal-700   border-teal-200',
+  'Urdu': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'Art & Craft': 'bg-pink-100   text-pink-700   border-pink-200',
 };
 
@@ -40,14 +41,15 @@ const EMPTY_HW = {
 };
 
 export default function TeacherHomeworkPage() {
-  const t = getPortalTerms('school');
+  const user = useAuthStore((state) => state.user);
+  const t = getPortalTerms(user?.institute_type || 'school');
   const { classes } = useTeacherClasses();
   const { assignments: homework, loading, createAssignment, updateAssignment, deleteAssignment } = useTeacherAssignments({ type: 'homework' });
 
   const [filterSubject, setFilter] = useState('All');
-  const [modalOpen, setModalOpen]  = useState(false);
-  const [form, setForm]            = useState(EMPTY_HW);
-  const [saving, setSaving]        = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_HW);
+  const [saving, setSaving] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [publishNow, setPublishNow] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -78,8 +80,8 @@ export default function TeacherHomeworkPage() {
   const subjectOptions = selectedClass?.subjects || [];
   const requiresSection = sectionOptions.length > 1;
 
-  const subjects  = ['All', ...new Set(homework.map((h) => h.subject).filter(Boolean))];
-  const filtered  = filterSubject === 'All' ? homework : homework.filter((h) => h.subject === filterSubject);
+  const subjects = ['All', ...new Set(homework.map((h) => h.subject).filter(Boolean))];
+  const filtered = filterSubject === 'All' ? homework : homework.filter((h) => h.subject === filterSubject);
 
   // Group by date
   const grouped = filtered.reduce((acc, hw) => {
