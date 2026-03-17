@@ -169,13 +169,7 @@ export default function StudentsPage({ type }) {
 
   const addStudent = useMutation({
     mutationFn: async (data) => {
-      try {
-        return await studentService.create(data, type);
-      } catch {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return { success: true, id: Math.random().toString() };
-      }
+      return await studentService.create(data, type);
     },
     onSuccess: () => {
       toast.success(`${terms.student} added successfully`);

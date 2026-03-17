@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -120,7 +120,12 @@ export default function StudentsPage() {
   const totalPages = extractPages(data);
   const total      = data?.data?.total ?? students.length;
 
-  const classOptions        = toOptions(extractRows(classesData), (c) => c.name);
+  const classOptions        = (extractRows(classesData) || []).map(c => ({
+    value: c.id,
+    label: c.name,
+    sections: c.sections,
+    original: c
+  }));
   const academicYearOptions = toOptions(yearsData?.data ?? [], (y) => y.name);
 
   const createMutation = useMutation({
