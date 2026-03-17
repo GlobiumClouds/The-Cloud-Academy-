@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ClipboardList, PlusCircle, CheckCircle2, Clock, Award, CalendarIcon, Pencil, Trash2 } from 'lucide-react';
+import { ClipboardList, PlusCircle, CheckCircle2, Clock, Award, CalendarIcon, Pencil, Trash2, Paperclip, ExternalLink } from 'lucide-react';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -57,11 +57,26 @@ export default function TeacherAssignmentsPage() {
   const [filterStatus, setFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [files, setFiles] = useState([]);
   const [saving, setSaving] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [publishNow, setPublishNow] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  const existingAttachments = useMemo(() => {
+    if (!editingItem || !Array.isArray(editingItem.attachments)) return [];
+    return editingItem.attachments.map((file, idx) => ({
+      id: file?.id || `${idx}`,
+      name: file?.name || file?.original_name || file?.filename || `Attachment ${idx + 1}`,
+      url: file?.url || file?.file_url || file?.download_url || file?.pdf_url || null,
+      type: file?.type || null
+    }));
+  }, [editingItem]);
+
+  const existingPdf = existingAttachments.find(
+    (file) => String(file?.type || '').toLowerCase().includes('pdf') || String(file?.url || '').toLowerCase().endsWith('.pdf')
+  );
 
   const normalizedClasses = useMemo(
     () => classes.map((cls) => {
@@ -97,6 +112,11 @@ export default function TeacherAssignmentsPage() {
 
   const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
+  const handleFile = (e) => {
+    const picked = Array.from(e.target.files || []);
+    setFiles(picked);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title || !form.subject || !form.class_id || !form.due_date) {
@@ -122,7 +142,7 @@ export default function TeacherAssignmentsPage() {
         status: publishNow ? 'published' : 'draft',
         is_published: publishNow
       };
-      const formData = teacherPortalService.prepareAssignmentFormData(payload);
+      const formData = teacherPortalService.prepareAssignmentFormData(payload, files);
       if (editingItem?.id) {
         await updateAssignment(editingItem.id, formData);
       } else {
@@ -131,6 +151,7 @@ export default function TeacherAssignmentsPage() {
       setSaving(false);
       setModalOpen(false);
       setForm(EMPTY_FORM);
+      setFiles([]);
       setEditingItem(null);
       setPublishNow(true);
     } catch {
@@ -142,6 +163,7 @@ export default function TeacherAssignmentsPage() {
     setEditingItem(null);
     setPublishNow(true);
     setForm(EMPTY_FORM);
+    setFiles([]);
     setModalOpen(true);
   };
 
@@ -158,6 +180,7 @@ export default function TeacherAssignmentsPage() {
       due_time: item.due_time || '',
       total_marks: item.total_marks ? String(item.total_marks) : ''
     });
+    setFiles([]);
     setModalOpen(true);
   };
 
@@ -243,6 +266,7 @@ export default function TeacherAssignmentsPage() {
         onClose={() => {
           setModalOpen(false);
           setForm(EMPTY_FORM);
+          setFiles([]);
           setEditingItem(null);
           setPublishNow(true);
         }}
@@ -254,6 +278,7 @@ export default function TeacherAssignmentsPage() {
             <Button variant="outline" onClick={() => {
               setModalOpen(false);
               setForm(EMPTY_FORM);
+              setFiles([]);
               setEditingItem(null);
               setPublishNow(true);
             }}>Cancel</Button>
@@ -374,6 +399,48 @@ export default function TeacherAssignmentsPage() {
             onChange={setPublishNow}
             hint="Turn off to save this item as draft"
           />
+
+          <div className="space-y-1.5">
+            <Label htmlFor="assignment-file">Attach File(s)</Label>
+            <label
+              htmlFor="assignment-file"
+              className="flex items-center gap-2 h-9 w-full rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 text-xs text-slate-500 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            >
+              <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">
+                {files.length ? `${files.length} file(s) selected` : 'Choose file(s)...'}
+              </span>
+            </label>
+            <input id="assignment-file" type="file" className="hidden" onChange={handleFile} multiple />
+          </div>
+
+          {editingItem && existingAttachments.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-slate-200 p-3 bg-slate-50">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Existing Attachments</p>
+              {existingAttachments.map((file) => (
+                <div key={file.id} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 border border-slate-200">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <Paperclip className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                    <span className="text-xs text-slate-700 truncate">{file.name}</span>
+                  </div>
+                  {file.url ? (
+                    <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900">
+                      Open <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  ) : (
+                    <span className="text-xs text-slate-400">No URL</span>
+                  )}
+                </div>
+              ))}
+
+              {existingPdf?.url && (
+                <div className="rounded-md border border-slate-200 overflow-hidden bg-white">
+                  <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-600 border-b">PDF Preview</div>
+                  <iframe title="Assignment Attachment PDF" src={existingPdf.url} className="w-full h-64" />
+                </div>
+              )}
+            </div>
+          )}
         </form>
       </AppModal>
 

@@ -36,7 +36,7 @@ export default function TeacherClassesPage() {
         id: item?.id || `${idx}`,
         name: item?.name || item?.title || item?.file_name || `Material ${idx + 1}`,
         type: item?.type || null,
-        url: item?.url || item?.file_url || item?.download_url || null
+        url: item?.url || item?.file_url || item?.download_url || item?.pdf_url || null
       };
     });
 
