@@ -233,7 +233,7 @@ export default function PortalShell({ children, type }) {
                 {navItems.find((n) => n.href === pathname)?.label || t.overviewLabel}
               </h1>
               <p className="text-xs text-slate-400 hidden sm:block">
-                {portalLabel} · The Clouds Academy
+                {portalLabel} · {user.institute.name || 'The Clouds Academy'}
               </p>
             </div>
           </div>

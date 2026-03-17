@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { NotebookPen, PlusCircle, CalendarDays, BookOpen, CalendarIcon, Pencil, Trash2, Paperclip, ExternalLink } from 'lucide-react';
+import { NotebookPen, PlusCircle, CalendarDays, BookOpen, CalendarIcon, Pencil, Trash2, Paperclip, ExternalLink, FileText } from 'lucide-react';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -29,6 +29,9 @@ const SUBJECT_COLORS = {
 };
 
 const today = () => new Date().toISOString().split('T')[0];
+
+const asText = (value) => String(value ?? '').trim();
+
 const EMPTY_HW = {
   title: '',
   subject: '',
@@ -55,6 +58,10 @@ export default function TeacherHomeworkPage() {
   const [publishNow, setPublishNow] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [activeAttachmentView, setActiveAttachmentView] = useState(null);
+  const [isAttachmentViewOpen, setIsAttachmentViewOpen] = useState(false);
+
+  console.log('Homework:', homework);
 
   const existingAttachments = useMemo(() => {
     if (!editingItem || !Array.isArray(editingItem.attachments)) return [];
@@ -72,11 +79,16 @@ export default function TeacherHomeworkPage() {
 
   const normalizedClasses = useMemo(
     () => classes.map((cls) => {
-      const classId = cls.class_id || cls.id;
+      const classId = asText(cls.class_id || cls.id);
       const sections = Array.isArray(cls.sections) && cls.sections.length
-        ? cls.sections.filter((section) => section?.id)
+        ? cls.sections
+          .map((section) => ({
+            id: asText(section?.id || section?.section_id),
+            name: section?.name || section?.section_name || 'Section'
+          }))
+          .filter((section) => section.id)
         : (cls.section_id
-          ? [{ id: cls.section_id, name: cls.section_name || 'Section' }]
+          ? [{ id: asText(cls.section_id), name: cls.section_name || 'Section' }]
           : []);
 
       return {
@@ -90,10 +102,68 @@ export default function TeacherHomeworkPage() {
     [classes]
   );
 
-  const selectedClass = normalizedClasses.find((cls) => cls.class_id === form.class_id);
+  const classMap = useMemo(() => normalizedClasses.reduce((acc, cls) => {
+    acc[cls.class_id] = cls;
+    return acc;
+  }, {}), [normalizedClasses]);
+
+  const resolveClassForItem = (item) => {
+    const itemClassId = asText(item.class_id);
+    const byId = normalizedClasses.find((c) => asText(c.class_id) === itemClassId);
+    if (byId) return byId;
+
+    const itemClassName = asText(item.class_name || item.class);
+    if (!itemClassName) return null;
+    const normalizedItemClass = itemClassName.toLowerCase().split(' - ')[0].trim();
+
+    const byName = normalizedClasses.find((c) => {
+      const clsName = asText(c.class_name || c.name).toLowerCase();
+      return clsName === itemClassName.toLowerCase() || clsName === normalizedItemClass || normalizedItemClass.includes(clsName);
+    });
+    if (byName) return byName;
+
+    const itemSectionName = asText(item.section_name).toLowerCase();
+    if (!itemSectionName) return null;
+    const bySection = normalizedClasses.find((c) =>
+      (c.sections || []).some((section) => asText(section.name).toLowerCase() === itemSectionName)
+    );
+    return bySection || null;
+  };
+
+  const resolveSectionIdForItem = (item) => {
+    const cls = resolveClassForItem(item);
+    const options = cls?.sections || [];
+
+    if (!options.length) return '';
+    const itemSectionId = asText(item.section_id);
+    if (itemSectionId && options.some((section) => asText(section.id) === itemSectionId)) {
+      return itemSectionId;
+    }
+
+    const byName = options.find(
+      (section) => asText(section.name).toLowerCase() === asText(item.section_name).toLowerCase()
+    );
+    if (byName?.id) return byName.id;
+
+    return options.length === 1 ? options[0].id : '';
+  };
+
+  const selectedClass = normalizedClasses.find((cls) => asText(cls.class_id) === asText(form.class_id));
   const sectionOptions = selectedClass?.sections || [];
   const subjectOptions = selectedClass?.subjects || [];
-  const requiresSection = sectionOptions.length > 1;
+  const fallbackEditSectionOptions = useMemo(() => {
+    if (!editingItem) return sectionOptions;
+    const originalClassId = asText(editingItem.class_id);
+    const currentClassId = asText(form.class_id);
+    if (currentClassId && currentClassId !== originalClassId) return sectionOptions;
+    if (sectionOptions.length > 0) return sectionOptions;
+
+    const fallbackId = asText(form.section_id || editingItem.section_id || editingItem.section_name);
+    const fallbackName = asText(editingItem.section_name || editingItem.section_id || 'Section');
+    return fallbackId ? [{ id: fallbackId, name: fallbackName }] : [];
+  }, [editingItem, form.class_id, form.section_id, sectionOptions]);
+  const effectiveSectionOptions = fallbackEditSectionOptions;
+  const requiresSection = effectiveSectionOptions.length > 0;
 
   const subjects = ['All', ...new Set(homework.map((h) => h.subject).filter(Boolean))];
   const filtered = filterSubject === 'All' ? homework : homework.filter((h) => h.subject === filterSubject);
@@ -130,7 +200,7 @@ export default function TeacherHomeworkPage() {
         title: form.title,
         subject: form.subject,
         class_id: form.class_id,
-        section_id: form.section_id || sectionOptions[0]?.id || null,
+        section_id: form.section_id || null,
         description: form.description,
         assigned_on: form.date,
         due_date: form.due_date,
@@ -165,13 +235,15 @@ export default function TeacherHomeworkPage() {
   };
 
   const openEditModal = (item) => {
+    const matchedClass = resolveClassForItem(item);
+    const resolvedSectionId = resolveSectionIdForItem(item) || asText(item.section_id || item.section_name);
     setEditingItem(item);
     setPublishNow(item.is_published ?? item.status === 'published');
     setForm({
       title: item.title || '',
       subject: item.subject || '',
-      class_id: item.class_id || '',
-      section_id: item.section_id || '',
+      class_id: asText(matchedClass?.class_id || item.class_id),
+      section_id: resolvedSectionId,
       description: item.description || item.instructions || '',
       date: item.assigned_on ? String(item.assigned_on).split('T')[0] : today(),
       due_date: item.due_date ? String(item.due_date).split('T')[0] : '',
@@ -192,18 +264,16 @@ export default function TeacherHomeworkPage() {
     }
   };
 
-  const classNameById = normalizedClasses.reduce((acc, cls) => {
-    acc[cls.class_id] = cls.class_name || cls.name;
-    return acc;
-  }, {});
+  const classNameById = classMap;
 
   const onClassChange = (classId) => {
-    const cls = normalizedClasses.find((c) => c.class_id === classId);
+    const nextClassId = asText(classId);
+    const cls = normalizedClasses.find((c) => asText(c.class_id) === nextClassId);
     const nextSections = cls?.sections || [];
     setForm((prev) => ({
       ...prev,
-      class_id: classId,
-      section_id: nextSections.length === 1 ? nextSections[0].id : '',
+      class_id: nextClassId,
+      section_id: '',
       subject: ''
     }));
   };
@@ -213,6 +283,27 @@ export default function TeacherHomeworkPage() {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return String(value);
     return format(parsed, 'dd MMM yyyy');
+  };
+
+  const openAttachmentView = (item) => {
+    const materials = (Array.isArray(item?.attachments) ? item.attachments : []).map((file, idx) => ({
+      id: file?.id || `${idx}`,
+      name: file?.name || file?.original_name || file?.filename || `Attachment ${idx + 1}`,
+      type: file?.type || null,
+      url: file?.url || file?.file_url || file?.download_url || file?.pdf_url || null
+    }));
+
+    const pdf = materials.find(
+      (m) => String(m?.type || '').toLowerCase().includes('pdf') || String(m?.url || '').toLowerCase().endsWith('.pdf')
+    );
+
+    setActiveAttachmentView({
+      title: item?.title || 'Homework',
+      className: item?.class_name || classMap[item?.class_id]?.class_name || '-',
+      materials,
+      pdfUrl: pdf?.url || null
+    });
+    setIsAttachmentViewOpen(true);
   };
 
   if (loading) {
@@ -301,16 +392,15 @@ export default function TeacherHomeworkPage() {
            
           </div>
 
-          {sectionOptions.length > 0 && (
+          {effectiveSectionOptions.length > 0 && (
             <div className="space-y-1.5">
               <SelectField
                 label={`Section${requiresSection ? ' *' : ''}`}
                 name="section_id"
-                value={form.section_id || (sectionOptions.length === 1 ? sectionOptions[0].id : '')}
+                value={form.section_id}
                 onChange={(v) => setForm((p) => ({ ...p, section_id: v }))}
-                disabled={sectionOptions.length === 1}
                 placeholder="Select Section"
-                options={sectionOptions.map((section) => ({ value: section.id, label: section.name }))}
+                options={effectiveSectionOptions.map((section) => ({ value: asText(section.id), label: section.name }))}
               />
             </div>
           )}
@@ -483,7 +573,7 @@ export default function TeacherHomeworkPage() {
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${SUBJECT_COLORS[hw.subject] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                             {hw.subject}
                           </span>
-                          <span className="text-[10px] text-slate-400">{hw.class_name || classNameById[hw.class_id] || hw.class || 'N/A'}</span>
+                          <span className="text-[10px] text-slate-400">{hw.class_name || classMap[hw.class_id]?.class_name || '-'}</span>
                         </div>
                         <h3 className="text-sm font-extrabold text-slate-800">{hw.title}</h3>
                         <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{hw.description || hw.instructions || 'No description provided'}</p>
@@ -492,6 +582,16 @@ export default function TeacherHomeworkPage() {
                     <div className="mt-3 flex items-center justify-between">
                       <span className="text-[10px] text-slate-400">Due: <span className="font-semibold text-red-600">{formatSafeDate(hw.due_date)}</span></span>
                       <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={(Array.isArray(hw.attachments) ? hw.attachments.length : 0) === 0}
+                          onClick={() => openAttachmentView(hw)}
+                        >
+                          <Paperclip className="w-3.5 h-3.5 mr-1" /> Files ({Array.isArray(hw.attachments) ? hw.attachments.length : 0})
+                        </Button>
                         <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => openEditModal(hw)}>
                           <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
                         </Button>
@@ -527,6 +627,75 @@ export default function TeacherHomeworkPage() {
         confirmLabel="Delete"
         variant="destructive"
       />
+
+      <AppModal
+        open={isAttachmentViewOpen}
+        onClose={() => {
+          setIsAttachmentViewOpen(false);
+          setActiveAttachmentView(null);
+        }}
+        title={activeAttachmentView ? `${activeAttachmentView.title} Attachments` : 'Attachments'}
+        description={activeAttachmentView ? `${activeAttachmentView.className} - Uploaded Materials` : 'Attachment details'}
+        size="xl"
+        footer={
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsAttachmentViewOpen(false);
+              setActiveAttachmentView(null);
+            }}
+          >
+            Close
+          </Button>
+        }
+      >
+        {!activeAttachmentView ? null : (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 p-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Materials</p>
+              {activeAttachmentView.materials.length === 0 ? (
+                <p className="text-sm text-slate-500">No material uploaded for this homework.</p>
+              ) : (
+                <div className="space-y-2">
+                  {activeAttachmentView.materials.map((material) => (
+                    <div key={material.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <p className="text-sm text-slate-700 truncate">{material.name}</p>
+                      </div>
+                      {material.url ? (
+                        <a
+                          href={material.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
+                        >
+                          Open <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">No file URL</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {activeAttachmentView.pdfUrl && (
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2 bg-slate-50 border-b text-xs font-semibold text-slate-600">
+                  PDF Preview
+                </div>
+                <iframe
+                  title="Homework Attachment PDF Preview"
+                  src={activeAttachmentView.pdfUrl}
+                  className="w-full h-[60vh]"
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </AppModal>
     </div>
   );
 }

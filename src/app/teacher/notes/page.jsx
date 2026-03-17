@@ -48,6 +48,8 @@ const formatSafeDate = (value) => {
     return format(parsed, 'dd MMM yyyy');
 };
 
+const asText = (value) => String(value ?? '').trim();
+
 export default function TeacherNotesPage() {
     const user = useAuthStore((state) => state.user);
     const t = getPortalTerms(user?.institute_type || 'school');
@@ -69,6 +71,10 @@ export default function TeacherNotesPage() {
     const [publishNow, setPublishNow] = useState(true);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
+    const [activeAttachmentView, setActiveAttachmentView] = useState(null);
+    const [isAttachmentViewOpen, setIsAttachmentViewOpen] = useState(false);
+
+    console.log('Notes:', notes);
 
     const existingAttachments = useMemo(() => {
         if (!editingItem || !Array.isArray(editingItem.attachments)) return [];
@@ -86,11 +92,16 @@ export default function TeacherNotesPage() {
 
     const normalizedClasses = useMemo(
         () => classes.map((cls) => {
-            const classId = cls.class_id || cls.id;
+            const classId = asText(cls.class_id || cls.id);
             const sections = Array.isArray(cls.sections) && cls.sections.length
-                ? cls.sections.filter((section) => section?.id)
+                ? cls.sections
+                    .map((section) => ({
+                        id: asText(section?.id || section?.section_id),
+                        name: section?.name || section?.section_name || 'Section'
+                    }))
+                    .filter((section) => section.id)
                 : (cls.section_id
-                    ? [{ id: cls.section_id, name: cls.section_name || 'Section' }]
+                    ? [{ id: asText(cls.section_id), name: cls.section_name || 'Section' }]
                     : []);
 
             return {
@@ -104,10 +115,22 @@ export default function TeacherNotesPage() {
         [classes]
     );
 
-    const selectedClass = normalizedClasses.find((cls) => cls.class_id === form.class_id);
+    const selectedClass = normalizedClasses.find((cls) => asText(cls.class_id) === asText(form.class_id));
     const sectionOptions = selectedClass?.sections || [];
     const subjectOptions = selectedClass?.subjects || [];
-    const requiresSection = sectionOptions.length > 1;
+    const fallbackEditSectionOptions = useMemo(() => {
+        if (!editingItem) return sectionOptions;
+        const originalClassId = asText(editingItem.class_id);
+        const currentClassId = asText(form.class_id);
+        if (currentClassId && currentClassId !== originalClassId) return sectionOptions;
+        if (sectionOptions.length > 0) return sectionOptions;
+
+        const fallbackId = asText(form.section_id || editingItem.section_id || editingItem.section_name);
+        const fallbackName = asText(editingItem.section_name || editingItem.section_id || 'Section');
+        return fallbackId ? [{ id: fallbackId, name: fallbackName }] : [];
+    }, [editingItem, form.class_id, form.section_id, sectionOptions]);
+    const effectiveSectionOptions = fallbackEditSectionOptions;
+    const requiresSection = effectiveSectionOptions.length > 0;
 
     const classMap = useMemo(() => normalizedClasses.reduce((acc, cls) => {
         acc[cls.class_id] = cls;
@@ -126,14 +149,77 @@ export default function TeacherNotesPage() {
     const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
     const onClassChange = (classId) => {
-        const cls = normalizedClasses.find((c) => c.class_id === classId);
+        const nextClassId = asText(classId);
+        const cls = normalizedClasses.find((c) => asText(c.class_id) === nextClassId);
         const nextSections = cls?.sections || [];
         setForm((prev) => ({
             ...prev,
-            class_id: classId,
-            section_id: nextSections.length === 1 ? nextSections[0].id : '',
+            class_id: nextClassId,
+            section_id: '',
             subject: ''
         }));
+    };
+
+    const resolveClassForItem = (item) => {
+        const itemClassId = asText(item.class_id);
+        const byId = normalizedClasses.find((c) => asText(c.class_id) === itemClassId);
+        if (byId) return byId;
+
+        const itemClassName = asText(item.class_name || item.class);
+        if (!itemClassName) return null;
+        const normalizedItemClass = itemClassName.toLowerCase().split(' - ')[0].trim();
+
+        const byName = normalizedClasses.find((c) => {
+            const clsName = asText(c.class_name || c.name).toLowerCase();
+            return clsName === itemClassName.toLowerCase() || clsName === normalizedItemClass || normalizedItemClass.includes(clsName);
+        });
+        if (byName) return byName;
+
+        const itemSectionName = asText(item.section_name).toLowerCase();
+        if (!itemSectionName) return null;
+        const bySection = normalizedClasses.find((c) =>
+            (c.sections || []).some((section) => asText(section.name).toLowerCase() === itemSectionName)
+        );
+        return bySection || null;
+    };
+
+    const resolveSectionIdForItem = (item) => {
+        const cls = resolveClassForItem(item);
+        const options = cls?.sections || [];
+
+        if (!options.length) return '';
+        const itemSectionId = asText(item.section_id);
+        if (itemSectionId && options.some((section) => asText(section.id) === itemSectionId)) {
+            return itemSectionId;
+        }
+
+        const byName = options.find(
+            (section) => asText(section.name).toLowerCase() === asText(item.section_name).toLowerCase()
+        );
+        if (byName?.id) return byName.id;
+
+        return options.length === 1 ? options[0].id : '';
+    };
+
+    const openAttachmentView = (item) => {
+        const materials = (Array.isArray(item?.attachments) ? item.attachments : []).map((file, idx) => ({
+            id: file?.id || `${idx}`,
+            name: file?.name || file?.original_name || file?.filename || `Attachment ${idx + 1}`,
+            type: file?.type || null,
+            url: file?.url || file?.file_url || file?.download_url || file?.pdf_url || null
+        }));
+
+        const pdf = materials.find(
+            (m) => String(m?.type || '').toLowerCase().includes('pdf') || String(m?.url || '').toLowerCase().endsWith('.pdf')
+        );
+
+        setActiveAttachmentView({
+            title: item?.title || 'Note',
+            className: item?.class_name || classMap[item?.class_id]?.class_name || '-',
+            materials,
+            pdfUrl: pdf?.url || null
+        });
+        setIsAttachmentViewOpen(true);
     };
 
     const handleFile = (e) => {
@@ -158,7 +244,7 @@ export default function TeacherNotesPage() {
                 title: form.title,
                 subject: form.subject,
                 class_id: form.class_id,
-                section_id: form.section_id || sectionOptions[0]?.id || null,
+                section_id: form.section_id || null,
                 description: form.description,
                 assigned_on: form.assigned_on,
                 due_date: form.due_date || null,
@@ -194,13 +280,15 @@ export default function TeacherNotesPage() {
     };
 
     const openEditModal = (item) => {
+        const matchedClass = resolveClassForItem(item);
+        const resolvedSectionId = resolveSectionIdForItem(item) || asText(item.section_id || item.section_name);
         setEditingItem(item);
         setPublishNow(item.is_published ?? item.status === 'published');
         setForm({
             title: item.title || '',
             subject: item.subject || '',
-            class_id: item.class_id || '',
-            section_id: item.section_id || '',
+            class_id: asText(matchedClass?.class_id || item.class_id),
+            section_id: resolvedSectionId,
             description: item.description || item.instructions || '',
             assigned_on: item.assigned_on ? String(item.assigned_on).split('T')[0] : EMPTY_NOTE.assigned_on,
             due_date: item.due_date ? String(item.due_date).split('T')[0] : ''
@@ -284,10 +372,10 @@ export default function TeacherNotesPage() {
                                 label="Class"
                                 name="class_id"
                                 required
-                                value={form.class_id}
+                                value={asText(form.class_id)}
                                 onChange={onClassChange}
                                 placeholder="Select Class"
-                                options={normalizedClasses.map((c) => ({ value: c.class_id, label: c.class_name || c.name }))}
+                                options={normalizedClasses.map((c) => ({ value: asText(c.class_id), label: c.class_name || c.name }))}
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -303,16 +391,15 @@ export default function TeacherNotesPage() {
                         </div>
                     </div>
 
-                    {sectionOptions.length > 0 && (
+                    {effectiveSectionOptions.length > 0 && (
                         <div className="space-y-1.5">
                             <SelectField
                                 label={`Section${requiresSection ? ' *' : ''}`}
                                 name="section_id"
-                                value={form.section_id || (sectionOptions.length === 1 ? sectionOptions[0].id : '')}
+                                value={asText(form.section_id)}
                                 onChange={(v) => setForm((p) => ({ ...p, section_id: v }))}
-                                disabled={sectionOptions.length === 1}
                                 placeholder="Select Section"
-                                options={sectionOptions.map((section) => ({ value: section.id, label: section.name }))}
+                                options={effectiveSectionOptions.map((section) => ({ value: asText(section.id), label: section.name }))}
                             />
                         </div>
                     )}
@@ -471,7 +558,8 @@ export default function TeacherNotesPage() {
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                         <button
-                                            onClick={() => toast.info('Download feature coming soon!')}
+                                            onClick={() => openAttachmentView(note)}
+                                            disabled={filesCount === 0}
                                             className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                                         >
                                             <Download className="w-3.5 h-3.5" />
@@ -504,6 +592,75 @@ export default function TeacherNotesPage() {
                 confirmLabel="Delete"
                 variant="destructive"
             />
+
+            <AppModal
+                open={isAttachmentViewOpen}
+                onClose={() => {
+                    setIsAttachmentViewOpen(false);
+                    setActiveAttachmentView(null);
+                }}
+                title={activeAttachmentView ? `${activeAttachmentView.title} Attachments` : 'Attachments'}
+                description={activeAttachmentView ? `${activeAttachmentView.className} - Uploaded Materials` : 'Attachment details'}
+                size="xl"
+                footer={
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setIsAttachmentViewOpen(false);
+                            setActiveAttachmentView(null);
+                        }}
+                    >
+                        Close
+                    </Button>
+                }
+            >
+                {!activeAttachmentView ? null : (
+                    <div className="space-y-4">
+                        <div className="rounded-xl border border-slate-200 p-4">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Materials</p>
+                            {activeAttachmentView.materials.length === 0 ? (
+                                <p className="text-sm text-slate-500">No material uploaded for this note.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {activeAttachmentView.materials.map((material) => (
+                                        <div key={material.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                                            <div className="min-w-0 flex items-center gap-2">
+                                                <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                                <p className="text-sm text-slate-700 truncate">{material.name}</p>
+                                            </div>
+                                            {material.url ? (
+                                                <a
+                                                    href={material.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
+                                                >
+                                                    Open <ExternalLink className="w-3.5 h-3.5" />
+                                                </a>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">No file URL</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {activeAttachmentView.pdfUrl && (
+                            <div className="rounded-xl border border-slate-200 overflow-hidden">
+                                <div className="px-4 py-2 bg-slate-50 border-b text-xs font-semibold text-slate-600">
+                                    PDF Preview
+                                </div>
+                                <iframe
+                                    title="Note Attachment PDF Preview"
+                                    src={activeAttachmentView.pdfUrl}
+                                    className="w-full h-[60vh]"
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+            </AppModal>
         </div>
     );
 }
