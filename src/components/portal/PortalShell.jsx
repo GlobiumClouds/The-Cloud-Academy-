@@ -62,6 +62,7 @@ export default function PortalShell({ children, type }) {
   const logout = useAuthStore((s) => s.logout);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const user = portalUser;
 
   useEffect(() => {
     // Check if persist hydration already completed (synchronous case)
@@ -141,7 +142,7 @@ export default function PortalShell({ children, type }) {
             <GraduationCap className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="text-xs font-bold text-white leading-tight">The Clouds Academy</p>
+            <p className="text-xs font-bold text-white leading-tight">{user.institute.name || 'The Clouds Academy'}</p>
             <p className="text-[10px] text-white/60">{portalLabel}</p>
           </div>
         </div>
