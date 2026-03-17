@@ -8,7 +8,7 @@ import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 import {
   GraduationCap, LayoutDashboard, Calendar, DollarSign,
-  BookOpen, Bell, Clock, LogOut, Menu, X, Users,
+  BookOpen, Bell, Clock, LogOut, Menu, Users,
   Briefcase, FileText, ClipboardList, NotebookPen, UserCheck, BookMarked,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,7 @@ function buildTeacherNav(t) {
     { label: t.nav.overview,      href: '/teacher',               icon: LayoutDashboard, permission: 'dashboard.view' },
     { label: t.nav.classes,       href: '/teacher/classes',       icon: Briefcase,       permission: 'classes.read' },
     { label: t.nav.students,      href: '/teacher/students',      icon: Users,           permission: 'students.read' },
+    { label: t.nav.timetable,     href: '/teacher/timetable',     icon: Clock,           permission: 'timetable.view' },
     { label: t.notesLabel,        href: '/teacher/notes',         icon: FileText,        permission: 'notes.create' },
     { label: t.nav.assignments,   href: '/teacher/assignments',   icon: ClipboardList,   permission: 'assignments.create' },
     { label: t.nav.homework,      href: '/teacher/homework',      icon: NotebookPen,     permission: 'homework.create' },
@@ -60,21 +61,31 @@ export default function PortalShell({ children, type }) {
   const { portalUser, clearPortal, getInstituteType, canDo } = usePortalStore();
   const logout = useAuthStore((s) => s.logout);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const user = portalUser;
 
   useEffect(() => {
-    setMounted(true);
+    // Check if persist hydration already completed (synchronous case)
+    if (usePortalStore.persist?.hasHydrated?.()) {
+      setHydrated(true);
+      return;
+    }
+    // Otherwise wait for the onRehydrateStorage callback
+    const unsub = usePortalStore.persist.onFinishHydration(() => {
+      setHydrated(true);
+    });
+    return () => unsub?.();
   }, []);
 
-  // Redirect if not logged in
+  // Redirect if not logged in (only after hydration)
   useEffect(() => {
-    if (mounted && !portalUser) {
+    if (hydrated && !portalUser) {
       router.replace('/portal-login');
     }
-  }, [portalUser, mounted, router]);
+  }, [portalUser, hydrated, router]);
 
-  if (!mounted || !portalUser) {
-    return null; // or loading spinner
+  if (!hydrated || !portalUser) {
+    return null;
   }
 
   const instituteType = getInstituteType();
@@ -131,7 +142,7 @@ export default function PortalShell({ children, type }) {
             <GraduationCap className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="text-xs font-bold text-white leading-tight">The Clouds Academy</p>
+            <p className="text-xs font-bold text-white leading-tight">{user.institute.name || 'The Clouds Academy'}</p>
             <p className="text-[10px] text-white/60">{portalLabel}</p>
           </div>
         </div>

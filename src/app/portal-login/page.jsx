@@ -247,7 +247,7 @@ export default function PortalLoginPage() {
               <p className="text-sm font-mono text-white/90">
                 {activeType === 'STUDENT' ? 'ali@student.tca / student123' : 
                  activeType === 'PARENT' ? 'parent@tca.edu.pk / parent123' : 
-                 'hassan@teacher.tca / teacher123'}
+                 'shoaibrazamemon160@gmail.com / 123456'}
               </p>
             </div>
           </div>

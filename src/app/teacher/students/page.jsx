@@ -2,42 +2,51 @@
 
 import { useMemo, useState } from 'react';
 import { Users } from 'lucide-react';
-import usePortalStore from '@/store/portalStore';
-import { DUMMY_TEACHER_PORTAL_USERS, getTeacherStudents } from '@/data/portalDummyData';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import DataTable from '@/components/common/DataTable';
+import { useTeacherStudents, useTeacherClasses } from '@/hooks/useTeacherPortal';
+import useAuthStore from '@/store/authStore';
 
 const ATTENDANCE_COLORS = {
   present: 'bg-emerald-100 text-emerald-700',
-  absent:  'bg-red-100    text-red-700',
-  late:    'bg-amber-100  text-amber-700',
+  absent: 'bg-red-100    text-red-700',
+  late: 'bg-amber-100  text-amber-700',
 };
 
 export default function TeacherStudentsPage() {
-  const { portalUser } = usePortalStore();
-  const teacher  = portalUser || DUMMY_TEACHER_PORTAL_USERS[0];
-  const t = getPortalTerms(teacher?.institute_type);
-  const students = getTeacherStudents(teacher);
-  const classes  = teacher.assigned_classes || [];
+  const user = useAuthStore((state) => state.user);
+  const t = getPortalTerms(user?.institute_type || 'school');
+  const { students, loading, search: searchStudents, filterByClass } = useTeacherStudents();
+  const { classes } = useTeacherClasses();
 
-  const [search, setSearch]      = useState('');
+  const [search, setSearch] = useState('');
   const [filterClass, setFilter] = useState('');
 
+  const classNameById = useMemo(
+    () => classes.reduce((acc, cls) => {
+      acc[cls.class_id] = cls.class_name || cls.name;
+      return acc;
+    }, {}),
+    [classes]
+  );
+
   const filtered = useMemo(() => students.filter((s) => {
-    const matchSearch = `${s.first_name} ${s.last_name} ${s.roll_no || ''}`.toLowerCase().includes(search.toLowerCase());
-    const matchClass  = !filterClass || s.class_name === filterClass;
+    const source = `${s.name || ''} ${s.registration_no || ''} ${s.roll_no || s.roll_number || ''}`.toLowerCase();
+    const matchSearch = source.includes(search.toLowerCase());
+    const selectedClassName = classNameById[filterClass];
+    const matchClass = !filterClass || s.class === selectedClassName || s.class_name === selectedClassName;
     return matchSearch && matchClass;
-  }), [students, search, filterClass]);
+  }), [students, search, filterClass, classNameById]);
 
   const columns = useMemo(() => [
     {
       id: 'name',
       header: 'Student',
-      accessorFn: (row) => `${row.first_name} ${row.last_name}`,
+      accessorFn: (row) => row.name || `${row.first_name || ''} ${row.last_name || ''}`.trim(),
       cell: ({ row: { original: s }, getValue }) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-sky-600 flex items-center justify-center text-white text-sm font-extrabold flex-shrink-0">
-            {s.first_name?.[0]}
+            {(s.first_name?.[0] || s.name?.[0] || 'S')}
           </div>
           <div>
             <p className="text-sm font-bold text-slate-800">{getValue()}</p>
@@ -49,7 +58,7 @@ export default function TeacherStudentsPage() {
     {
       id: 'class',
       header: 'Class',
-      accessorKey: 'class_name',
+      accessorFn: (row) => row.class || row.class_name,
       cell: ({ getValue }) => (
         <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg border border-blue-100">
           {getValue() || '—'}
@@ -67,7 +76,7 @@ export default function TeacherStudentsPage() {
     {
       id: 'attendance',
       header: "Today's Attendance",
-      accessorKey: 'attendance_today',
+      accessorFn: (row) => row.attendance_today || (row.attendance_percentage >= 75 ? 'present' : 'absent'),
       cell: ({ getValue }) => {
         const val = getValue() || 'present';
         return (
@@ -79,7 +88,21 @@ export default function TeacherStudentsPage() {
     },
   ], []);
 
-  const classFilterOptions = classes.map((cls) => ({ value: cls.class_name, label: cls.class_name }));
+  const classFilterOptions = classes.map((cls) => ({ value: cls.class_id, label: cls.class_name || cls.name }));
+
+  const onSearch = (value) => {
+    setSearch(value);
+    searchStudents(value);
+  };
+
+  const onFilterClass = (value) => {
+    setFilter(value);
+    filterByClass(value || null);
+  };
+
+  if (loading) {
+    return <div className="max-w-5xl mx-auto text-sm text-slate-500">Loading students...</div>;
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -95,10 +118,10 @@ export default function TeacherStudentsPage() {
           columns={columns}
           data={filtered}
           search={search}
-          onSearch={setSearch}
+          onSearch={onSearch}
           searchPlaceholder="Search students..."
           filters={classFilterOptions.length > 0 ? [
-            { name: 'class', label: 'Class', value: filterClass, onChange: setFilter, options: classFilterOptions },
+            { name: 'class', label: 'Class', value: filterClass, onChange: onFilterClass, options: classFilterOptions },
           ] : []}
           emptyMessage="No students found."
           enableColumnVisibility

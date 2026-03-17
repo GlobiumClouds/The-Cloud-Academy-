@@ -2,36 +2,37 @@
 
 import { useState } from 'react';
 import { Bell, ChevronDown, ChevronUp, Calendar, User } from 'lucide-react';
-import { DUMMY_ANNOUNCEMENTS } from '@/data/portalDummyData';
-import usePortalStore from '@/store/portalStore';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
-
-const CATEGORIES = ['All', 'Exam', 'Fee', 'Event', 'Meeting', 'Holiday', 'General'];
+import { useTeacherNotices } from '@/hooks/useTeacherPortal';
+import useAuthStore from '@/store/authStore';
 
 const CATEGORY_COLORS = {
-  Exam:     'bg-violet-100 text-violet-700',
-  Fee:      'bg-emerald-100 text-emerald-700',
-  Event:    'bg-blue-100   text-blue-700',
-  Meeting:  'bg-amber-100  text-amber-700',
-  Holiday:  'bg-pink-100   text-pink-700',
-  General:  'bg-slate-100  text-slate-600',
+  Exam: 'bg-violet-100 text-violet-700',
+  Fee: 'bg-emerald-100 text-emerald-700',
+  Event: 'bg-blue-100   text-blue-700',
+  Meeting: 'bg-amber-100  text-amber-700',
+  Holiday: 'bg-pink-100   text-pink-700',
+  General: 'bg-slate-100  text-slate-600',
 };
 
 const PRIORITY_COLORS = {
-  high:   'bg-red-100   text-red-700',
+  high: 'bg-red-100   text-red-700',
   medium: 'bg-amber-100 text-amber-700',
-  low:    'bg-slate-100 text-slate-500',
+  low: 'bg-slate-100 text-slate-500',
 };
 
 export default function TeacherAnnouncementsPage() {
-  const { portalUser } = usePortalStore();
-  const t = getPortalTerms(portalUser?.institute_type);
+  const user = useAuthStore((state) => state.user);
+  const t = getPortalTerms(user?.institute_type || 'school');
+  const { notices, loading } = useTeacherNotices(50);
   const [activeCategory, setActiveCategory] = useState('All');
   const [expanded, setExpanded] = useState(null);
 
+  const categoryOptions = ['All', ...new Set(notices.map((n) => n.category || 'General'))];
+
   const filtered = activeCategory === 'All'
-    ? DUMMY_ANNOUNCEMENTS
-    : DUMMY_ANNOUNCEMENTS.filter((a) => a.category === activeCategory);
+    ? notices
+    : notices.filter((a) => (a.category || 'General') === activeCategory);
 
   const toggle = (id) => setExpanded((prev) => (prev === id ? null : id));
 
@@ -46,20 +47,21 @@ export default function TeacherAnnouncementsPage() {
 
       {/* Category filters */}
       <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((cat) => (
+        {categoryOptions.map((cat) => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              activeCategory === cat
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeCategory === cat
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700'
-            }`}
+              }`}
           >
             {cat}
           </button>
         ))}
       </div>
+
+      {loading && <div className="text-sm text-slate-500">Loading announcements...</div>}
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400">

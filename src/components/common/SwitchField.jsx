@@ -19,7 +19,16 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
-export default function SwitchField({ label, name, control, hint, disabled, className }) {
+export default function SwitchField({
+  label,
+  name,
+  control,
+  value,
+  onChange,
+  hint,
+  disabled,
+  className
+}) {
   return (
     <div className={cn('flex items-center justify-between rounded-lg border p-3', className)}>
       <div>
@@ -27,18 +36,27 @@ export default function SwitchField({ label, name, control, hint, disabled, clas
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       </div>
 
-      <Controller
-        name={name}
-        control={control}
-        render={({ field }) => (
-          <Switch
-            id={name}
-            checked={!!field.value}
-            onCheckedChange={field.onChange}
-            disabled={disabled}
-          />
-        )}
-      />
+      {control ? (
+        <Controller
+          name={name}
+          control={control}
+          render={({ field }) => (
+            <Switch
+              id={name}
+              checked={!!field.value}
+              onCheckedChange={field.onChange}
+              disabled={disabled}
+            />
+          )}
+        />
+      ) : (
+        <Switch
+          id={name}
+          checked={!!value}
+          onCheckedChange={onChange}
+          disabled={disabled}
+        />
+      )}
     </div>
   );
 }

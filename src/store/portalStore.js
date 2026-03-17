@@ -55,7 +55,11 @@ const usePortalStore = create(
           portalUser:    user,
           portalType:    type,
           instituteType: instType || user?.institute?.institute_type || user?.school?.institute_type || 'school',
-          permissions:   user?.permissions || [],
+           // Use empty array so canDo() falls back to role-based defaults
+           // (teacherDefaults / parentDefaults / studentDefaults).
+           // API permissions are backend RBAC codes that don't match portal
+           // nav permission strings like 'dashboard.view', 'classes.read'.
+           permissions:   [],
         }),
 
       clearPortal: () => set({ 
@@ -74,42 +78,62 @@ const usePortalStore = create(
       /** Check if user has specific permission */
       canDo: (permission) => {
         const { permissions, portalType } = get();
+
+        const hasPermission = (list = [], required) => {
+          if (!required) return true;
+          if (!Array.isArray(list) || list.length === 0) return false;
+          if (list.includes('ALL') || list.includes('*') || list.includes(required)) return true;
+          return list.some((p) => p.endsWith('.*') && required.startsWith(p.slice(0, -1)));
+        };
         
         // Teachers have specific permissions
         if (portalType === 'TEACHER') {
-          const teacherPermissions = [
+          const teacherDefaults = [
+            'dashboard.view',
             'classes.read',
             'students.read',
             'attendance.mark',
+            'timetable.view',
+            'homework.create',
             'assignments.create',
             'notes.create',
+            'announcements.create'
           ];
-          return teacherPermissions.includes(permission);
+          const granted = permissions?.length ? permissions : teacherDefaults;
+          return hasPermission(granted, permission);
         }
         
         // Parents have view permissions
         if (portalType === 'PARENT') {
-          const parentPermissions = [
+          const parentDefaults = [
+            'dashboard.view',
             'attendance.view',
             'fees.view',
             'results.view',
             'announcements.view'
           ];
-          return parentPermissions.includes(permission);
+          const granted = permissions?.length ? permissions : parentDefaults;
+          return hasPermission(granted, permission);
         }
         
         // Students have self permissions
         if (portalType === 'STUDENT') {
-          const studentPermissions = [
+          const studentDefaults = [
+            'dashboard.view.self',
             'attendance.view.self',
             'fees.view.self',
             'results.view.self',
-            'timetable.view.self'
+            'timetable.view.self',
+            'assignments.view',
+            'homework.view',
+            'announcements.view',
+            'syllabus.view'
           ];
-          return studentPermissions.includes(permission);
+          const granted = permissions?.length ? permissions : studentDefaults;
+          return hasPermission(granted, permission);
         }
 
-        return permissions?.includes(permission) || false;
+        return hasPermission(permissions, permission);
       },
 
       /** Get user display name */
@@ -137,6 +161,9 @@ const usePortalStore = create(
         portalType: state.portalType,
         instituteType: state.instituteType,
       }),
+        onRehydrateStorage: () => (state) => {
+          if (state) state._hasHydrated = true;
+        },
     },
   ),
 );
