@@ -8,7 +8,7 @@ import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 import {
   GraduationCap, LayoutDashboard, Calendar, DollarSign,
-  BookOpen, Bell, Clock, LogOut, Menu, X, Users,
+  BookOpen, Bell, Clock, LogOut, Menu, Users,
   Briefcase, FileText, ClipboardList, NotebookPen, UserCheck, BookMarked,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,21 +61,30 @@ export default function PortalShell({ children, type }) {
   const { portalUser, clearPortal, getInstituteType, canDo } = usePortalStore();
   const logout = useAuthStore((s) => s.logout);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    // Check if persist hydration already completed (synchronous case)
+    if (usePortalStore.persist?.hasHydrated?.()) {
+      setHydrated(true);
+      return;
+    }
+    // Otherwise wait for the onRehydrateStorage callback
+    const unsub = usePortalStore.persist.onFinishHydration(() => {
+      setHydrated(true);
+    });
+    return () => unsub?.();
   }, []);
 
-  // Redirect if not logged in
+  // Redirect if not logged in (only after hydration)
   useEffect(() => {
-    if (mounted && !portalUser) {
+    if (hydrated && !portalUser) {
       router.replace('/portal-login');
     }
-  }, [portalUser, mounted, router]);
+  }, [portalUser, hydrated, router]);
 
-  if (!mounted || !portalUser) {
-    return null; // or loading spinner
+  if (!hydrated || !portalUser) {
+    return null;
   }
 
   const instituteType = getInstituteType();

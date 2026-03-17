@@ -55,7 +55,11 @@ const usePortalStore = create(
           portalUser:    user,
           portalType:    type,
           instituteType: instType || user?.institute?.institute_type || user?.school?.institute_type || 'school',
-          permissions:   user?.permissions || [],
+           // Use empty array so canDo() falls back to role-based defaults
+           // (teacherDefaults / parentDefaults / studentDefaults).
+           // API permissions are backend RBAC codes that don't match portal
+           // nav permission strings like 'dashboard.view', 'classes.read'.
+           permissions:   [],
         }),
 
       clearPortal: () => set({ 
@@ -157,6 +161,9 @@ const usePortalStore = create(
         portalType: state.portalType,
         instituteType: state.instituteType,
       }),
+        onRehydrateStorage: () => (state) => {
+          if (state) state._hasHydrated = true;
+        },
     },
   ),
 );
