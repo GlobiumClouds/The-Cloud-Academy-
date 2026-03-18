@@ -514,7 +514,7 @@ export default function TeacherNotesPage() {
                 <div className="grid sm:grid-cols-2 gap-4">
                     {filtered.map((note) => {
                         const classInfo = classMap[note.class_id] || {};
-                        const sectionName = note.section_name || classInfo.section_name || classInfo.sections?.[0]?.name || '-';
+                        const sectionName = note.section_name || classInfo.section_name || classInfo.sections?.[1]?.name || '-';
                         const filesCount = Array.isArray(note.attachments) ? note.attachments.length : 0;
                         const firstFile = filesCount > 0 ? note.attachments[0]?.original_name || note.attachments[0]?.filename || '' : '';
 

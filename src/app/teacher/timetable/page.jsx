@@ -92,11 +92,11 @@ export default function TeacherTimetablePage() {
             <div className="flex flex-col gap-3">
                 <div className="flex items-start justify-between flex-wrap gap-3">
                     <div>
-                        <h1 className="text-[22px] font-medium text-slate-900 flex items-center gap-2.5">
+                        <h1 className="text-[22px] font-bold text-slate-900 flex items-center gap-2.5">
                             <span className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                                 <CalendarDays className="w-[18px] h-[18px] text-blue-600" />
                             </span>
-                            {t.nav.timetable}
+                            {t.nav.myTimetable}
                         </h1>
                         <p className="text-sm text-slate-400 mt-1 ml-11">Your assigned classes and periods for each day</p>
                     </div>

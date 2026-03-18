@@ -129,59 +129,124 @@ export default function PortalLoginPage() {
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = async (data) => {
-    try {
-      setLoading(true);
+  // // Handle form submission
+  // const onSubmit = async (data) => {
+  //   try {
+  //     setLoading(true);
       
-      // 🔥 Use real auth service
-      const response = await authService.login({
-        email: data.email,
-        password: data.password
-      });
+  //     // 🔥 Use real auth service
+  //     const response = await authService.login({
+  //       email: data.email,
+  //       password: data.password
+  //     });
 
-      const user = response.user;
+  //     const user = response.user;
 
-      // Verify user type matches selected portal
-      if (user.user_type !== activeType) {
-        toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
-        setLoading(false);
-        return;
-      }
+  //     // Verify user type matches selected portal
+  //     if (user.user_type !== activeType) {
+  //       toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
+  //       setLoading(false);
+  //       return;
+  //     }
 
-      // Set in auth store (for token management)
-      setAuthUser(user, response.access_token);
+  //     // Set in auth store (for token management)
+  //     setAuthUser(user, response.access_token);
 
-      // Set in portal store
-      setPortalUser(
-        user, 
-        user.user_type, 
-        user.institute?.institute_type || 'school'
-      );
+  //     // Set in portal store
+  //     setPortalUser(
+  //       user, 
+  //       user.user_type, 
+  //       user.institute?.institute_type || 'school'
+  //     );
 
-      // Set cookies
-      Cookies.set('portal_token', response.access_token, { expires: 1 });
-      Cookies.set('portal_type', user.user_type, { expires: 1 });
-      Cookies.set('access_token', response.access_token, { expires: 7 });
-      Cookies.set('user_type', user.user_type, { expires: 7 });
+  //     // Set cookies
+  //     Cookies.set('portal_token', response.access_token, { expires: 1 });
+  //     Cookies.set('portal_type', user.user_type, { expires: 1 });
+  //     Cookies.set('access_token', response.access_token, { expires: 7 });
+  //     Cookies.set('user_type', user.user_type, { expires: 7 });
 
-      toast.success(`Welcome, ${user.first_name}!`);
+  //     toast.success(`Welcome, ${user.first_name}!`);
 
-      // Redirect based on user type
-      const redirectPaths = {
-        STUDENT: '/student',
-        PARENT: '/parent',
-        TEACHER: '/teacher'
-      };
+  //     // Redirect based on user type
+  //     const redirectPaths = {
+  //       STUDENT: '/student',
+  //       PARENT: '/parent',
+  //       TEACHER: '/teacher'
+  //     };
       
-      router.replace(redirectPaths[user.user_type] || '/portal');
+  //     router.replace(redirectPaths[user.user_type] || '/portal');
 
-    } catch (err) {
-      console.error('Login error:', err);
-      toast.error(err?.response?.data?.message || err?.message || 'Login failed. Check your credentials.');
-    } finally {
+  //   } catch (err) {
+  //     console.error('Login error:', err);
+  //     toast.error(err?.response?.data?.message || err?.message || 'Login failed. Check your credentials.');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  // In src/app/portal-login/page.jsx, update the onSubmit function:
+
+const onSubmit = async (data) => {
+  try {
+    setLoading(true);
+    
+    // 🔥 Use real auth service
+    const response = await authService.login({
+      email: data.email,
+      password: data.password
+    });
+
+    const user = response.user;
+
+    // Verify user type matches selected portal
+    if (user.user_type !== activeType) {
+      toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
       setLoading(false);
+      return;
     }
-  };
+
+    // Log the user object to see permissions
+    console.log('👤 Logged in user:', {
+      id: user.id,
+      type: user.user_type,
+      permissionsCount: user.permissions?.length,
+      permissions: user.permissions
+    });
+
+    // Set in auth store (for token management)
+    setAuthUser(user, response.access_token);
+
+    // Set in portal store - now permissions will be passed correctly
+    setPortalUser(
+      user, 
+      user.user_type, 
+      user.institute?.institute_type || 'school'
+    );
+
+    // Set cookies
+    Cookies.set('portal_token', response.access_token, { expires: 1 });
+    Cookies.set('portal_type', user.user_type, { expires: 1 });
+    Cookies.set('access_token', response.access_token, { expires: 7 });
+    Cookies.set('user_type', user.user_type, { expires: 7 });
+
+    toast.success(`Welcome, ${user.first_name}!`);
+
+    // Redirect based on user type
+    const redirectPaths = {
+      STUDENT: '/student',
+      PARENT: '/parent',
+      TEACHER: '/teacher'
+    };
+    
+    router.replace(redirectPaths[user.user_type] || '/portal');
+
+  } catch (err) {
+    console.error('Login error:', err);
+    toast.error(err?.response?.data?.message || err?.message || 'Login failed. Check your credentials.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Quick fill demo account
   const fillDemoAccount = (account) => {
