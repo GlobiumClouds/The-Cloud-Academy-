@@ -14,7 +14,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Plus, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, UserCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
@@ -48,7 +48,7 @@ const GROUP_KEY = {
 };
 
 // Build react-table ColumnDef[] dynamically from studentColumns config
-function buildColumns(studentColumns, type, terms, canDo, router, onDelete) {
+function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onToggleStatus) {
   const cols = studentColumns.map((col) => ({
     accessorKey: col.key,
     header: col.label,
@@ -64,12 +64,21 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete) {
       const stu = row.original;
       return (
         <div className="flex items-center justify-end gap-1">
+          {onToggleStatus && canDo('students.update') && (
+            <button
+              onClick={() => onToggleStatus(stu.id, !stu.is_active)}
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
+              title={stu.is_active ? 'Deactivate' : 'Activate'}
+            >
+              {stu.is_active ? <UserX size={13} className="text-amber-500" /> : <UserCheck size={13} className="text-emerald-500" />}
+            </button>
+          )}
           <button
             onClick={() => router.push(`/${type}/students/${stu.id}`)}
             className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
             title="View"
           >
-            <Eye size={13} />
+            <Eye size={13} className="text-muted-foreground" />
           </button>
           {canDo('students.update') && (
             <button
@@ -77,7 +86,7 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete) {
               className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
               title="Edit"
             >
-              <Pencil size={13} />
+              <Pencil size={13} className="text-muted-foreground" />
             </button>
           )}
           {canDo('students.delete') && (
@@ -181,6 +190,17 @@ export default function StudentsPage({ type }) {
     },
   });
 
+  const toggleStatus = useMutation({
+    mutationFn: async ({ id, is_active }) => {
+      return await studentService.updateStatus(id, is_active, type);
+    },
+    onSuccess: () => {
+      toast.success('Status updated');
+      qc.invalidateQueries({ queryKey: ['students', type] });
+    },
+    onError: (error) => toast.error(error.message || 'Failed to update status'),
+  });
+
   const remove = useMutation({
     mutationFn: async (id) => {
       try { 
@@ -216,12 +236,21 @@ export default function StudentsPage({ type }) {
     placeholderData: (prev) => prev,
   });
 
-  const students   = data?.data?.rows       ?? DUMMY_FLAT_STUDENTS;
-  const total      = data?.data?.total      ?? students.length;
-  const totalPages = data?.data?.totalPages ?? 1;
+  let students = DUMMY_FLAT_STUDENTS;
+  let total = DUMMY_FLAT_STUDENTS.length;
+  let totalPages = 1;
+
+  if (data) {
+    if (Array.isArray(data)) students = data;
+    else if (Array.isArray(data.data)) students = data.data;
+    else students = data?.data?.rows ?? data?.rows ?? data?.students ?? data?.data?.students ?? [];
+    
+    total = data?.data?.total ?? data?.total ?? students.length;
+    totalPages = data?.data?.totalPages ?? data?.totalPages ?? 1;
+  }
 
   const columns = useMemo(
-    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting),
+    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting, (id, is_active) => toggleStatus.mutate({ id, is_active })),
     [studentColumns, type, terms, canDo, router],
   );
 
@@ -319,6 +348,8 @@ export default function StudentsPage({ type }) {
 // Cell renderer — per-column display logic
 // ─────────────────────────────────────────────────────────────────────────────
 function StudentCell({ student: s, columnKey }) {
+  const dt = s.details?.studentDetails || {};
+
   switch (columnKey) {
     case 'name':
       return (
@@ -333,31 +364,34 @@ function StudentCell({ student: s, columnKey }) {
         </div>
       );
     case 'roll_number':
-      return <span className="font-mono text-xs">{s.roll_number || s.candidate_id || s.trainee_id || s.reg_number || '—'}</span>;
-    case 'class_name':    return <span>{s.class?.name || '—'}</span>;
-    case 'course_name':   return <span>{s.course?.name || '—'}</span>;
-    case 'program_name':  return <span>{s.program?.name || '—'}</span>;
-    case 'section_name':  return <span>{s.section?.name || '—'}</span>;
-    case 'batch_name':    return <span>{s.batch?.name || '—'}</span>;
-    case 'semester':      return <span>{s.semester?.name || (s.semester_number ? `Semester ${s.semester_number}` : '—')}</span>;
-    case 'department':    return <span>{s.department?.name || '—'}</span>;
-    case 'faculty':       return <span>{s.faculty?.name || '—'}</span>;
-    case 'target_exam':   return <span>{s.target_exam || '—'}</span>;
-    case 'module':        return <span>{s.current_module || '—'}</span>;
-    case 'cgpa':          return <span className="font-mono">{s.cgpa ?? '—'}</span>;
+      return <span className="font-mono text-xs">{s.roll_number || s.registration_no || s.gr_number || s.candidate_id || s.trainee_id || s.reg_number || dt.roll_no || '—'}</span>;
+    case 'class_name':    return <span>{s.class?.name || s.class_name || dt.class_id || '—'}</span>;
+    case 'course_name':   return <span>{s.course?.name || s.course_name || dt.course_id || dt.program_id || '—'}</span>;
+    case 'program_name':  return <span>{s.program?.name || s.program_name || dt.program_id || '—'}</span>;
+    case 'section_name':  return <span>{s.section?.name || s.section_name || dt.section_id || dt.batch_id || '—'}</span>;
+    case 'batch_name':    return <span>{s.batch?.name || s.batch_name || dt.batch_id || '—'}</span>;
+    case 'semester':      return <span>{s.semester?.name || s.semester_name || dt.semester || s.semester_number ? `Semester ${s.semester?.name || s.semester_name || dt.semester || s.semester_number}` : '—'}</span>;
+    case 'department':    return <span>{s.department?.name || s.department_name || dt.department_id || '—'}</span>;
+    case 'faculty':       return <span>{s.faculty?.name || s.faculty_name || dt.faculty_id || '—'}</span>;
+    case 'target_exam':   return <span>{s.target_exam || dt.target_exam || '—'}</span>;
+    case 'module':        return <span>{s.current_module || dt.current_module || '—'}</span>;
+    case 'cgpa':          return <span className="font-mono">{s.cgpa ?? dt.cgpa ?? '—'}</span>;
     case 'fee_status':
       return s.fee_status ? (
         <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLORS[s.fee_status] ?? 'bg-gray-100 text-gray-700')}>
           {s.fee_status.charAt(0).toUpperCase() + s.fee_status.slice(1)}
         </span>
       ) : <span className="text-muted-foreground">—</span>;
-    case 'guardian_name':
-      return s.guardian_name ? (
+    case 'guardian_name': {
+      const gName = s.guardian_name || s.parent?.name || dt.guardian_name || dt.father_name;
+      const gPhone = s.guardian_phone || s.parent?.phone || dt.guardian_phone || dt.father_phone;
+      return gName ? (
         <div>
-          <p className="text-xs">{s.guardian_name}</p>
-          {s.guardian_phone && <p className="text-[10px] text-muted-foreground">{s.guardian_phone}</p>}
+          <p className="text-xs">{gName}</p>
+          {gPhone && <p className="text-[10px] text-muted-foreground">{gPhone}</p>}
         </div>
       ) : <span className="text-muted-foreground">—</span>;
+    }
     case 'is_active':
       return (
         <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500')}>

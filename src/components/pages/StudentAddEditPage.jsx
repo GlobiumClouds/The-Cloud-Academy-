@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   ArrowLeft, Save, User, Phone, Mail, MapPin, Calendar,
   BookOpen, Users, GraduationCap, ChevronRight,
@@ -14,7 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
-import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
+import { studentService } from '@/services';
 
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 const GENDERS = ['male', 'female', 'other'];
@@ -208,40 +209,54 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
   const isEdit = mode === 'edit';
   const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');
 
-  // ── Fetch existing student if editing ──────────────────────────────────────
+  // ── GET /students/:id  (edit mode only) ───────────────────────────────────
   const { isLoading: fetching } = useQuery({
-    queryKey: ['student-edit', type, id],
-    enabled: isEdit && !!id,
-    queryFn: async () => {
-      try {
-        const { studentService } = await import('@/services');
-        return await studentService.getById(id, type);
-      } catch {
-        return { data: DUMMY_FLAT_STUDENTS.find((s) => s.id === id) ?? null };
-      }
-    },
+    queryKey: ['student-edit', id],
+    enabled:  isEdit && !!id,
+    queryFn:  () => studentService.getById(id),
     onSuccess: (res) => {
-      const s = res?.data;
-      if (s) setForm({ ...EMPTY, ...s });
+      const s = res?.data ?? res;
+      if (s) {
+        const dt = s.details?.studentDetails || {};
+        setForm({
+          ...EMPTY, ...s,
+          date_of_birth:    s.date_of_birth    || s.dob || dt.date_of_birth || dt.dob || '',
+          gender:           s.gender           || dt.gender           || '',
+          address:          s.address          || dt.present_address  || dt.permanent_address || '',
+          guardian_name:    s.guardian_name    || dt.guardian_name    || dt.father_name || '',
+          guardian_phone:   s.guardian_phone   || dt.guardian_phone   || dt.father_phone || '',
+          guardian_email:   s.guardian_email   || dt.guardian_email   || '',
+          guardian_relation:s.guardian_relation|| dt.guardian_relation|| '',
+          roll_number:      s.roll_number      || s.registration_no   || dt.roll_no || '',
+          class_id:         s.class_id         || dt.class_id         || '',
+          section_id:       s.section_id       || dt.section_id       || '',
+          course_id:        s.course_id        || dt.course_id        || '',
+          batch_id:         s.batch_id         || dt.batch_id         || '',
+          program_id:       s.program_id       || dt.program_id       || '',
+          department_id:    s.department_id    || dt.department_id    || '',
+          faculty_id:       s.faculty_id       || dt.faculty_id       || '',
+          semester_id:      s.semester_id      || dt.semester_id      || '',
+          target_exam:      s.target_exam      || dt.target_exam      || '',
+          current_module:   s.current_module   || dt.current_module   || '',
+          cgpa:             s.cgpa             || dt.cgpa             || '',
+        });
+      }
     },
   });
 
-  // ── Mutation ───────────────────────────────────────────────────────────────
+  // ── POST /students  OR  PUT /students/:id ────────────────────────────────
   const mutation = useMutation({
-    mutationFn: async (payload) => {
-      try {
-        const { studentService } = await import('@/services');
-        if (isEdit) return await studentService.update(id, payload, type);
-        return await studentService.create(payload, type);
-      } catch {
-        // Demo mode — simulate success
-        return { success: true };
-      }
-    },
+    mutationFn: (payload) =>
+      isEdit
+        ? studentService.update(id, payload)
+        : studentService.create(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['students'] });
+      toast.success(isEdit ? 'Student updated' : 'Student added');
       router.push(`/${type}/students`);
     },
+    onError: (e) =>
+      toast.error(e?.response?.data?.message ?? (isEdit ? 'Update failed' : 'Create failed')),
   });
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -262,7 +277,36 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    mutation.mutate(form);
+    
+    // Convert flat form to API expected payload
+    const payload = {
+      ...form,
+      registration_no: form.roll_number,
+      details: {
+        studentDetails: {
+          date_of_birth: form.date_of_birth,
+          gender: form.gender,
+          guardian_name: form.guardian_name,
+          guardian_phone: form.guardian_phone,
+          guardian_email: form.guardian_email,
+          guardian_relation: form.guardian_relation,
+          present_address: form.address,
+          roll_no: form.roll_number,
+          class_id: form.class_id,
+          section_id: form.section_id,
+          course_id: form.course_id,
+          batch_id: form.batch_id,
+          program_id: form.program_id,
+          department_id: form.department_id,
+          faculty_id: form.faculty_id,
+          semester_id: form.semester_id,
+          target_exam: form.target_exam,
+          current_module: form.current_module,
+          cgpa: form.cgpa,
+        }
+      }
+    };
+    mutation.mutate(payload);
   };
 
   if (isEdit && fetching) {
@@ -276,17 +320,10 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     );
   }
 
-<<<<<<< HEAD
-  if (isEdit && !canDo('student.update')) {
-    return <div className="py-20 text-center text-muted-foreground">You don't have permission to edit {studentLabel.toLowerCase()}s.</div>;
-  }
-  if (!isEdit && !canDo('student.create')) {
-=======
   if (isEdit && !canDo('students.update')) {
     return <div className="py-20 text-center text-muted-foreground">You don't have permission to edit {studentLabel.toLowerCase()}s.</div>;
   }
   if (!isEdit && !canDo('students.create')) {
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c
     return <div className="py-20 text-center text-muted-foreground">You don't have permission to add {studentLabel.toLowerCase()}s.</div>;
   }
 
@@ -407,13 +444,3 @@ export default function StudentAddEditPage({ type, id, mode = 'add' }) {
     </form>
   );
 }
-<<<<<<< HEAD
-=======
-
-
-
-
-
-
-
->>>>>>> 9bec5616ab4ff5e499e6d95ede92136574206c2c

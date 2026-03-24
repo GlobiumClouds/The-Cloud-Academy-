@@ -5,16 +5,17 @@
  */
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   ArrowLeft, Pencil, User, Phone, Mail, MapPin, Calendar,
   GraduationCap, BookOpen, TrendingUp, DollarSign, CheckSquare,
-  ChevronRight, Hash, Users, ShieldCheck, Clock, AlertCircle,
+  ChevronRight, Hash, Users, ShieldCheck, Clock, AlertCircle, Power,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
-import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
 import useAuthStore from '@/store/authStore';
+import { studentService } from '@/services';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function initials(s) {
@@ -35,7 +36,7 @@ function age(dob) {
 }
 
 const FEE_COLORS = {
-  paid:    'bg-emerald-100 text-emerald-700 border-emerald-200',
+  paid: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   pending: 'bg-amber-100   text-amber-700   border-amber-200',
   overdue: 'bg-red-100     text-red-700     border-red-200',
   partial: 'bg-blue-100    text-blue-700    border-blue-200',
@@ -78,17 +79,30 @@ function InfoRow({ icon: Icon, label, value }) {
 // ─── Overview Tab ────────────────────────────────────────────────────────────
 function OverviewTab({ student, terms }) {
   const idLabel = {
-    school:     'Roll Number',
-    coaching:   'Candidate ID',
-    academy:    'Trainee ID',
-    college:    'Enrollment No.',
+    school: 'Roll Number',
+    coaching: 'Candidate ID',
+    academy: 'Trainee ID',
+    college: 'Enrollment No.',
     university: 'Registration No.',
   };
-  const rollNo = student.roll_number || student.candidate_id || student.trainee_id || student.reg_number;
+  
+  const dt = student.details?.studentDetails || {};
+
+  const rollNo = student.roll_number || student.registration_no || student.gr_number || student.candidate_id || student.trainee_id || student.reg_number || dt.roll_no || '—';
   const className = student.class?.name || student.class_name
-    || student.course?.name || student.program?.name || '—';
-  const section = student.section?.name || student.section
-    || student.batch?.name || student.semester?.name || '—';
+    || student.course?.name || student.program?.name || dt.class_id || dt.course_id || dt.program_id || '—';
+  const section = student.section?.name || student.section_name || student.section
+    || student.batch?.name || student.semester?.name || dt.section_id || dt.batch_id || '—';
+
+  const gender = student.gender || dt.gender;
+  const dob = student.date_of_birth || student.dob || dt.date_of_birth || dt.dob;
+  const admissionDate = student.admission_date || student.enrollment_date || dt.admission_date;
+  const address = student.address || dt.present_address || dt.permanent_address || '—';
+  
+  const guardianName = student.guardian_name || student.parent?.name || dt.guardian_name || dt.father_name;
+  const guardianPhone = student.guardian_phone || student.parent?.phone || dt.guardian_phone || dt.father_phone;
+  const guardianEmail = student.guardian_email || student.parent?.email || dt.guardian_email;
+  const guardianRelation = student.guardian_relation || student.parent?.relation || dt.guardian_relation || (dt.father_name ? 'Father' : '');
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -99,15 +113,15 @@ function OverviewTab({ student, terms }) {
           <h3 className="text-sm font-semibold">Personal Information</h3>
         </div>
         <div className="px-4 py-1">
-          <InfoRow icon={Hash}      label="ID"            value={rollNo} />
-          <InfoRow icon={User}      label="Full Name"     value={`${student.first_name || ''} ${student.last_name || ''}`.trim()} />
-          <InfoRow icon={Users}     label="Gender"        value={student.gender ? student.gender.charAt(0).toUpperCase() + student.gender.slice(1) : null} />
-          <InfoRow icon={Calendar}  label="Date of Birth" value={formatDate(student.date_of_birth || student.dob)} />
-          <InfoRow icon={Clock}     label="Age"           value={age(student.date_of_birth || student.dob) ? `${age(student.date_of_birth || student.dob)} years` : null} />
-          <InfoRow icon={Mail}      label="Email"         value={student.email} />
-          <InfoRow icon={Phone}     label="Phone"         value={student.phone} />
-          <InfoRow icon={MapPin}    label="Address"       value={student.address} />
-          <InfoRow icon={Calendar}  label="Admission Date" value={formatDate(student.admission_date || student.enrollment_date)} />
+          <InfoRow icon={Hash} label="ID" value={rollNo} />
+          <InfoRow icon={User} label="Full Name" value={`${student.first_name || ''} ${student.last_name || ''}`.trim()} />
+          <InfoRow icon={Users} label="Gender" value={gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : null} />
+          <InfoRow icon={Calendar} label="Date of Birth" value={formatDate(dob)} />
+          <InfoRow icon={Clock} label="Age" value={age(dob) ? `${age(dob)} years` : null} />
+          <InfoRow icon={Mail} label="Email" value={student.email} />
+          <InfoRow icon={Phone} label="Phone" value={student.phone || dt.phone} />
+          <InfoRow icon={MapPin} label="Address" value={address} />
+          <InfoRow icon={Calendar} label="Admission Date" value={formatDate(admissionDate)} />
         </div>
       </div>
 
@@ -118,14 +132,14 @@ function OverviewTab({ student, terms }) {
           <h3 className="text-sm font-semibold">Academic Information</h3>
         </div>
         <div className="px-4 py-1">
-          <InfoRow icon={BookOpen}  label={idLabel[terms?.type] ?? 'Roll Number'} value={rollNo} />
-          <InfoRow icon={BookOpen}  label={terms?.class ?? 'Class'} value={className} />
-          <InfoRow icon={BookOpen}  label={terms?.section ?? 'Section'} value={section} />
+          <InfoRow icon={BookOpen} label={idLabel[terms?.type] ?? 'Roll Number'} value={rollNo} />
+          <InfoRow icon={BookOpen} label={terms?.class ?? 'Class'} value={className} />
+          <InfoRow icon={BookOpen} label={terms?.section ?? 'Section'} value={section} />
           {student.department?.name && <InfoRow icon={BookOpen} label="Department" value={student.department.name} />}
-          {student.faculty?.name    && <InfoRow icon={BookOpen} label="Faculty" value={student.faculty.name} />}
-          {student.target_exam      && <InfoRow icon={TrendingUp} label="Target Exam" value={student.target_exam} />}
-          {student.current_module   && <InfoRow icon={BookOpen} label="Current Module" value={student.current_module} />}
-          {student.cgpa             && <InfoRow icon={TrendingUp} label="CGPA" value={String(student.cgpa)} />}
+          {student.faculty?.name && <InfoRow icon={BookOpen} label="Faculty" value={student.faculty.name} />}
+          {(student.target_exam || dt.target_exam) && <InfoRow icon={TrendingUp} label="Target Exam" value={student.target_exam || dt.target_exam} />}
+          {(student.current_module || dt.current_module) && <InfoRow icon={BookOpen} label="Current Module" value={student.current_module || dt.current_module} />}
+          {student.cgpa && <InfoRow icon={TrendingUp} label="CGPA" value={String(student.cgpa)} />}
           <InfoRow icon={ShieldCheck} label="Status" value={student.is_active ? 'Active' : 'Inactive'} />
         </div>
       </div>
@@ -137,10 +151,10 @@ function OverviewTab({ student, terms }) {
           <h3 className="text-sm font-semibold">{terms?.parent ?? 'Guardian'} Information</h3>
         </div>
         <div className="px-4 py-1">
-          <InfoRow icon={User}  label="Guardian Name"  value={student.guardian_name  || student.parent?.name} />
-          <InfoRow icon={Phone} label="Guardian Phone" value={student.guardian_phone || student.parent?.phone} />
-          <InfoRow icon={Mail}  label="Guardian Email" value={student.guardian_email || student.parent?.email} />
-          <InfoRow icon={Users} label="Relation"       value={student.guardian_relation || student.parent?.relation} />
+          <InfoRow icon={User} label="Guardian Name" value={guardianName} />
+          <InfoRow icon={Phone} label="Guardian Phone" value={guardianPhone} />
+          <InfoRow icon={Mail} label="Guardian Email" value={guardianEmail} />
+          <InfoRow icon={Users} label="Relation" value={guardianRelation} />
         </div>
       </div>
 
@@ -159,9 +173,9 @@ function OverviewTab({ student, terms }) {
                   {student.fee_status}
                 </span>
               </div>
-              {student.total_fee    && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Fee</span><span className="font-semibold">Rs. {Number(student.total_fee).toLocaleString()}</span></div>}
-              {student.paid_amount  && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Paid</span><span className="font-semibold text-emerald-600">Rs. {Number(student.paid_amount).toLocaleString()}</span></div>}
-              {student.due_amount   && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Due</span><span className="font-semibold text-red-500">Rs. {Number(student.due_amount).toLocaleString()}</span></div>}
+              {student.total_fee && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Fee</span><span className="font-semibold">Rs. {Number(student.total_fee).toLocaleString()}</span></div>}
+              {student.paid_amount && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Paid</span><span className="font-semibold text-emerald-600">Rs. {Number(student.paid_amount).toLocaleString()}</span></div>}
+              {student.due_amount && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Due</span><span className="font-semibold text-red-500">Rs. {Number(student.due_amount).toLocaleString()}</span></div>}
             </>
           ) : (
             <p className="text-sm text-muted-foreground">No fee record available</p>
@@ -182,15 +196,15 @@ function AttendanceTab({ student }) {
   ];
 
   const totalPresent = rows.reduce((s, r) => s + r.present, 0);
-  const totalDays    = rows.reduce((s, r) => s + r.total,   0);
+  const totalDays = rows.reduce((s, r) => s + r.total, 0);
   const pct = totalDays ? Math.round((totalPresent / totalDays) * 100) : 0;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard icon={CheckSquare} label="Attendance %" value={`${pct}%`} sub="Overall" color={pct >= 75 ? 'text-emerald-600' : 'text-red-500'} bg={pct >= 75 ? 'bg-emerald-50' : 'bg-red-50'} />
-        <StatCard icon={TrendingUp}  label="Days Present" value={totalPresent} sub="Total present" color="text-blue-600" bg="bg-blue-50" />
-        <StatCard icon={AlertCircle} label="Days Absent"  value={totalDays - totalPresent} sub="Total absent" color="text-amber-600" bg="bg-amber-50" />
+        <StatCard icon={TrendingUp} label="Days Present" value={totalPresent} sub="Total present" color="text-blue-600" bg="bg-blue-50" />
+        <StatCard icon={AlertCircle} label="Days Absent" value={totalDays - totalPresent} sub="Total absent" color="text-amber-600" bg="bg-amber-50" />
       </div>
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
@@ -237,18 +251,18 @@ function AttendanceTab({ student }) {
 // ─── Fees Tab ────────────────────────────────────────────────────────────────
 function FeesTab({ student }) {
   const feeRows = student.fee_history ?? [
-    { month: 'April 2025',    amount: 3500, status: 'paid',    paid_date: '2025-04-05' },
-    { month: 'March 2025',    amount: 3500, status: 'paid',    paid_date: '2025-03-07' },
-    { month: 'February 2025', amount: 3500, status: 'paid',    paid_date: '2025-02-10' },
-    { month: 'January 2025',  amount: 3500, status: 'pending', paid_date: null },
+    { month: 'April 2025', amount: 3500, status: 'paid', paid_date: '2025-04-05' },
+    { month: 'March 2025', amount: 3500, status: 'paid', paid_date: '2025-03-07' },
+    { month: 'February 2025', amount: 3500, status: 'paid', paid_date: '2025-02-10' },
+    { month: 'January 2025', amount: 3500, status: 'pending', paid_date: null },
   ];
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard icon={DollarSign}  label="Total Paid"     value={`Rs. ${feeRows.filter(r => r.status === 'paid').reduce((s, r) => s + r.amount, 0).toLocaleString()}`}    color="text-emerald-600" bg="bg-emerald-50" />
-        <StatCard icon={AlertCircle} label="Pending Amount" value={`Rs. ${feeRows.filter(r => r.status !== 'paid').reduce((s, r) => s + r.amount, 0).toLocaleString()}`}    color="text-red-500" bg="bg-red-50" />
-        <StatCard icon={TrendingUp}  label="Months Paid"    value={`${feeRows.filter(r => r.status === 'paid').length} / ${feeRows.length}`} color="text-blue-600" bg="bg-blue-50" />
+        <StatCard icon={DollarSign} label="Total Paid" value={`Rs. ${feeRows.filter(r => r.status === 'paid').reduce((s, r) => s + r.amount, 0).toLocaleString()}`} color="text-emerald-600" bg="bg-emerald-50" />
+        <StatCard icon={AlertCircle} label="Pending Amount" value={`Rs. ${feeRows.filter(r => r.status !== 'paid').reduce((s, r) => s + r.amount, 0).toLocaleString()}`} color="text-red-500" bg="bg-red-50" />
+        <StatCard icon={TrendingUp} label="Months Paid" value={`${feeRows.filter(r => r.status === 'paid').length} / ${feeRows.length}`} color="text-blue-600" bg="bg-blue-50" />
       </div>
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
@@ -290,11 +304,11 @@ function FeesTab({ student }) {
 // ─── Exams Tab ───────────────────────────────────────────────────────────────
 function ExamsTab({ student }) {
   const results = student.exam_results ?? [
-    { subject: 'Mathematics',  marks: 85, total: 100, grade: 'A',  exam: 'Mid Term 2025' },
-    { subject: 'English',      marks: 78, total: 100, grade: 'B+', exam: 'Mid Term 2025' },
-    { subject: 'Science',      marks: 92, total: 100, grade: 'A+', exam: 'Mid Term 2025' },
-    { subject: 'Urdu',         marks: 71, total: 100, grade: 'B',  exam: 'Mid Term 2025' },
-    { subject: 'Social Study', marks: 80, total: 100, grade: 'A',  exam: 'Mid Term 2025' },
+    { subject: 'Mathematics', marks: 85, total: 100, grade: 'A', exam: 'Mid Term 2025' },
+    { subject: 'English', marks: 78, total: 100, grade: 'B+', exam: 'Mid Term 2025' },
+    { subject: 'Science', marks: 92, total: 100, grade: 'A+', exam: 'Mid Term 2025' },
+    { subject: 'Urdu', marks: 71, total: 100, grade: 'B', exam: 'Mid Term 2025' },
+    { subject: 'Social Study', marks: 80, total: 100, grade: 'A', exam: 'Mid Term 2025' },
   ];
 
   const avg = results.length
@@ -306,9 +320,9 @@ function ExamsTab({ student }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard icon={GraduationCap} label="Average Score" value={`${avg}%`}             color="text-violet-600" bg="bg-violet-50" />
-        <StatCard icon={TrendingUp}    label="Top Subject"   value={results.length ? results.reduce((a, b) => a.marks > b.marks ? a : b).subject : '—'} color="text-emerald-600" bg="bg-emerald-50" />
-        <StatCard icon={BookOpen}      label="Subjects"      value={results.length}          color="text-blue-600" bg="bg-blue-50" />
+        <StatCard icon={GraduationCap} label="Average Score" value={`${avg}%`} color="text-violet-600" bg="bg-violet-50" />
+        <StatCard icon={TrendingUp} label="Top Subject" value={results.length ? results.reduce((a, b) => a.marks > b.marks ? a : b).subject : '—'} color="text-emerald-600" bg="bg-emerald-50" />
+        <StatCard icon={BookOpen} label="Subjects" value={results.length} color="text-blue-600" bg="bg-blue-50" />
       </div>
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
@@ -362,28 +376,38 @@ function ExamsTab({ student }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function StudentDetailPage({ type, id }) {
   const router = useRouter();
+  const qc     = useQueryClient();
   const canDo  = useAuthStore((s) => s.canDo);
   const { terms } = useInstituteConfig();
   const [activeTab, setActiveTab] = useState('Overview');
 
+  // GET /api/v1/students/:id
   const { data, isLoading } = useQuery({
-    queryKey: ['student', type, id],
-    queryFn: async () => {
-      try {
-        const { studentService } = await import('@/services');
-        return await studentService.getById(id, type);
-      } catch {
-        return {
-          data: DUMMY_FLAT_STUDENTS.find((s) => s.id === id) ?? DUMMY_FLAT_STUDENTS[0],
-        };
-      }
-    },
+    queryKey: ['student', id],
+    queryFn:  () => studentService.getById(id),
   });
 
-  const student = data?.data ?? DUMMY_FLAT_STUDENTS[0];
+  // PATCH /api/v1/students/:id/toggle-status
+  const toggleMutation = useMutation({
+    mutationFn: () => studentService.toggleStatus(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['student', id] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      toast.success('Status updated');
+    },
+    onError: (e) => toast.error(e?.response?.data?.message ?? 'Failed'),
+  });
+
+  const student = data?.data ?? data ?? {};
 
   const studentLabel = terms?.student ?? (type === 'coaching' ? 'Candidate' : type === 'academy' ? 'Trainee' : 'Student');
-  const rollNo = student.roll_number || student.candidate_id || student.trainee_id || student.reg_number;
+  const dt = student.details?.studentDetails || {};
+  const rollNo      = student.roll_number   || student.registration_no || student.gr_number || student.candidate_id || student.trainee_id || student.reg_number || dt.roll_no;
+  const className   = student.class?.name   || student.class_name   || dt.class_id;
+  const sectionName = student.section?.name || student.section_name || student.section || dt.section_id;
+  const courseName  = student.course?.name  || dt.course_id         || dt.program_id;
+  const gender      = student.gender        || dt.gender;
+  const dob         = student.date_of_birth || student.dob          || dt.date_of_birth || dt.dob;
 
   if (isLoading) {
     return (
@@ -418,7 +442,10 @@ export default function StudentDetailPage({ type, id }) {
         <div className="flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold">{student.first_name} {student.last_name}</h1>
-            <span className={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', student.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-gray-50 text-gray-600')}>
+            <span className={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+              student.is_active
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-gray-200 bg-gray-50 text-gray-600')}>
               {student.is_active ? 'Active' : 'Inactive'}
             </span>
             {student.fee_status && (
@@ -428,45 +455,61 @@ export default function StudentDetailPage({ type, id }) {
             )}
           </div>
 
-          {rollNo && (
-            <p className="font-mono text-sm text-muted-foreground">#{rollNo}</p>
-          )}
+          {rollNo && <p className="font-mono text-sm text-muted-foreground">#{rollNo}</p>}
 
           {/* Quick meta pills */}
           <div className="flex flex-wrap gap-3 pt-1">
-            {(student.class_name || student.class?.name) && (
+            {className && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <BookOpen size={11} /> {student.class?.name || student.class_name}
-                {(student.section || student.section?.name) && ` · ${student.section?.name || student.section}`}
+                <BookOpen size={11} /> {className}{sectionName && ` · ${sectionName}`}
               </span>
             )}
-            {(student.course?.name) && (
+            {courseName && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <BookOpen size={11} /> {student.course.name}
+                <BookOpen size={11} /> {courseName}
               </span>
             )}
-            {student.gender && (
+            {gender && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
-                <User size={11} /> {student.gender}
+                <User size={11} /> {gender}
               </span>
             )}
-            {(student.date_of_birth || student.dob) && (
+            {dob && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Calendar size={11} /> {age(student.date_of_birth || student.dob)} yrs
+                <Calendar size={11} /> {age(dob)} yrs
               </span>
             )}
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 gap-2 flex-wrap">
           <button
             onClick={() => router.push(`/${type}/students`)}
             className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-accent transition-colors"
           >
             <ArrowLeft size={14} /> Back
           </button>
-          {canDo('student.update') && (
+
+          {/* PATCH toggle-status */}
+          {canDo('students.update') && (
+            <button
+              onClick={() => toggleMutation.mutate()}
+              disabled={toggleMutation.isPending}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors disabled:opacity-60',
+                student.is_active
+                  ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+              )}
+            >
+              <Power size={14} />
+              {student.is_active ? 'Deactivate' : 'Activate'}
+            </button>
+          )}
+
+          {/* PUT edit */}
+          {canDo('students.update') && (
             <button
               onClick={() => router.push(`/${type}/students/${id}/edit`)}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
@@ -496,10 +539,10 @@ export default function StudentDetailPage({ type, id }) {
       </div>
 
       {/* ── Tab Content ── */}
-      {activeTab === 'Overview'    && <OverviewTab    student={student} terms={{ ...terms, type }} />}
-      {activeTab === 'Attendance'  && <AttendanceTab  student={student} />}
-      {activeTab === 'Fees'        && <FeesTab        student={student} />}
-      {activeTab === 'Exams'       && <ExamsTab       student={student} />}
+      {activeTab === 'Overview'   && <OverviewTab   student={student} terms={{ ...terms, type }} />}
+      {activeTab === 'Attendance' && <AttendanceTab student={student} />}
+      {activeTab === 'Fees'       && <FeesTab       student={student} />}
+      {activeTab === 'Exams'      && <ExamsTab      student={student} />}
     </div>
   );
 }

@@ -51,15 +51,20 @@ export default function StudentForm({
 }) {
   const [activeTab, setActiveTab] = useState('personal');
   const [documents, setDocuments] = useState(defaultValues.documents || []);
-  const [guardianType, setGuardianType] = useState('parent');
+  const [guardianType, setGuardianType] = useState(
+    defaultValues.guardian_name || defaultValues.details?.studentDetails?.guardian_name
+      ? 'guardian'
+      : 'parent'
+  );
   const [profilePhotoPreview, setProfilePhotoPreview] = useState(
     defaultValues.profile_image && typeof defaultValues.profile_image === 'string'
       ? defaultValues.profile_image
-      : null
+      : defaultValues.photo_url || null
   );
   const isMobile = useMediaQuery('(max-width: 640px)');
   const isTablet = useMediaQuery('(max-width: 1024px)');
 
+  const dt = defaultValues.details?.studentDetails || {};
   const {
     register,
     control,
@@ -72,6 +77,30 @@ export default function StudentForm({
     defaultValues: {
       documents: [],
       ...defaultValues,
+      dob: defaultValues.dob || defaultValues.date_of_birth || dt.date_of_birth || dt.dob,
+      gender: defaultValues.gender || dt.gender,
+      blood_group: defaultValues.blood_group || dt.blood_group,
+      religion: defaultValues.religion || dt.religion,
+      nationality: defaultValues.nationality || dt.nationality,
+      cnic: defaultValues.cnic || dt.cnic,
+      father_name: defaultValues.father_name || dt.father_name,
+      father_cnic: defaultValues.father_cnic || dt.father_cnic,
+      father_phone: defaultValues.father_phone || dt.father_phone,
+      father_occupation: defaultValues.father_occupation || dt.father_occupation,
+      mother_name: defaultValues.mother_name || dt.mother_name,
+      mother_phone: defaultValues.mother_phone || dt.mother_phone,
+      mother_occupation: defaultValues.mother_occupation || dt.mother_occupation,
+      guardian_name: defaultValues.guardian_name || dt.guardian_name,
+      guardian_relation: defaultValues.guardian_relation || dt.guardian_relation,
+      guardian_phone: defaultValues.guardian_phone || dt.guardian_phone,
+      guardian_cnic: defaultValues.guardian_cnic || dt.guardian_cnic,
+      present_address: defaultValues.present_address || dt.present_address,
+      permanent_address: defaultValues.permanent_address || dt.permanent_address,
+      city: defaultValues.city || dt.city,
+      registration_no: defaultValues.registration_no || defaultValues.gr_number || dt.registration_no,
+      admission_date: defaultValues.admission_date || dt.admission_date,
+      phone: defaultValues.phone || dt.phone,
+      alternate_phone: defaultValues.alternate_phone || dt.alternate_phone,
       details: {
         studentDetails: {
           ...defaultValues.details?.studentDetails,
@@ -103,9 +132,9 @@ export default function StudentForm({
     if (!isEdit && !watchAcademicYearId && fetchedAcademicYears.length > 0) {
       const currentYear = fetchedAcademicYears.find(y => y.is_current) || fetchedAcademicYears[0];
       if (currentYear) {
-        setValue('details.studentDetails.academic_year_id', currentYear.value, { 
-          shouldValidate: true, 
-          shouldDirty: true 
+        setValue('details.studentDetails.academic_year_id', currentYear.value, {
+          shouldValidate: true,
+          shouldDirty: true
         });
       }
     }
@@ -115,19 +144,19 @@ export default function StudentForm({
   const { data: fetchedClasses = [] } = useQuery({
     queryKey: ['form-classes', instituteId, watchAcademicYearId],
     queryFn: async () => {
-      const res = await classService.getAll({ 
-        institute_id: instituteId, 
-        academic_year_id: watchAcademicYearId, 
-        limit: 100 
+      const res = await classService.getAll({
+        institute_id: instituteId,
+        academic_year_id: watchAcademicYearId,
+        limit: 100
       });
       let items = [];
       if (Array.isArray(res)) items = res;
       else if (Array.isArray(res?.data)) items = res.data;
       else if (Array.isArray(res?.data?.data)) items = res.data.data;
       else if (Array.isArray(res?.data?.rows)) items = res.data.rows;
-      
-      return items.map(c => ({ 
-        value: c.id, 
+
+      return items.map(c => ({
+        value: c.id,
         label: c.name,
         sections: c.sections,
         original: c
@@ -144,14 +173,14 @@ export default function StudentForm({
       let items = [];
       try {
         console.log('Fetching sections for class:', watchClassId);
-        const res = await sectionService.getAll({ 
-          institute_id: instituteId, 
+        const res = await sectionService.getAll({
+          institute_id: instituteId,
           academic_year_id: watchAcademicYearId,
-          class_id: watchClassId, 
-          limit: 100 
+          class_id: watchClassId,
+          limit: 100
         });
         console.log('Sections API response:', res);
-        
+
         if (Array.isArray(res)) items = res;
         else if (Array.isArray(res?.data)) items = res.data;
         else if (Array.isArray(res?.data?.data)) items = res.data.data;
@@ -168,17 +197,17 @@ export default function StudentForm({
       } catch (err) {
         console.error('sectionService failed, will use fallback:', err);
       }
-      
+
       if (!items || items.length === 0) {
         const foundClass = fetchedClasses.find(c => c.value === watchClassId) || classOptions?.find(c => c.value === watchClassId);
         console.log('Falling back to finding sections in Class object:', foundClass);
         if (foundClass?.sections && Array.isArray(foundClass.sections)) {
-           items = foundClass.sections; 
+          items = foundClass.sections;
         } else if (foundClass?.original?.sections && Array.isArray(foundClass?.original?.sections)) {
-           items = foundClass.original.sections;
+          items = foundClass.original.sections;
         }
       }
-      
+
       console.log('Final parsed section items:', items);
       return items.map(s => ({ value: s.id, label: s.name }));
     },
@@ -187,21 +216,21 @@ export default function StudentForm({
 
   const finalClassOptions = watchAcademicYearId ? fetchedClasses : classOptions;
   const finalSectionOptions = watchClassId ? fetchedSections : sectionOptions;
-  
+
   console.log('📊 Dropdown UI received sections:', finalSectionOptions);
-  
+
   const finalAcademicYearOptions = fetchedAcademicYears.length > 0 ? fetchedAcademicYears : academicYearOptions;
 
   const TABS = ['personal', 'academic', 'guardian', 'contact', 'fee', 'documents'];
 
   const getFieldsForTab = (tab) => {
-    switch(tab) {
+    switch (tab) {
       case 'personal':
         return ['first_name', 'last_name', 'registration_no', 'dob', 'gender'];
       case 'academic':
         return [
-          'details.studentDetails.academic_year_id', 
-          'admission_date', 
+          'details.studentDetails.academic_year_id',
+          'admission_date',
           'details.studentDetails.class_id',
           'details.studentDetails.program_id',
           'details.studentDetails.course_id',
@@ -223,7 +252,7 @@ export default function StudentForm({
   const handleNext = async () => {
     const fieldsToValidate = getFieldsForTab(activeTab);
     const isValid = await trigger(fieldsToValidate);
-    
+
     if (isValid) {
       const currentIndex = TABS.indexOf(activeTab);
       if (currentIndex < TABS.length - 1) {
@@ -244,17 +273,17 @@ export default function StudentForm({
   const handleTabChange = async (newTab) => {
     const currentIndex = TABS.indexOf(activeTab);
     const newIndex = TABS.indexOf(newTab);
-    
+
     // Allow backwards navigation directly
     if (newIndex <= currentIndex) {
       setActiveTab(newTab);
       return;
     }
-    
+
     // Check validation of current tab before jumping to next tab
     const fieldsToValidate = getFieldsForTab(activeTab);
     const isValid = await trigger(fieldsToValidate);
-    
+
     if (isValid) {
       setActiveTab(newTab);
     } else {
@@ -456,52 +485,52 @@ export default function StudentForm({
   };
 
   const onSubmitForm = (data) => {
+    const studentDetails = {
+      ...data.details?.studentDetails,
+      date_of_birth:         data.dob,
+      gender:                data.gender,
+      blood_group:           data.blood_group,
+      religion:              data.religion,
+      nationality:           data.nationality,
+      cnic:                  data.cnic,
+      father_name:           data.father_name,
+      father_cnic:           data.father_cnic,
+      father_phone:          data.father_phone,
+      father_occupation:     data.father_occupation,
+      mother_name:           data.mother_name,
+      mother_phone:          data.mother_phone,
+      guardian_name:         data.guardian_name,
+      guardian_relation:     data.guardian_relation,
+      guardian_phone:        data.guardian_phone,
+      present_address:       data.present_address,
+      permanent_address:     data.permanent_address,
+      city:                  data.city,
+      medical_conditions:    data.medical_conditions,
+      allergies:             data.allergies,
+      fee_plan_id:           data.fee_plan_id,
+      monthly_fee:           data.monthly_fee,
+      concession_type:       data.concession_type,
+      concession_percentage: data.concession_percentage,
+      admission_date:        data.admission_date,
+      previous_school:       data.previous_school,
+      roll_no:               data.details?.studentDetails?.roll_no,
+    };
+
     const formattedData = {
       ...data,
-      user_type: 'STUDENT',
       registration_no: data.registration_no || data.gr_number,
-      details: {
-        studentDetails: {
-          ...data.details?.studentDetails,
-          date_of_birth: data.dob,
-          gender: data.gender,
-          blood_group: data.blood_group,
-          religion: data.religion,
-          nationality: data.nationality,
-          cnic: data.cnic,
-          father_name: data.father_name,
-          father_cnic: data.father_cnic,
-          father_phone: data.father_phone,
-          father_occupation: data.father_occupation,
-          mother_name: data.mother_name,
-          mother_phone: data.mother_phone,
-          guardian_name: data.guardian_name,
-          guardian_relation: data.guardian_relation,
-          guardian_phone: data.guardian_phone,
-          present_address: data.present_address,
-          permanent_address: data.permanent_address,
-          city: data.city,
-          medical_conditions: data.medical_conditions,
-          allergies: data.allergies,
-          fee_plan_id: data.fee_plan_id,
-          monthly_fee: data.monthly_fee,
-          concession_type: data.concession_type,
-          concession_percentage: data.concession_percentage,
-          admission_date: data.admission_date,
-          previous_school: data.previous_school,
-          // academic_sessions:[
-          //   class_info{
-          //     academic_year_id: data.academic_year_id,
-          //     class_id: data.class_id,
-          //     section_id: data.section_id,
-          //     roll_no: data.roll_no,
-          //   }
-          // ]
-        }
-      },
-      documents: documents,
+      details: { studentDetails },
+      documents,
       guardian_type: guardianType,
     };
+
+    // In edit mode, remove fields the PUT endpoint shouldn't receive
+    if (isEdit) {
+      delete formattedData.password;
+      delete formattedData.user_type;
+    } else {
+      formattedData.user_type = 'STUDENT';
+    }
 
     onSubmit(formattedData);
   };
@@ -589,7 +618,7 @@ export default function StudentForm({
                       <InputField label="CNIC/B-Form" name="cnic" register={register} error={errors.cnic} placeholder="00000-0000000-0" />
                     </div>
                   </div>
-                  
+
                   <Separator />
 
                   <div>
@@ -657,8 +686,8 @@ export default function StudentForm({
                     <button
                       type="button"
                       className={`px-6 py-2 text-sm font-medium rounded-md transition-all ${guardianType === 'parent'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
                         }`}
                       onClick={() => setGuardianType('parent')}
                     >
@@ -667,8 +696,8 @@ export default function StudentForm({
                     <button
                       type="button"
                       className={`px-6 py-2 text-sm font-medium rounded-md transition-all ${guardianType === 'guardian'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
                         }`}
                       onClick={() => setGuardianType('guardian')}
                     >
@@ -691,7 +720,7 @@ export default function StudentForm({
                           <InputField label="Father's Phone" name="father_phone" register={register} error={errors.father_phone} required={guardianType === 'parent'} placeholder="e.g. 03001234567" type="tel" />
                         </div>
                       </div>
-                      
+
                       <div>
                         <h3 className="text-sm font-medium text-foreground mb-4">Professional Details</h3>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -715,7 +744,7 @@ export default function StudentForm({
                           <InputField label="Mother's Phone" name="mother_phone" register={register} error={errors.mother_phone} placeholder="e.g. 03001234567" type="tel" />
                         </div>
                       </div>
-                      
+
                       <div>
                         <h3 className="text-sm font-medium text-foreground mb-4">Professional Details</h3>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -930,34 +959,34 @@ export default function StudentForm({
           Cancel
         </Button>
         <div className="flex w-full sm:w-auto gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePrev}
+            disabled={activeTab === 'personal'}
+            className="w-full sm:w-32"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1 sm:mr-2" />
+            Previous
+          </Button>
+
+          {activeTab !== 'documents' ? (
             <Button
               type="button"
-              variant="outline"
-              onClick={handlePrev}
-              disabled={activeTab === 'personal'}
-              className="w-full sm:w-32"
+              onClick={handleNext}
+              className="w-full sm:w-32 shadow-md relative overflow-hidden transition-all hover:shadow-lg"
             >
-              <ChevronLeft className="h-4 w-4 mr-1 sm:mr-2" />
-              Previous
+              Next
+              <ChevronRight className="h-4 w-4 ml-1 sm:ml-2" />
             </Button>
-            
-            {activeTab !== 'documents' ? (
-              <Button
-                type="button"
-                onClick={handleNext}
-                className="w-full sm:w-32 shadow-md relative overflow-hidden transition-all hover:shadow-lg"
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1 sm:ml-2" />
-              </Button>
-            ) : (
-              <FormSubmitButton
-                loading={loading}
-                label={isEdit ? 'Save Changes' : 'Add Student'}
-                loadingLabel={isEdit ? 'Saving…' : 'Adding…'}
-                className="w-full sm:w-40 shadow-md"
-              />
-            )}
+          ) : (
+            <FormSubmitButton
+              loading={loading}
+              label={isEdit ? 'Save Changes' : 'Add Student'}
+              loadingLabel={isEdit ? 'Saving…' : 'Adding…'}
+              className="w-full sm:w-40 shadow-md"
+            />
+          )}
         </div>
       </div>
     </form>
