@@ -1,22 +1,49 @@
 /**
  * Dashboard API Service
- * GET /dashboard/stats
+ * Realtime institute dashboard using backend endpoint:
+ * GET /dashboard/institute
  */
 
 import api from '@/lib/api';
-import { withFallback } from '@/lib/withFallback';
-import { DUMMY_DASHBOARD_STATS, DUMMY_CHART_DATA } from '@/data/dummyData';
+
+const unwrap = (payload) => payload?.data ?? payload ?? {};
+
+const getInstituteDashboard = async (params = {}) => {
+  const response = await api.get('/dashboard/institute', { params });
+  return unwrap(response?.data);
+};
+
+const normalizeStatsObject = (summary = {}) => ({
+  total_students: summary.total_students ?? 0,
+  active_students: summary.total_students ?? 0,
+  total_teachers: summary.total_teachers ?? 0,
+  active_teachers: summary.total_teachers ?? 0,
+  total_classes: summary.total_classes ?? 0,
+  total_sections: summary.total_sections ?? 0,
+  fees_collected: summary.fees_collected ?? 0,
+  fees_pending: summary.fees_pending ?? 0,
+  upcoming_exams: summary.upcoming_exams ?? 0,
+  avg_attendance_pct: summary.avg_attendance_pct ?? 0,
+});
 
 export const dashboardService = {
-  getStats: () =>
-    withFallback(
-      () => api.get('/dashboard').then((r) => r.data),
-      () => ({ data: DUMMY_DASHBOARD_STATS }),
-    ),
+  getAdaptiveDashboard: ({ type = 'school', branchId, range = '30d' } = {}) =>
+    getInstituteDashboard({
+      type,
+      range,
+      ...(branchId ? { branch_id: branchId } : {}),
+    }).then((data) => ({ data })),
 
-  getChartData: () =>
-    withFallback(
-      () => api.get('/dashboard/charts').then((r) => r.data),
-      () => ({ data: DUMMY_CHART_DATA }),
-    ),
+  // Backward-compatible methods used by older pages/components.
+  getStats: ({ type = 'school', branchId } = {}) =>
+    getInstituteDashboard({
+      type,
+      ...(branchId ? { branch_id: branchId } : {}),
+    }).then((data) => ({ data: normalizeStatsObject(data.summary || {}) })),
+
+  getChartData: ({ type = 'school', branchId } = {}) =>
+    getInstituteDashboard({
+      type,
+      ...(branchId ? { branch_id: branchId } : {}),
+    }).then((data) => ({ data: data.charts || {} })),
 };
