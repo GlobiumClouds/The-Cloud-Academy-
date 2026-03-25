@@ -3,13 +3,16 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { Controller } from 'react-hook-form';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 
-export default function MultiSelectField({
+function MultiSelectFieldBase({
   label,
+  name,
+  control,
   options = [],
   value = [],
   onChange,
@@ -23,6 +26,13 @@ export default function MultiSelectField({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef(null);
+
+  const selectedValues = Array.isArray(value) ? value : [];
+  const emitChange = (nextValue) => {
+    if (typeof onChange === 'function') {
+      onChange(nextValue);
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -42,7 +52,7 @@ export default function MultiSelectField({
 
   // Check if option is selected
   const isSelected = (optionValue) => {
-    return Array.isArray(value) && value.includes(optionValue);
+    return selectedValues.includes(optionValue);
   };
 
   // Toggle selection
@@ -51,19 +61,19 @@ export default function MultiSelectField({
     
     let newValue;
     if (isSelected(optionValue)) {
-      newValue = value.filter(v => v !== optionValue);
+      newValue = selectedValues.filter(v => v !== optionValue);
     } else {
-      newValue = [...value, optionValue];
+      newValue = [...selectedValues, optionValue];
     }
-    onChange(newValue);
+    emitChange(newValue);
   };
 
   // Remove a single selected item
   const removeItem = (itemValue, e) => {
     e.stopPropagation();
     if (disabled) return;
-    const newValue = value.filter(v => v !== itemValue);
-    onChange(newValue);
+    const newValue = selectedValues.filter(v => v !== itemValue);
+    emitChange(newValue);
   };
 
   // Get label for a value
@@ -92,9 +102,9 @@ export default function MultiSelectField({
             error && "border-destructive focus-visible:ring-destructive"
           )}
         >
-          {value.length > 0 ? (
+          {selectedValues.length > 0 ? (
             <>
-              {value.slice(0, 3).map((item) => (
+              {selectedValues.slice(0, 3).map((item) => (
                 <Badge
                   key={item}
                   variant="secondary"
@@ -109,8 +119,8 @@ export default function MultiSelectField({
                   )}
                 </Badge>
               ))}
-              {value.length > 3 && (
-                <Badge variant="outline">+{value.length - 3}</Badge>
+              {selectedValues.length > 3 && (
+                <Badge variant="outline">+{selectedValues.length - 3}</Badge>
               )}
             </>
           ) : (
@@ -171,8 +181,31 @@ export default function MultiSelectField({
 
       {/* Error Message */}
       {error && (
-        <p className="text-xs text-destructive mt-1">{error}</p>
+        <p className="text-xs text-destructive mt-1">{error.message || error}</p>
       )}
     </div>
+  );
+}
+
+export default function MultiSelectField(props) {
+  const { name, control, ...rest } = props;
+
+  if (!control) {
+    return <MultiSelectFieldBase name={name} {...rest} />;
+  }
+
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field }) => (
+        <MultiSelectFieldBase
+          name={name}
+          value={field.value ?? []}
+          onChange={field.onChange}
+          {...rest}
+        />
+      )}
+    />
   );
 }
