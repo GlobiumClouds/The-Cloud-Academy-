@@ -297,67 +297,53 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import usePortalStore from '@/store/portalStore';
 import useAuthStore from '@/store/authStore';
-import { getPortalTerms } from '@/constants/portalInstituteConfig';
+import { getPortalTerms, getNavItems } from '@/constants/portalInstituteConfig';
 import { PERM } from '@/constants/permissions';
 
 // ─── Nav helpers with updated permissions ────────────────────────────────────
-function buildParentNav(t) {
+function buildParentNav(t, navLabels) {
   return [
-    { label: t.nav.overview, href: '/parent', icon: LayoutDashboard, permission: PERM.DASHBOARD_VIEW },
-    { label: t.nav.myChildren, href: '/parent/children', icon: Users, permission: PERM.PARENTS_VIEW_CHILDREN },
-    { label: t.attendanceLabel, href: '/parent/attendance', icon: Calendar, permission: PERM.ATTENDANCE_VIEW },
-    { label: t.resultsLabel, href: '/parent/results', icon: BookOpen, permission: PERM.EXAM_RESULTS_VIEW },
-    { label: t.feesLabel, href: '/parent/fees', icon: DollarSign, permission: PERM.FEES_READ },
-    { label: t.timetableLabel, href: '/parent/timetable', icon: Clock, permission: PERM.TIMETABLE_READ },
-    { label: t.homeworkLabel, href: '/parent/homework', icon: NotebookPen, permission: PERM.HOMEWORK_READ },
-    { label: t.assignmentsLabel, href: '/parent/assignments', icon: ClipboardList, permission: PERM.ASSIGNMENTS_READ },
-    { label: t.notesLabel, href: '/parent/study-material', icon: BookMarked, permission: PERM.NOTES_READ },
-    { label: t.nav.announcements, href: '/parent/announcements', icon: Bell, permission: PERM.NOTICES_READ },
+    { label: navLabels.overview, href: '/parent', icon: LayoutDashboard, permission: PERM.DASHBOARD_VIEW },
+    { label: navLabels.attendance, href: '/parent/attendance', icon: Calendar, permission: PERM.ATTENDANCE_VIEW },
+    { label: navLabels.results, href: '/parent/results', icon: BookOpen, permission: PERM.EXAM_RESULTS_VIEW },
+    { label: navLabels.fees, href: '/parent/fees', icon: DollarSign, permission: PERM.FEES_READ },
+    { label: navLabels.announcements, href: '/parent/announcements', icon: Bell, permission: PERM.NOTICES_READ },
   ];
 }
 
-function buildStudentNav(t) {
+function buildStudentNav(t, navLabels) {
   return [
-    { label: t.nav.overview, href: '/student', icon: LayoutDashboard, permission: PERM.DASHBOARD_VIEW },
-    { label: t.nav.myAttendance, href: '/student/attendance', icon: Calendar, permission: PERM.ATTENDANCE_VIEW },
-    { label: t.nav.myResults, href: '/student/results', icon: BookOpen, permission: PERM.EXAM_RESULTS_VIEW },
-    { label: t.nav.myFees, href: '/student/fees', icon: DollarSign, permission: PERM.FEES_READ },
-    { label: t.timetableLabel, href: '/student/timetable', icon: Clock, permission: PERM.TIMETABLE_READ },
-    { label: t.nav.myClasses, href: '/student/classes', icon: Briefcase, permission: PERM.CLASSES_READ },
-    { label: t.homeworkLabel, href: '/student/homework', icon: NotebookPen, permission: PERM.HOMEWORK_READ },
-    { label: t.assignmentsLabel, href: '/student/assignments', icon: ClipboardList, permission: PERM.ASSIGNMENTS_READ },
-    { label: t.notesLabel, href: '/student/study-material', icon: BookMarked, permission: PERM.NOTES_READ },
-    { label: t.syllabusLabel, href: '/student/syllabus', icon: BookOpen, permission: PERM.SYLLABUS_READ },
-    { label: t.examsLabel, href: '/student/exams', icon: FileText, permission: PERM.EXAMS_READ },
-    { label: t.nav.announcements, href: '/student/announcements', icon: Bell, permission: PERM.NOTICES_READ },
-    { label: t.libraryLabel, href: '/student/library', icon: Library, permission: PERM.LIBRARY_ACCESS },
-    { label: t.transportLabel, href: '/student/transport', icon: Truck, permission: PERM.TRANSPORT_VIEW },
-    { label: t.hostelLabel, href: '/student/hostel', icon: Building, permission: PERM.HOSTEL_VIEW },
-    { label: t.calendarLabel, href: '/student/calendar', icon: Calendar, permission: PERM.CALENDAR_VIEW },
-    { label: t.profileLabel, href: '/student/profile', icon: User, permission: PERM.STUDENT_PROFILE_VIEW },
-    { label: t.achievementsLabel, href: '/student/achievements', icon: Award, permission: PERM.STUDENT_ACHIEVEMENTS },
+    { label: navLabels.overview, href: '/student', icon: LayoutDashboard, permission: PERM.DASHBOARD_VIEW },
+    { label: navLabels.myAttendance, href: '/student/attendance', icon: Calendar, permission: PERM.ATTENDANCE_VIEW },
+    { label: navLabels.myTimetable, href: '/student/timetable', icon: Clock, permission: PERM.TIMETABLE_READ },
+    { label: navLabels.syllabus, href: '/student/syllabus', icon: BookOpen, permission: PERM.ASSIGNMENTS_READ  || PERM.SYLLABUS_READ },
+    { label: navLabels.assignments, href: '/student/assignments', icon: ClipboardList, permission: PERM.ASSIGNMENTS_READ },
+    { label: navLabels.homework, href: '/student/homework', icon: NotebookPen, permission: PERM.HOMEWORK_READ },
+    { label: navLabels.notes, href: '/student/notes', icon: FileText, permission: PERM.NOTES_READ },
+    { label: navLabels.announcements, href: '/student/announcements', icon: Bell, permission: PERM.NOTICES_READ },
+    { label: navLabels.exams, href: '/student/exams', icon: FileText, permission: PERM.EXAMS_READ },
+    // { label: navLabels.myFees, href: '/student/fees', icon: DollarSign, permission: PERM.FEES_READ },
   ];
 }
 
-function buildTeacherNav(t) {
+function buildTeacherNav(t, navLabels) {
   return [
-    { label: t.nav.overview, href: '/teacher', icon: LayoutDashboard, permission: PERM.DASHBOARD_VIEW },
-    { label: t.nav.myClasses, href: '/teacher/classes', icon: Briefcase, permission: PERM.CLASSES_READ },
-    { label: t.nav.myStudents, href: '/teacher/students', icon: Users, permission: PERM.STUDENTS_READ },
-    { label: t.nav.myTimetable, href: '/teacher/timetable', icon: Clock, permission: PERM.TIMETABLE_READ },
-    { label: t.nav.attendance, href: '/teacher/attendance', icon: Calendar, permission: PERM.ATTENDANCE_MARK },
-    { label: t.nav.selfAttendance, href: '/teacher/self-attendance', icon: UserCheck, permission: PERM.ATTENDANCE_SELF_MARK },
-    { label: t.homeworkLabel, href: '/teacher/homework', icon: NotebookPen, permission: PERM.HOMEWORK_CREATE },
-    { label: t.assignmentsLabel, href: '/teacher/assignments', icon: ClipboardList, permission: PERM.ASSIGNMENTS_CREATE },
-    { label: t.notesLabel, href: '/teacher/notes', icon: FileText, permission: PERM.NOTES_CREATE },
+    { label: navLabels.overview, href: '/teacher', icon: LayoutDashboard, permission: PERM.DASHBOARD_VIEW },
+    { label: navLabels.myClasses, href: '/teacher/classes', icon: Briefcase, permission: PERM.CLASSES_READ },
+    { label: navLabels.myStudents, href: '/teacher/students', icon: Users, permission: PERM.STUDENTS_READ },
+    { label: navLabels.myTimetable, href: '/teacher/timetable', icon: Clock, permission: PERM.TIMETABLE_READ },
+    { label: navLabels.attendance, href: '/teacher/attendance', icon: Calendar, permission: PERM.ATTENDANCE_MARK },
+    { label: navLabels.homework, href: '/teacher/homework', icon: NotebookPen, permission: PERM.HOMEWORK_CREATE },
+    { label: navLabels.assignments, href: '/teacher/assignments', icon: ClipboardList, permission: PERM.ASSIGNMENTS_CREATE },
+    { label: navLabels.notes, href: '/teacher/notes', icon: FileText, permission: PERM.NOTES_CREATE },
     // { label: t.notesLabel, href: '/teacher/study-material', icon: BookMarked, permission: PERM.NOTES_CREATE },
-    { label: t.syllabusLabel, href: '/teacher/syllabus', icon: BookOpen, permission: PERM.SYLLABUS_UPDATE },
+    // { label: t.syllabusLabel, href: '/teacher/syllabus', icon: BookOpen, permission: PERM.SYLLABUS_UPDATE },
     // { label: t.examsLabel, href: '/teacher/exams', icon: FileText, permission: PERM.EXAMS_UPDATE },
     // { label: t.resultsLabel, href: '/teacher/exam-results', icon: TrendingUp, permission: PERM.EXAM_RESULTS_ENTER },
-    { label: t.nav.announcements, href: '/teacher/announcements', icon: Bell, permission: PERM.NOTICES_CREATE },
-    { label: t.nav.reports, href: '/teacher/reports', icon: PieChart, permission: PERM.REPORTS_STUDENT },
+    { label: navLabels.announcements, href: '/teacher/announcements', icon: Bell, permission: PERM.NOTICES_CREATE },
+    // { label: navLabels.reports, href: '/teacher/reports', icon: PieChart, permission: PERM.REPORTS_STUDENT },
     // { label: t.nav.grade, href: '/teacher/gradebook', icon: BookOpen, permission: PERM.EXAM_RESULTS_GRADE },
-    { label: t.nav.lessonPlans, href: '/teacher/lesson-plans', icon: FileText, permission: PERM.LESSON_PLANS_CREATE },
+    // { label: navLabels.lessonPlans, href: '/teacher/lesson-plans', icon: FileText, permission: PERM.LESSON_PLANS_CREATE },
     // { label: t.profileLabel, href: '/teacher/profile', icon: User, permission: PERM.TEACHER_PROFILE_VIEW },
     // { label: t.achievementsLabel, href: '/teacher/achievements', icon: Award, permission: PERM.TEACHER_ACHIEVEMENTS },
   ];
@@ -409,13 +395,14 @@ export default function PortalShell({ children, type }) {
 
   const instituteType = getInstituteType();
   const t = getPortalTerms(instituteType);
+  const navLabels = getNavItems(instituteType, type);
 
   const isParent = type === 'PARENT';
   const isTeacher = type === 'TEACHER';
   const isStudent = type === 'STUDENT';
 
   // Build and filter nav items by permissions
-  const allNavItems = isParent ? buildParentNav(t) : isTeacher ? buildTeacherNav(t) : buildStudentNav(t);
+  const allNavItems = isParent ? buildParentNav(t, navLabels) : isTeacher ? buildTeacherNav(t, navLabels) : buildStudentNav(t, navLabels);
   const navItems = allNavItems.filter(item => canDo(item.permission));
 
   const themeClasses = isParent

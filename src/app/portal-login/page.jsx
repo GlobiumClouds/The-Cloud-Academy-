@@ -23,7 +23,7 @@ import useAuthStore from '@/store/authStore'; // ✅ Use auth store
 import { authService } from '@/services'; // ✅ Real auth service
 
 const schema = z.object({
-  email:    z.string().email('Enter a valid email'),
+  email: z.string().email('Enter a valid email'),
   password: z.string().min(4, 'Minimum 4 characters'),
 });
 
@@ -75,25 +75,25 @@ const PORTAL_TYPES = [
 // 🔥 Demo accounts for quick login (will be removed in production)
 const DEMO_ACCOUNTS = [
   // School
-  { role: 'STUDENT', email: 'ali.khan@student.tca', password: 'student123', name: 'Ali Khan', institute_type: 'school' },
+  { role: 'STUDENT', email: 'sajood483@gmail.com', password: 'The123456', name: 'Hassan Raza Attari', institute_type: 'school' },
   { role: 'PARENT', email: 'father.ali@parent.tca', password: 'parent123', name: 'Mr. Khan', institute_type: 'school' },
   { role: 'TEACHER', email: 'shoaibrazamemon160@gmail.com', password: '123456', name: 'Hassan Ahmed', institute_type: 'school' },
-  
+
   // Coaching
   { role: 'STUDENT', email: 'sara@coaching.tca', password: 'student123', name: 'Sara Khan', institute_type: 'coaching' },
   { role: 'PARENT', email: 'mother.sara@parent.tca', password: 'parent123', name: 'Mrs. Khan', institute_type: 'coaching' },
   { role: 'TEACHER', email: 'usman@coaching.tca', password: 'teacher123', name: 'Usman Ali', institute_type: 'coaching' },
-  
+
   // Academy
   { role: 'STUDENT', email: 'ahmed@academy.tca', password: 'student123', name: 'Ahmed Raza', institute_type: 'academy' },
   { role: 'PARENT', email: 'father.ahmed@parent.tca', password: 'parent123', name: 'Mr. Raza', institute_type: 'academy' },
   { role: 'TEACHER', email: 'fatima@academy.tca', password: 'teacher123', name: 'Fatima Ali', institute_type: 'academy' },
-  
+
   // College
   { role: 'STUDENT', email: 'bilal@college.tca', password: 'student123', name: 'Bilal Ahmed', institute_type: 'college' },
   { role: 'PARENT', email: 'father.bilal@parent.tca', password: 'parent123', name: 'Mr. Ahmed', institute_type: 'college' },
   { role: 'TEACHER', email: 'zainab@college.tca', password: 'teacher123', name: 'Zainab Ali', institute_type: 'college' },
-  
+
   // University
   { role: 'STUDENT', email: 'omar@uni.tca', password: 'student123', name: 'Omar Farooq', institute_type: 'university' },
   { role: 'PARENT', email: 'father.omar@parent.tca', password: 'parent123', name: 'Mr. Farooq', institute_type: 'university' },
@@ -101,17 +101,17 @@ const DEMO_ACCOUNTS = [
 ];
 
 const INSTITUTE_TABS = [
-  { value: 'school',     label: 'School'     },
-  { value: 'coaching',   label: 'Coaching'   },
-  { value: 'academy',    label: 'Academy'    },
-  { value: 'college',    label: 'College'    },
+  { value: 'school', label: 'School' },
+  { value: 'coaching', label: 'Coaching' },
+  { value: 'academy', label: 'Academy' },
+  { value: 'college', label: 'College' },
   { value: 'university', label: 'University' },
 ];
 
 const ROLE_STYLES = {
-  PARENT:  { icon: Users,     bg: 'bg-indigo-100',  ic: 'text-indigo-600'  },
-  STUDENT: { icon: BookOpen,  bg: 'bg-emerald-100', ic: 'text-emerald-600' },
-  TEACHER: { icon: Briefcase, bg: 'bg-blue-100',    ic: 'text-blue-600'    },
+  PARENT: { icon: Users, bg: 'bg-indigo-100', ic: 'text-indigo-600' },
+  STUDENT: { icon: BookOpen, bg: 'bg-emerald-100', ic: 'text-emerald-600' },
+  TEACHER: { icon: Briefcase, bg: 'bg-blue-100', ic: 'text-blue-600' },
 };
 
 export default function PortalLoginPage() {
@@ -129,124 +129,68 @@ export default function PortalLoginPage() {
     resolver: zodResolver(schema),
   });
 
-  // // Handle form submission
-  // const onSubmit = async (data) => {
-  //   try {
-  //     setLoading(true);
-      
-  //     // 🔥 Use real auth service
-  //     const response = await authService.login({
-  //       email: data.email,
-  //       password: data.password
-  //     });
+  // Handle form submission
+  const onSubmit = async (data) => {
+    try {
+      setLoading(true);
 
-  //     const user = response.user;
+      // 🔥 Use real auth service
+      const response = await authService.login({
+        email: data.email,
+        password: data.password
+      });
 
-  //     // Verify user type matches selected portal
-  //     if (user.user_type !== activeType) {
-  //       toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
-  //       setLoading(false);
-  //       return;
-  //     }
+      const user = response.user;
 
-  //     // Set in auth store (for token management)
-  //     setAuthUser(user, response.access_token);
+      // Verify user type matches selected portal
+      if (user.user_type !== activeType) {
+        toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
+        setLoading(false);
+        return;
+      }
 
-  //     // Set in portal store
-  //     setPortalUser(
-  //       user, 
-  //       user.user_type, 
-  //       user.institute?.institute_type || 'school'
-  //     );
+      // Log the user object to see permissions
+      console.log('👤 Logged in user:', {
+        id: user.id,
+        type: user.user_type,
+        permissionsCount: user.permissions?.length,
+        permissions: user.permissions
+      });
 
-  //     // Set cookies
-  //     Cookies.set('portal_token', response.access_token, { expires: 1 });
-  //     Cookies.set('portal_type', user.user_type, { expires: 1 });
-  //     Cookies.set('access_token', response.access_token, { expires: 7 });
-  //     Cookies.set('user_type', user.user_type, { expires: 7 });
+      // Set in auth store (for token management)
+      setAuthUser(user, response.access_token);
 
-  //     toast.success(`Welcome, ${user.first_name}!`);
+      // Set in portal store - now permissions will be passed correctly
+      setPortalUser(
+        user,
+        user.user_type,
+        user.institute?.institute_type || 'school'
+      );
 
-  //     // Redirect based on user type
-  //     const redirectPaths = {
-  //       STUDENT: '/student',
-  //       PARENT: '/parent',
-  //       TEACHER: '/teacher'
-  //     };
-      
-  //     router.replace(redirectPaths[user.user_type] || '/portal');
+      // Set cookies
+      Cookies.set('portal_token', response.access_token, { expires: 1 });
+      Cookies.set('portal_type', user.user_type, { expires: 1 });
+      Cookies.set('access_token', response.access_token, { expires: 7 });
+      Cookies.set('user_type', user.user_type, { expires: 7 });
 
-  //   } catch (err) {
-  //     console.error('Login error:', err);
-  //     toast.error(err?.response?.data?.message || err?.message || 'Login failed. Check your credentials.');
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+      toast.success(`Welcome, ${user.first_name}!`);
 
-  // In src/app/portal-login/page.jsx, update the onSubmit function:
+      // Redirect based on user type
+      const redirectPaths = {
+        STUDENT: '/student',
+        PARENT: '/parent',
+        TEACHER: '/teacher'
+      };
 
-const onSubmit = async (data) => {
-  try {
-    setLoading(true);
-    
-    // 🔥 Use real auth service
-    const response = await authService.login({
-      email: data.email,
-      password: data.password
-    });
+      router.replace(redirectPaths[user.user_type] || '/portal');
 
-    const user = response.user;
-
-    // Verify user type matches selected portal
-    if (user.user_type !== activeType) {
-      toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
+    } catch (err) {
+      console.error('Login error:', err);
+      toast.error(err?.response?.data?.message || err?.message || 'Login failed. Check your credentials.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Log the user object to see permissions
-    console.log('👤 Logged in user:', {
-      id: user.id,
-      type: user.user_type,
-      permissionsCount: user.permissions?.length,
-      permissions: user.permissions
-    });
-
-    // Set in auth store (for token management)
-    setAuthUser(user, response.access_token);
-
-    // Set in portal store - now permissions will be passed correctly
-    setPortalUser(
-      user, 
-      user.user_type, 
-      user.institute?.institute_type || 'school'
-    );
-
-    // Set cookies
-    Cookies.set('portal_token', response.access_token, { expires: 1 });
-    Cookies.set('portal_type', user.user_type, { expires: 1 });
-    Cookies.set('access_token', response.access_token, { expires: 7 });
-    Cookies.set('user_type', user.user_type, { expires: 7 });
-
-    toast.success(`Welcome, ${user.first_name}!`);
-
-    // Redirect based on user type
-    const redirectPaths = {
-      STUDENT: '/student',
-      PARENT: '/parent',
-      TEACHER: '/teacher'
-    };
-    
-    router.replace(redirectPaths[user.user_type] || '/portal');
-
-  } catch (err) {
-    console.error('Login error:', err);
-    toast.error(err?.response?.data?.message || err?.message || 'Login failed. Check your credentials.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Quick fill demo account
   const fillDemoAccount = (account) => {
@@ -263,8 +207,8 @@ const onSubmit = async (data) => {
         background: activeType === 'PARENT'
           ? 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e40af 100%)'
           : activeType === 'TEACHER'
-          ? 'linear-gradient(135deg, #0c1a2e 0%, #1e3a5f 50%, #1d4ed8 100%)'
-          : 'linear-gradient(135deg, #064e3b 0%, #065f46 50%, #0f766e 100%)',
+            ? 'linear-gradient(135deg, #0c1a2e 0%, #1e3a5f 50%, #1d4ed8 100%)'
+            : 'linear-gradient(135deg, #064e3b 0%, #065f46 50%, #0f766e 100%)',
         transition: 'background 0.5s ease',
       }}
     >
@@ -310,9 +254,9 @@ const onSubmit = async (data) => {
             <div className="mt-8 p-4 bg-white/10 rounded-xl border border-white/20">
               <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">Demo Credentials</p>
               <p className="text-sm font-mono text-white/90">
-                {activeType === 'STUDENT' ? 'ali@student.tca / student123' : 
-                 activeType === 'PARENT' ? 'parent@tca.edu.pk / parent123' : 
-                 'shoaibrazamemon160@gmail.com / 123456'}
+                {activeType === 'STUDENT' ? 'sajood483@gmail.com / The123456' :
+                  activeType === 'PARENT' ? 'parent@tca.edu.pk / parent123' :
+                    'shoaibrazamemon160@gmail.com / 123456'}
               </p>
             </div>
           </div>
@@ -328,11 +272,10 @@ const onSubmit = async (data) => {
                   <button
                     key={pt.type}
                     onClick={() => setActiveType(pt.type)}
-                    className={`flex items-center justify-center gap-2.5 py-4 text-sm font-semibold transition-all duration-200 ${
-                      isActive
+                    className={`flex items-center justify-center gap-2.5 py-4 text-sm font-semibold transition-all duration-200 ${isActive
                         ? `${pt.activeBg} text-white`
                         : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     <Icon className={`w-4 h-4 ${isActive ? 'text-white' : ''}`} />
                     {pt.label}
@@ -346,9 +289,9 @@ const onSubmit = async (data) => {
               <div className="mb-6">
                 <h2 className="text-xl font-bold text-slate-900">Sign in to {activePt.label}</h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  {activeType === 'PARENT' ? 'Enter your registered parent account credentials' : 
-                   activeType === 'TEACHER' ? 'Enter your teacher account credentials' : 
-                   'Enter your student login credentials'}
+                  {activeType === 'PARENT' ? 'Enter your registered parent account credentials' :
+                    activeType === 'TEACHER' ? 'Enter your teacher account credentials' :
+                      'Enter your student login credentials'}
                 </p>
               </div>
 
@@ -362,9 +305,9 @@ const onSubmit = async (data) => {
                     <Input
                       id="email"
                       type="email"
-                      placeholder={activeType === 'PARENT' ? 'parent@tca.edu.pk' : 
-                                 activeType === 'TEACHER' ? 'teacher@tca.edu' : 
-                                 'student@tca.edu'}
+                      placeholder={activeType === 'PARENT' ? 'parent@tca.edu.pk' :
+                        activeType === 'TEACHER' ? 'teacher@tca.edu' :
+                          'student@tca.edu'}
                       className="pl-10"
                       {...register('email')}
                     />
@@ -399,13 +342,12 @@ const onSubmit = async (data) => {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className={`w-full font-semibold py-5 ${
-                    activeType === 'PARENT'
+                  className={`w-full font-semibold py-5 ${activeType === 'PARENT'
                       ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700'
                       : activeType === 'TEACHER'
-                      ? 'bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700'
-                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-                  } text-white`}
+                        ? 'bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700'
+                        : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+                    } text-white`}
                 >
                   {loading ? 'Signing in...' : `Sign in to ${activePt.label}`}
                 </Button>
@@ -422,11 +364,10 @@ const onSubmit = async (data) => {
                       key={tab.value}
                       type="button"
                       onClick={() => setDemoInstitute(tab.value)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
-                        demoInstitute === tab.value
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${demoInstitute === tab.value
                           ? 'bg-slate-800 text-white'
                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
+                        }`}
                     >
                       {tab.label}
                     </button>

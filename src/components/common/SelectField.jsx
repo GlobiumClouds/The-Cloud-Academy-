@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import StatusBadge from '@/components/common/StatusBadge';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
@@ -79,7 +80,12 @@ export default function SelectField({
               <SelectContent>
                 {normalizedOptions.map((opt) => (
                   <SelectItem key={opt.value} value={String(opt.value)}>
-                    {opt.label}
+                    <span className="flex items-center justify-between gap-2 w-full">
+                      <span>{opt.label}</span>
+                      {opt.badgeStatus ? (
+                        <StatusBadge status={opt.badgeStatus} label={opt.badgeLabel || 'Current'} />
+                      ) : null}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -98,7 +104,12 @@ export default function SelectField({
           <SelectContent>
             {normalizedOptions.map((opt) => (
               <SelectItem key={opt.value} value={String(opt.value)}>
-                {opt.label}
+                <span className="flex items-center justify-between gap-2 w-full">
+                  <span>{opt.label}</span>
+                  {opt.badgeStatus ? (
+                    <StatusBadge status={opt.badgeStatus} label={opt.badgeLabel || 'Current'} />
+                  ) : null}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>

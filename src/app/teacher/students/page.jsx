@@ -34,7 +34,9 @@ export default function TeacherStudentsPage() {
     const source = `${s.name || ''} ${s.registration_no || ''} ${s.roll_no || s.roll_number || ''}`.toLowerCase();
     const matchSearch = source.includes(search.toLowerCase());
     const selectedClassName = classNameById[filterClass];
-    const matchClass = !filterClass || s.class === selectedClassName || s.class_name === selectedClassName;
+    const studentClassId = s.class_id || s.details?.studentDetails?.class_id;
+    const studentClassName = s.class || s.class_name || s.details?.studentDetails?.class_name;
+    const matchClass = !filterClass || studentClassId === filterClass || studentClassName === selectedClassName;
     return matchSearch && matchClass;
   }), [students, search, filterClass, classNameById]);
 

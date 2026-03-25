@@ -78,10 +78,7 @@ export const studentService = {
    */
   getAll: (filters = {}, instituteType = 'school') => {
     const normalized = normalizeFilters(filters, instituteType);
-    return withFallback(
-      () => api.get(`/students${buildQuery(normalized)}`).then((r) => r.data),
-      () => filterDummies(normalized, instituteType),
-    );
+    return api.get(`/students${buildQuery(normalized)}`).then((r) => r.data);
   },
 
   getById: (id) => api.get(`/students/${id}`).then((r) => r.data),

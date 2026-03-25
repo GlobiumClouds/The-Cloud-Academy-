@@ -1,13 +1,314 @@
+// // src/app/teacher/assignments/page.jsx
+// 'use client';
+
+// import { useMemo, useState } from 'react';
+// import { useForm } from 'react-hook-form';
+// import { 
+//   ClipboardList, PlusCircle, CheckCircle2, Clock, Award, 
+//   CalendarIcon, Pencil, Trash2, Paperclip, ExternalLink, 
+//   FileText, PlayCircle, Image as ImageIcon, X, ChevronRight 
+// } from 'lucide-react';
+// import { getPortalTerms } from '@/constants/portalInstituteConfig';
+// import { Button } from '@/components/ui/button';
+// import { Label } from '@/components/ui/label';
+// import { toast } from 'sonner';
+// import AppModal from '@/components/common/AppModal';
+// import ConfirmDialog from '@/components/common/ConfirmDialog';
+// import InputField from '@/components/common/InputField';
+// import SelectField from '@/components/common/SelectField';
+// import SwitchField from '@/components/common/SwitchField';
+// import TextareaField from '@/components/common/TextareaField';
+// import { useTeacherAssignments, useTeacherClasses } from '@/hooks/useTeacherPortal';
+// import { teacherPortalService } from '@/services/teacherPortalService';
+// import { format, parseISO } from 'date-fns';
+// import useAuthStore from '@/store/authStore';
+
+// const STATUS_MAP = {
+//   active: { label: 'Active', icon: Clock, classes: 'bg-blue-100 text-blue-700' },
+//   submitted: { label: 'In Progress', icon: CheckCircle2, classes: 'bg-amber-100 text-amber-700' },
+//   graded: { label: 'Graded', icon: Award, classes: 'bg-emerald-100 text-emerald-700' },
+//   draft: { label: 'Draft', icon: Pencil, classes: 'bg-slate-100 text-slate-600' },
+// };
+
+// const SUBJECT_COLORS = [
+//   'bg-blue-50/50 border-blue-100', 'bg-violet-50/50 border-violet-100',
+//   'bg-emerald-50/50 border-emerald-100', 'bg-amber-50/50 border-amber-100',
+// ];
+
+// const EMPTY_FORM = {
+//   title: '', subject: '', class_id: '', section_id: '',
+//   description: '', due_date: '', total_marks: ''
+// };
+
+// const asText = (value) => String(value ?? '').trim();
+
+// const getFileType = (url) => {
+//   if (!url) return 'file';
+//   const ext = url.split('.').pop().toLowerCase();
+//   if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image';
+//   if (['mp4', 'webm', 'ogg'].includes(ext)) return 'video';
+//   if (ext === 'pdf' || url.includes('/raw/upload')) return 'pdf';
+//   return 'file';
+// };
+
+// export default function TeacherAssignmentsPage() {
+//   const user = useAuthStore((state) => state.user);
+//   const t = getPortalTerms(user?.institute_type || 'school');
+//   const { classes } = useTeacherClasses();
+//   const { assignments, loading, createAssignment, updateAssignment, deleteAssignment } = useTeacherAssignments({ type: 'assignment' });
+
+//   const [modalOpen, setModalOpen] = useState(false);
+//   const [form, setForm] = useState(EMPTY_FORM);
+//   const [files, setFiles] = useState([]);
+//   const [saving, setSaving] = useState(false);
+//   const [editingItem, setEditingItem] = useState(null);
+//   const [publishNow, setPublishNow] = useState(true);
+//   const [deleteTarget, setDeleteTarget] = useState(null);
+//   const [activeAttachmentView, setActiveAttachmentView] = useState(null);
+//   const [isAttachmentViewOpen, setIsAttachmentViewOpen] = useState(false);
+//   const [removedAttachmentIds, setRemovedAttachmentIds] = useState([]);
+
+//   const existingAttachments = useMemo(() => {
+//     if (!editingItem || !Array.isArray(editingItem.attachments)) return [];
+//     return editingItem.attachments.map((file, idx) => ({
+//       id: file?.id || `${idx}`,
+//       name: file?.name || file?.filename || `File ${idx + 1}`,
+//       url: file?.url || file?.file_url || null,
+//       type: getFileType(file?.url || file?.file_url)
+//     }));
+//   }, [editingItem]);
+
+//   const normalizedClasses = useMemo(() => classes.map(cls => ({
+//     ...cls,
+//     class_id: asText(cls.class_id || cls.id),
+//     class_name: cls.class_name || cls.name,
+//     sections: Array.isArray(cls.sections) ? cls.sections : [],
+//     subjects: Array.isArray(cls.subjects) ? cls.subjects : []
+//   })), [classes]);
+
+//   const selectedClass = normalizedClasses.find(c => c.class_id === form.class_id);
+//   const sectionOptions = selectedClass?.sections || [];
+//   const subjectOptions = selectedClass?.subjects || [];
+
+//   const handleFormSubmit = async (e) => {
+//     e.preventDefault();
+//     if (!form.title || !form.subject || !form.class_id || !form.due_date) {
+//       toast.error('Please fill required fields'); return;
+//     }
+//     setSaving(true);
+//     try {
+//       const payload = {
+//         ...form,
+//         type: 'assignment',
+//         status: publishNow ? 'published' : 'draft',
+//         is_published: publishNow,
+//         remove_attachments: JSON.stringify(removedAttachmentIds)
+//       };
+//       const formData = teacherPortalService.prepareAssignmentFormData(payload, files);
+//       if (editingItem?.id) await updateAssignment(editingItem.id, formData);
+//       else await createAssignment(formData);
+      
+//       toast.success(editingItem ? 'Assignment updated' : 'Assignment created');
+//       setModalOpen(false);
+//       setForm(EMPTY_FORM);
+//       setRemovedAttachmentIds([]);
+//       setFiles([]);
+//     } catch (err) {
+//       toast.error('Operation failed');
+//     } finally { setSaving(false); }
+//   };
+
+//   const formatSafeDate = (v) => v ? format(parseISO(v.split('T')[0]), 'dd MMM yyyy') : 'N/A';
+
+//   return (
+//     <div className="space-y-6 max-w-4xl mx-auto">
+//       <div className="flex items-start justify-between">
+//         <div>
+//           <h1 className="text-2xl font-extrabold flex items-center gap-2 text-slate-900">
+//             <ClipboardList className="w-7 h-7 text-blue-600" /> {t.assignmentsLabel}
+//           </h1>
+//           <p className="text-sm text-slate-500 mt-1 tracking-tight">Track and manage student submissions efficiently.</p>
+//         </div>
+//         <Button className="bg-blue-600 hover:bg-blue-700 shadow-md" onClick={() => { setEditingItem(null); setForm(EMPTY_FORM); setPublishNow(true); setFiles([]); setRemovedAttachmentIds([]); setModalOpen(true); }}>
+//           <PlusCircle className="w-4 h-4 mr-2" /> New Assignment
+//         </Button>
+//       </div>
+
+//       {/* ── View Modal (Multi-media) ── */}
+//       <AppModal open={isAttachmentViewOpen} onClose={() => setIsAttachmentViewOpen(false)} title={activeAttachmentView?.title} size="xl">
+//         {activeAttachmentView && (
+//           <div className="flex flex-col md:flex-row gap-4 h-[70vh]">
+//             <div className="w-full md:w-[200px] border-r pr-2 overflow-y-auto flex-shrink-0">
+//               <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 px-1">Attachments</p>
+//               <div className="flex md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0">
+//                 {activeAttachmentView.materials.map((m) => (
+//                   <button key={m.id} onClick={() => setActiveAttachmentView(p => ({ ...p, activeUrl: m.url, activeType: m.type }))}
+//                     className={`flex-shrink-0 md:w-full p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${activeAttachmentView.activeUrl === m.url ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'bg-white hover:bg-slate-50'}`}>
+//                     {m.type === 'image' ? <ImageIcon className="w-4 h-4 text-pink-500" /> : m.type === 'video' ? <PlayCircle className="w-4 h-4 text-orange-500" /> : <FileText className="w-4 h-4 text-blue-500" />}
+//                     <span className="text-[11px] font-bold truncate">{m.name}</span>
+//                   </button>
+//                 ))}
+//               </div>
+//             </div>
+//             <div className="flex-1 bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center relative border shadow-inner">
+//               {activeAttachmentView.activeUrl ? (
+//                 <>
+//                   {activeAttachmentView.activeType === 'image' ? <img src={activeAttachmentView.activeUrl} className="max-w-full max-h-full object-contain" alt="Preview" /> :
+//                    activeAttachmentView.activeType === 'video' ? <video src={activeAttachmentView.activeUrl} controls className="w-full h-full" /> :
+//                    <iframe src={`${activeAttachmentView.activeUrl}#toolbar=1&view=FitH`} className="w-full h-full border-none" title="PDF" />}
+//                   <a href={activeAttachmentView.activeUrl} target="_blank" className="absolute top-3 right-3 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold backdrop-blur-md border border-white/20">FULL SCREEN</a>
+//                 </>
+//               ) : <p className="text-white/40 text-xs italic font-medium">Select a file to preview</p>}
+//             </div>
+//           </div>
+//         )}
+//       </AppModal>
+
+//       {/* ── Edit/Create Modal ── */}
+//       <AppModal open={modalOpen} onClose={() => setModalOpen(false)} title={editingItem ? 'Update Assignment' : 'Create Assignment'} size="md">
+//         <form onSubmit={handleFormSubmit} className="space-y-4 pt-2">
+//           <InputField label="Assignment Title" required value={form.title} onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))} />
+          
+//           <div className="grid grid-cols-2 gap-3">
+//             <SelectField label="Class" value={form.class_id} onChange={(v) => setForm(p => ({ ...p, class_id: v, section_id: '', subject: '' }))} options={normalizedClasses.map(c => ({ value: c.class_id, label: c.class_name }))} />
+//             <SelectField label="Subject" value={form.subject} onChange={(v) => setForm(p => ({ ...p, subject: v }))} options={subjectOptions.map(s => ({ value: s, label: s }))} />
+//           </div>
+
+//           <TextareaField label="Instructions" rows={3} value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} />
+
+//           {editingItem && existingAttachments.length > removedAttachmentIds.length && (
+//             <div className="p-3 bg-slate-50 rounded-xl border space-y-2">
+//               <p className="text-[10px] font-bold text-slate-400 uppercase">Manage Existing Files</p>
+//               {existingAttachments.filter(f => !removedAttachmentIds.includes(f.id)).map(f => (
+//                 <div key={f.id} className="flex items-center justify-between p-2 bg-white border rounded-lg shadow-sm">
+//                   <div className="flex items-center gap-2 min-w-0">
+//                     <Paperclip className="w-3.5 h-3.5 text-slate-400" />
+//                     <span className="text-xs font-bold truncate">{f.name}</span>
+//                   </div>
+//                   <button type="button" onClick={() => setRemovedAttachmentIds(p => [...p, f.id])} className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors"><Trash2 className="w-4 h-4" /></button>
+//                 </div>
+//               ))}
+//             </div>
+//           )}
+
+//           <div className="space-y-1.5">
+//             <Label>New Attachments</Label>
+//             <label className="flex items-center gap-2 h-10 border-2 border-dashed rounded-xl px-3 cursor-pointer hover:bg-slate-50 transition-all border-slate-200">
+//               <PlusCircle className="w-4 h-4 text-slate-400" />
+//               <span className="text-xs text-slate-500 font-medium">{files.length ? `${files.length} files selected` : 'Drop files here or click to upload'}</span>
+//               <input type="file" className="hidden" multiple onChange={(e) => setFiles(Array.from(e.target.files))} />
+//             </label>
+//           </div>
+
+//           <div className="grid grid-cols-2 gap-3">
+//              <div className="space-y-1.5">
+//                <Label>Due Date</Label>
+//                <input type="date" className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm focus:ring-2 ring-blue-100 outline-none transition-all" value={form.due_date} onChange={(e) => setForm(p => ({ ...p, due_date: e.target.value }))} />
+//              </div>
+//              <InputField label="Total Marks" type="number" value={form.total_marks} onChange={(e) => setForm(p => ({ ...p, total_marks: e.target.value }))} />
+//           </div>
+
+//           <SwitchField label="Publish Instantly" value={publishNow} onChange={setPublishNow} hint="Disable to save as draft (not visible to students)" />
+
+//           <div className="flex justify-end gap-2 pt-4 border-t">
+//             <Button variant="outline" type="button" onClick={() => setModalOpen(false)}>Cancel</Button>
+//             <Button className="bg-blue-600 hover:bg-blue-700 min-w-[120px]" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Assignment'}</Button>
+//           </div>
+//         </form>
+//       </AppModal>
+
+//       {/* ── Assignment Cards ── */}
+//       <div className="space-y-4">
+//         {assignments.map((asgn, i) => {
+//           const submitted = asgn.stats?.submitted || 0;
+//           const total = asgn.stats?.total_students || 1;
+//           const pct = Math.round((submitted / total) * 100);
+//           const status = asgn.is_published ? (submitted > 0 ? 'submitted' : 'active') : 'draft';
+//           const sm = STATUS_MAP[status];
+//           const Icon = sm.icon;
+
+//           return (
+//             <div key={asgn.id} className={`p-5 rounded-2xl border bg-white shadow-sm hover:shadow-md transition-all ${SUBJECT_COLORS[i % SUBJECT_COLORS.length]}`}>
+//               <div className="flex justify-between items-start">
+//                  <div className="flex-1 min-w-0">
+//                     <div className="flex items-center gap-2 mb-2">
+//                       <span className="text-[10px] font-bold bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600 uppercase tracking-wider">{asgn.subject}</span>
+//                       <span className={`flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${sm.classes}`}><Icon className="w-2.5 h-2.5" /> {sm.label}</span>
+//                     </div>
+//                     <h3 className="font-extrabold text-slate-800 text-base truncate">{asgn.title}</h3>
+//                     <p className="text-xs text-slate-500 mt-1 line-clamp-1">{asgn.description || 'No instructions provided'}</p>
+//                  </div>
+//                  <div className="flex items-center gap-2 ml-4">
+//                     <Button variant="outline" size="sm" className="h-8 rounded-lg bg-white" onClick={() => {
+//                         const mats = (asgn.attachments || []).map((f, idx) => ({ id: f.id || idx, name: f.name || 'File', url: f.url || f.file_url, type: getFileType(f.url || f.file_url) }));
+//                         setActiveAttachmentView({ title: asgn.title, materials: mats, activeUrl: mats[0]?.url, activeType: mats[0]?.type });
+//                         setIsAttachmentViewOpen(true);
+//                     }} disabled={!asgn.attachments?.length}>
+//                       <Paperclip className="w-3 h-3 mr-1.5" /> {asgn.attachments?.length || 0}
+//                     </Button>
+//                     <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg bg-white" onClick={() => {
+//                         setEditingItem(asgn);
+//                         setRemovedAttachmentIds([]);
+//                         setPublishNow(asgn.is_published);
+//                         setForm({ title: asgn.title, subject: asgn.subject, class_id: asgn.class_id, section_id: asgn.section_id || '', description: asgn.description || '', due_date: asgn.due_date?.split('T')[0], total_marks: asgn.total_marks });
+//                         setModalOpen(true);
+//                     }}><Pencil className="w-3 h-3" /></Button>
+//                     <Button variant="destructive" size="sm" className="h-8 w-8 p-0 rounded-lg" onClick={() => setDeleteTarget(asgn)}><Trash2 className="w-3 h-3" /></Button>
+//                  </div>
+//               </div>
+
+//               {/* Progress Bar Section */}
+//               <div className="mt-5 space-y-2">
+//                 <div className="flex justify-between items-end text-[10px] font-bold uppercase tracking-widest text-slate-400">
+//                   <span>Submission Progress</span>
+//                   <span className="text-slate-700">{submitted} / {total} Students</span>
+//                 </div>
+//                 <div className="w-full bg-slate-100 rounded-full h-2 shadow-inner overflow-hidden">
+//                   <div className={`h-full rounded-full transition-all duration-500 ${pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-blue-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }} />
+//                 </div>
+//               </div>
+
+//               <div className="mt-4 flex items-center justify-between text-[11px] font-bold text-slate-500 border-t border-slate-100 pt-3">
+//                  <div className="flex gap-4">
+//                     <span>DUE: <span className="text-red-500">{formatSafeDate(asgn.due_date)}</span></span>
+//                     <span>MARKS: <span className="text-slate-800">{asgn.total_marks || 'N/A'}</span></span>
+//                  </div>
+//                  <div className="flex items-center gap-1 text-blue-600 hover:underline cursor-pointer">View Submissions <ChevronRight className="w-3 h-3" /></div>
+//               </div>
+//             </div>
+//           );
+//         })}
+//       </div>
+
+//       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={async () => { await deleteAssignment(deleteTarget.id); setDeleteTarget(null); }} title="Delete Assignment?" description="This action cannot be undone." />
+//     </div>
+//   );
+// }
+
+
+
+
+// src/app/teacher/assignments/page.jsx
+
 'use client';
 
-import { useMemo, useState } from 'react';
-import { ClipboardList, PlusCircle, CheckCircle2, Clock, Award, CalendarIcon, Pencil, Trash2, Paperclip, ExternalLink, FileText } from 'lucide-react';
-import { getPortalTerms } from '@/constants/portalInstituteConfig';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { 
+  ClipboardList, PlusCircle, CheckCircle2, Clock, Award, 
+  CalendarIcon, Pencil, Trash2, Paperclip, ExternalLink, 
+  FileText, PlayCircle, Image as ImageIcon, X, ChevronRight,
+  Upload, Download, Eye, MessageSquare, Settings, Users,
+  BookOpen, GraduationCap, Building2, School, Library,
+  AlertCircle, CheckCircle, Loader2
+} from 'lucide-react';
+import { getPortalTerms, getInstituteTypeConfig } from '@/constants/portalInstituteConfig';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, parseISO } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import AppModal from '@/components/common/AppModal';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
@@ -17,61 +318,51 @@ import SwitchField from '@/components/common/SwitchField';
 import TextareaField from '@/components/common/TextareaField';
 import { useTeacherAssignments, useTeacherClasses } from '@/hooks/useTeacherPortal';
 import { teacherPortalService } from '@/services/teacherPortalService';
-import TimePickerField from '@/components/common/TimePickerField';
+import { format, parseISO } from 'date-fns';
 import useAuthStore from '@/store/authStore';
 
 const STATUS_MAP = {
-  active: { label: 'Active', icon: Clock, classes: 'bg-blue-100   text-blue-700' },
-  submitted: { label: 'Submitted', icon: CheckCircle2, classes: 'bg-amber-100  text-amber-700' },
+  active: { label: 'Active', icon: Clock, classes: 'bg-blue-100 text-blue-700' },
+  submitted: { label: 'In Progress', icon: CheckCircle2, classes: 'bg-amber-100 text-amber-700' },
   graded: { label: 'Graded', icon: Award, classes: 'bg-emerald-100 text-emerald-700' },
+  draft: { label: 'Draft', icon: Pencil, classes: 'bg-slate-100 text-slate-600' },
 };
 
 const SUBJECT_COLORS = [
-  'bg-blue-50 border-blue-200', 'bg-violet-50 border-violet-200',
-  'bg-teal-50 border-teal-200', 'bg-amber-50 border-amber-200',
+  'bg-blue-50/50 border-blue-100', 'bg-violet-50/50 border-violet-100',
+  'bg-emerald-50/50 border-emerald-100', 'bg-amber-50/50 border-amber-100',
 ];
 
 const EMPTY_FORM = {
-  title: '',
-  subject: '',
-  class_id: '',
-  section_id: '',
-  description: '',
-  due_date: '',
-  due_time: '',
-  total_marks: ''
+  title: '', subject: '', class_id: '', section_id: '', batch_id: '', program_id: '',
+  description: '', instructions: '', due_date: '', due_time: '', total_marks: '', passing_marks: '',
+  difficulty_level: 'intermediate', estimated_time: '', allow_late_submission: false,
+  late_submission_penalty: 0, max_files: 10, max_file_size: 50, grading_type: 'marks'
 };
 
 const asText = (value) => String(value ?? '').trim();
 
-const getSubmissionCount = (assignment) => assignment.stats?.submitted ?? assignment.submissions ?? 0;
-
-const getNormalizedAssignmentStatus = (assignment) => {
-  const rawStatus = String(assignment?.status || '').toLowerCase();
-  const submittedCount = getSubmissionCount(assignment);
-
-  if (rawStatus === 'graded') return 'graded';
-  if (submittedCount > 0) return 'submitted';
-
-  const published = assignment?.is_published || rawStatus === 'published' || rawStatus === 'active';
-  if (published) return 'active';
-
-  return 'active';
+const getFileType = (url) => {
+  if (!url) return 'file';
+  const ext = url.split('.').pop().toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image';
+  if (['mp4', 'webm', 'ogg'].includes(ext)) return 'video';
+  if (ext === 'pdf' || url.includes('/raw/upload')) return 'pdf';
+  if (['doc', 'docx'].includes(ext)) return 'word';
+  if (['xls', 'xlsx'].includes(ext)) return 'excel';
+  if (['ppt', 'pptx'].includes(ext)) return 'powerpoint';
+  return 'file';
 };
 
 export default function TeacherAssignmentsPage() {
   const user = useAuthStore((state) => state.user);
-  const t = getPortalTerms(user?.institute_type || 'school');
-  const { classes } = useTeacherClasses();
-  const {
-    assignments,
-    loading,
-    createAssignment,
-    updateAssignment,
-    deleteAssignment
-  } = useTeacherAssignments({ type: 'assignment' });
+  const instituteType = user?.institute_type || 'school';
+  const config = getInstituteTypeConfig(instituteType);
+  const t = getPortalTerms(instituteType);
+  
+  const { classes, batches, programs, loading: classesLoading } = useTeacherClasses();
+  const { assignments, loading, createAssignment, updateAssignment, deleteAssignment } = useTeacherAssignments({ type: 'assignment' });
 
-  const [filterStatus, setFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [files, setFiles] = useState([]);
@@ -79,651 +370,1098 @@ export default function TeacherAssignmentsPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [publishNow, setPublishNow] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
   const [activeAttachmentView, setActiveAttachmentView] = useState(null);
   const [isAttachmentViewOpen, setIsAttachmentViewOpen] = useState(false);
-
-  console.log('Assignments:', assignments);
+  const [removedAttachmentIds, setRemovedAttachmentIds] = useState([]);
+  const [submissionsModalOpen, setSubmissionsModalOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [gradingModalOpen, setGradingModalOpen] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
 
   const existingAttachments = useMemo(() => {
     if (!editingItem || !Array.isArray(editingItem.attachments)) return [];
     return editingItem.attachments.map((file, idx) => ({
       id: file?.id || `${idx}`,
-      name: file?.name || file?.original_name || file?.filename || `Attachment ${idx + 1}`,
-      url: file?.url || file?.file_url || file?.download_url || file?.pdf_url || null,
-      type: file?.type || null
+      name: file?.name || file?.filename || `File ${idx + 1}`,
+      url: file?.url || file?.file_url || null,
+      type: getFileType(file?.url || file?.file_url)
     }));
   }, [editingItem]);
 
-  const existingPdf = existingAttachments.find(
-    (file) => String(file?.type || '').toLowerCase().includes('pdf') || String(file?.url || '').toLowerCase().endsWith('.pdf')
-  );
+  const normalizedClasses = useMemo(() => {
+    if (!classes) return [];
+    return classes.map(cls => ({
+      ...cls,
+      class_id: asText(cls.class_id || cls.id),
+      class_name: cls.class_name || cls.name,
+      sections: Array.isArray(cls.sections) ? cls.sections : [],
+      subjects: Array.isArray(cls.subjects) ? cls.subjects : []
+    }));
+  }, [classes]);
 
-  const normalizedClasses = useMemo(
-    () => classes.map((cls) => {
-      const classId = asText(cls.class_id || cls.id);
-      const sections = Array.isArray(cls.sections) && cls.sections.length
-        ? cls.sections
-          .map((section) => ({
-            id: asText(section?.id || section?.section_id),
-            name: section?.name || section?.section_name || 'Section'
-          }))
-          .filter((section) => section.id)
-        : (cls.section_id
-          ? [{ id: asText(cls.section_id), name: cls.section_name || 'Section' }]
-          : []);
+  const normalizedBatches = useMemo(() => {
+    if (!batches) return [];
+    return batches.map(batch => ({
+      ...batch,
+      batch_id: asText(batch.batch_id || batch.id),
+      batch_name: batch.batch_name || batch.name
+    }));
+  }, [batches]);
 
-      return {
-        ...cls,
-        class_id: classId,
-        class_name: cls.class_name || cls.name,
-        sections,
-        subjects: Array.isArray(cls.subjects) ? cls.subjects : []
-      };
-    }),
-    [classes]
-  );
+  const normalizedPrograms = useMemo(() => {
+    if (!programs) return [];
+    return programs.map(program => ({
+      ...program,
+      program_id: asText(program.program_id || program.id),
+      program_name: program.program_name || program.name
+    }));
+  }, [programs]);
 
-  const classMap = useMemo(() => normalizedClasses.reduce((acc, cls) => {
-    acc[cls.class_id] = cls;
-    return acc;
-  }, {}), [normalizedClasses]);
-
-  const resolveClassForItem = (item) => {
-    const itemClassId = asText(item.class_id);
-    const byId = normalizedClasses.find((c) => asText(c.class_id) === itemClassId);
-    if (byId) return byId;
-
-    const itemClassName = asText(item.class_name || item.class);
-    if (!itemClassName) return null;
-    const normalizedItemClass = itemClassName.toLowerCase().split(' - ')[0].trim();
-
-    const byName = normalizedClasses.find((c) => {
-      const clsName = asText(c.class_name || c.name).toLowerCase();
-      return clsName === itemClassName.toLowerCase() || clsName === normalizedItemClass || normalizedItemClass.includes(clsName);
-    });
-    if (byName) return byName;
-
-    const itemSectionName = asText(item.section_name).toLowerCase();
-    if (!itemSectionName) return null;
-    const bySection = normalizedClasses.find((c) =>
-      (c.sections || []).some((section) => asText(section.name).toLowerCase() === itemSectionName)
-    );
-    return bySection || null;
-  };
-
-  const resolveSectionIdForItem = (item) => {
-    const cls = resolveClassForItem(item);
-    const options = cls?.sections || [];
-
-    if (!options.length) return '';
-    const itemSectionId = asText(item.section_id);
-    if (itemSectionId && options.some((section) => asText(section.id) === itemSectionId)) {
-      return itemSectionId;
-    }
-
-    const byName = options.find(
-      (section) => asText(section.name).toLowerCase() === asText(item.section_name).toLowerCase()
-    );
-    if (byName?.id) return byName.id;
-
-    return options.length === 1 ? options[0].id : '';
-  };
-
-  const selectedClass = normalizedClasses.find((cls) => asText(cls.class_id) === asText(form.class_id));
+  const selectedClass = normalizedClasses.find(c => c.class_id === form.class_id);
   const sectionOptions = selectedClass?.sections || [];
   const subjectOptions = selectedClass?.subjects || [];
-  const fallbackEditSectionOptions = useMemo(() => {
-    if (!editingItem) return sectionOptions;
-    const originalClassId = asText(editingItem.class_id);
-    const currentClassId = asText(form.class_id);
-    if (currentClassId && currentClassId !== originalClassId) return sectionOptions;
-    if (sectionOptions.length > 0) return sectionOptions;
+  
+  const selectedBatch = normalizedBatches.find(b => b.batch_id === form.batch_id);
+  const selectedProgram = normalizedPrograms.find(p => p.program_id === form.program_id);
 
-    const fallbackId = asText(form.section_id || editingItem.section_id || editingItem.section_name);
-    const fallbackName = asText(editingItem.section_name || editingItem.section_id || 'Section');
-    return fallbackId ? [{ id: fallbackId, name: fallbackName }] : [];
-  }, [editingItem, form.class_id, form.section_id, sectionOptions]);
-  const effectiveSectionOptions = fallbackEditSectionOptions;
-  const requiresSection = effectiveSectionOptions.length > 0;
-
-  const filtered = filterStatus === 'all'
-    ? assignments
-    : assignments.filter((a) => getNormalizedAssignmentStatus(a) === filterStatus);
-
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
-
-  const handleFile = (e) => {
-    const picked = Array.from(e.target.files || []);
-    setFiles(picked);
-  };
-
-  const handleSubmit = async (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (!form.title || !form.subject || !form.class_id || !form.due_date) {
-      toast.error('Please fill all required fields.');
+    
+    // Validation based on institute type
+    if (!form.title) {
+      toast.error('Please enter assignment title');
       return;
     }
-    if (requiresSection && !form.section_id) {
-      toast.error('Please select a section for this class.');
+    
+    if (config.hasSubjects && !form.subject) {
+      toast.error('Please select a subject');
       return;
     }
+    
+    if (config.hasClasses && !form.class_id && !form.batch_id && !form.program_id) {
+      toast.error(`Please select a ${config.classLabel.toLowerCase()}`);
+      return;
+    }
+    
+    if (!form.due_date) {
+      toast.error('Please select due date');
+      return;
+    }
+    
     setSaving(true);
     try {
       const payload = {
-        title: form.title,
-        subject: form.subject,
-        class_id: form.class_id,
-        section_id: form.section_id || null,
-        description: form.description,
-        due_date: form.due_date,
-        due_time: form.due_time || null,
-        total_marks: form.total_marks || null,
+        ...form,
         type: 'assignment',
         status: publishNow ? 'published' : 'draft',
-        is_published: publishNow
+        is_published: publishNow,
+        remove_attachments: JSON.stringify(removedAttachmentIds),
+        institute_type: instituteType
       };
+      
       const formData = teacherPortalService.prepareAssignmentFormData(payload, files);
+      
       if (editingItem?.id) {
         await updateAssignment(editingItem.id, formData);
+        toast.success('Assignment updated successfully');
       } else {
         await createAssignment(formData);
+        toast.success('Assignment created successfully');
       }
-      setSaving(false);
+      
       setModalOpen(false);
       setForm(EMPTY_FORM);
+      setRemovedAttachmentIds([]);
       setFiles([]);
       setEditingItem(null);
-      setPublishNow(true);
-    } catch {
-      setSaving(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Operation failed');
+    } finally { 
+      setSaving(false); 
     }
   };
 
-  const openCreateModal = () => {
-    setEditingItem(null);
-    setPublishNow(true);
-    setForm(EMPTY_FORM);
-    setFiles([]);
-    setModalOpen(true);
+  const formatSafeDate = (v) => v ? format(parseISO(v.split('T')[0]), 'dd MMM yyyy') : 'N/A';
+  
+  const handleViewSubmissions = (assignment) => {
+    setSelectedAssignment(assignment);
+    setSubmissionsModalOpen(true);
   };
-
-  const openEditModal = (item) => {
-    const matchedClass = resolveClassForItem(item);
-    const resolvedSectionId = resolveSectionIdForItem(item) || asText(item.section_id || item.section_name);
-    setEditingItem(item);
-    setPublishNow(item.is_published ?? item.status === 'published');
-    setForm({
-      title: item.title || '',
-      subject: item.subject || '',
-      class_id: asText(matchedClass?.class_id || item.class_id),
-      section_id: resolvedSectionId,
-      description: item.description || item.instructions || '',
-      due_date: item.due_date ? String(item.due_date).split('T')[0] : '',
-      due_time: item.due_time || '',
-      total_marks: item.total_marks ? String(item.total_marks) : ''
-    });
-    setFiles([]);
-    setModalOpen(true);
+  
+  const handleGradeSubmission = (submission) => {
+    setSelectedSubmission(submission);
+    setGradingModalOpen(true);
   };
-
-  const confirmDelete = async () => {
-    if (!deleteTarget?.id) return;
-    setDeleting(true);
-    try {
-      await deleteAssignment(deleteTarget.id);
-      setDeleteTarget(null);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const onClassChange = (classId) => {
-    const nextClassId = asText(classId);
-    const cls = normalizedClasses.find((c) => asText(c.class_id) === nextClassId);
-    const nextSections = cls?.sections || [];
-    setForm((prev) => ({
-      ...prev,
-      class_id: nextClassId,
-      section_id: '',
-      subject: ''
-    }));
-  };
-
-  const formatSafeDate = (value) => {
-    if (!value) return 'N/A';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
-    return format(parsed, 'dd MMM yyyy');
-  };
-
-  const openAttachmentView = (item) => {
-    const materials = (Array.isArray(item?.attachments) ? item.attachments : []).map((file, idx) => ({
-      id: file?.id || `${idx}`,
-      name: file?.name || file?.original_name || file?.filename || `Attachment ${idx + 1}`,
-      type: file?.type || null,
-      url: file?.url || file?.file_url || file?.download_url || file?.pdf_url || null
-    }));
-
-    const pdf = materials.find(
-      (m) => String(m?.type || '').toLowerCase().includes('pdf') || String(m?.url || '').toLowerCase().endsWith('.pdf')
-    );
-
-    setActiveAttachmentView({
-      title: item?.title || 'Assignment',
-      className: item?.class_name || classMap[item?.class_id]?.class_name || '-',
-      materials,
-      pdfUrl: pdf?.url || null
-    });
-    setIsAttachmentViewOpen(true);
-  };
-
-  const summaryData = [
-    {
-      label: 'Active',
-      value: assignments.filter((a) => getNormalizedAssignmentStatus(a) === 'active').length,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50'
-    },
-    {
-      label: 'Submitted',
-      value: assignments.filter((a) => getNormalizedAssignmentStatus(a) === 'submitted').length,
-      color: 'text-amber-600',
-      bg: 'bg-amber-50'
-    },
-    {
-      label: 'Graded',
-      value: assignments.filter((a) => getNormalizedAssignmentStatus(a) === 'graded').length,
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-50'
-    }
-  ];
 
   if (loading) {
-    return <div className="max-w-4xl mx-auto text-sm text-slate-500">Loading assignments...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-            <ClipboardList className="w-6 h-6 text-blue-600" /> {t.assignmentsLabel}
+          <h1 className="text-2xl font-extrabold flex items-center gap-2 text-slate-900">
+            <ClipboardList className="w-7 h-7 text-blue-600" /> 
+            {t.assignmentsLabel || 'Assignments'}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">{assignments.length} {t.assignmentsLabel.toLowerCase()} across your {t.classesLabel.toLowerCase()}</p>
+          <p className="text-sm text-slate-500 mt-1 tracking-tight">
+            {config.assignmentDescription || 'Track and manage student submissions efficiently.'}
+          </p>
         </div>
-        <Button
-          className="bg-blue-600 hover:bg-blue-700 text-white gap-2 flex-shrink-0"
-          onClick={openCreateModal}
+        <Button 
+          className="bg-blue-600 hover:bg-blue-700 shadow-md" 
+          onClick={() => { 
+            setEditingItem(null); 
+            setForm(EMPTY_FORM); 
+            setPublishNow(true); 
+            setFiles([]); 
+            setRemovedAttachmentIds([]); 
+            setModalOpen(true); 
+          }}
         >
-          <PlusCircle className="w-4 h-4" /> New Assignment
+          <PlusCircle className="w-4 h-4 mr-2" /> 
+          New {config.assignmentLabel || 'Assignment'}
         </Button>
       </div>
 
-      {/* ── New Assignment Modal ── */}
-      <AppModal
-        open={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setForm(EMPTY_FORM);
-          setFiles([]);
-          setEditingItem(null);
-          setPublishNow(true);
-        }}
-        title={editingItem ? 'Edit Assignment' : 'Create New Assignment'}
-        description="Fill in the details below to assign work to your class."
-        size="md"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => {
-              setModalOpen(false);
-              setForm(EMPTY_FORM);
-              setFiles([]);
-              setEditingItem(null);
-              setPublishNow(true);
-            }}>Cancel</Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSubmit} disabled={saving}>
-              {saving ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Assignment' : 'Create Assignment')}
+      {/* Assignment Cards */}
+      <div className="space-y-4">
+        {assignments.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
+            <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-400">No assignments created yet</p>
+            <Button variant="link" onClick={() => setModalOpen(true)} className="mt-2">
+              Create your first assignment
             </Button>
-          </>
-        }
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <InputField
-            label="Assignment Title"
-            name="title"
-            required
-            placeholder="e.g. Chapter 5 Practice Problems"
-            value={form.title}
-            onChange={handleChange}
-          />
-
-          {/* Subject + Class row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <SelectField
-                label="Class"
-                name="class_id"
-                required
-                value={form.class_id}
-                onChange={onClassChange}
-                placeholder="Select Class"
-                options={normalizedClasses.map((c) => ({ value: c.class_id, label: c.class_name || c.name }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <SelectField
-                label="Subject"
-                name="subject"
-                required
-                value={form.subject}
-                onChange={(v) => setForm((p) => ({ ...p, subject: v }))}
-                placeholder="Select Subject"
-                options={subjectOptions.map((s) => ({ value: s, label: s }))}
-              />
-            </div>
-
           </div>
-
-          {/* Section row */}
-          {effectiveSectionOptions.length > 0 && (
-            <div className="space-y-1.5">
-              <SelectField
-                label={`Section${requiresSection ? ' *' : ''}`}
-                name="section_id"
-                value={form.section_id}
-                onChange={(v) => setForm((p) => ({ ...p, section_id: v }))}
-                placeholder="Select Section"
-                options={effectiveSectionOptions.map((section) => ({ value: asText(section.id), label: section.name }))}
-              />
-            </div>
-          )}
-
-          <TextareaField
-            label="Description / Instructions"
-            name="description"
-            rows={3}
-            placeholder="Describe the assignment, what students need to do..."
-            value={form.description}
-            onChange={handleChange}
-            className="resize-none"
-          />
-
-          {/* Due Date + Total Marks row */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label>Due Date <span className="text-red-500">*</span></Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {form.due_date
-                      ? format(parseISO(form.due_date), 'dd MMM yyyy')
-                      : <span className="text-muted-foreground">Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={form.due_date ? parseISO(form.due_date) : undefined}
-                    onSelect={(d) => setForm((p) => ({ ...p, due_date: d ? format(d, 'yyyy-MM-dd') : '' }))}
-                    captionLayout="dropdown"
-                    fromYear={2020}
-                    toYear={2030}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Due Time</Label>
-              <TimePickerField
-                value={form.due_time}
-                onChange={(value) => setForm((p) => ({ ...p, due_time: value }))}
-                mode="simple"
-                interval={15}
-                placeholder="Select Time"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="total_marks">Total Marks</Label>
-              <InputField name="total_marks" type="number" min="0" placeholder="e.g. 20" value={form.total_marks} onChange={handleChange} />
-            </div>
-          </div>
-
-          <SwitchField
-            label="Publish Now"
-            name="is_published"
-            value={publishNow}
-            onChange={setPublishNow}
-            hint="Turn off to save this item as draft"
-          />
-
-          <div className="space-y-1.5">
-            <Label htmlFor="assignment-file">Attach File(s)</Label>
-            <label
-              htmlFor="assignment-file"
-              className="flex items-center gap-2 h-9 w-full rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 text-xs text-slate-500 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
-            >
-              <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate">
-                {files.length ? `${files.length} file(s) selected` : 'Choose file(s)...'}
-              </span>
-            </label>
-            <input id="assignment-file" type="file" className="hidden" onChange={handleFile} multiple />
-          </div>
-
-          {editingItem && existingAttachments.length > 0 && (
-            <div className="space-y-2 rounded-lg border border-slate-200 p-3 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Existing Attachments</p>
-              {existingAttachments.map((file) => (
-                <div key={file.id} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 border border-slate-200">
-                  <div className="min-w-0 flex items-center gap-2">
-                    <Paperclip className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-700 truncate">{file.name}</span>
-                  </div>
-                  {file.url ? (
-                    <a href={file.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900">
-                      Open <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  ) : (
-                    <span className="text-xs text-slate-400">No URL</span>
-                  )}
-                </div>
-              ))}
-
-              {existingPdf?.url && (
-                <div className="rounded-md border border-slate-200 overflow-hidden bg-white">
-                  <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-600 border-b">PDF Preview</div>
-                  <iframe title="Assignment Attachment PDF" src={existingPdf.url} className="w-full h-64" />
-                </div>
-              )}
-            </div>
-          )}
-        </form>
-      </AppModal>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
-        {summaryData.map((s) => (
-          <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-white text-center`}>
-            <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Filter buttons */}
-      <div className="flex gap-2 flex-wrap">
-        {[['all', 'All'], ['active', 'Active'], ['submitted', 'Submitted'], ['graded', 'Graded']].map(([v, l]) => (
-          <button
-            key={v}
-            onClick={() => setFilter(v)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${filterStatus === v ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300'}`}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {/* Assignment list */}
-      {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400">
-          <ClipboardList className="w-10 h-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No assignments in this category.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filtered.map((asgn, i) => {
-            const normalizedStatus = getNormalizedAssignmentStatus(asgn);
-            const sm = STATUS_MAP[normalizedStatus] || STATUS_MAP['active'];
+        ) : (
+          assignments.map((asgn, i) => {
+            const submitted = asgn.stats?.submitted || 0;
+            const total = asgn.stats?.total_students || 1;
+            const pct = Math.round((submitted / total) * 100);
+            const status = asgn.is_published ? (submitted > 0 ? 'submitted' : 'active') : 'draft';
+            const sm = STATUS_MAP[status];
             const Icon = sm.icon;
-            const submitted = getSubmissionCount(asgn);
-            const totalStudents = asgn.stats?.total_students ?? asgn.total_students ?? 0;
-            const submissionPct = totalStudents > 0 ? Math.round((submitted / totalStudents) * 100) : 0;
-            const attachmentCount = Array.isArray(asgn.attachments) ? asgn.attachments.length : 0;
+
             return (
-              <div key={asgn.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${SUBJECT_COLORS[i % SUBJECT_COLORS.length]}`}>
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <span className="text-xs font-bold bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 text-slate-700">{asgn.subject || 'General'}</span>
-                        <span className="text-xs text-slate-400">{asgn.class_name || classMap[asgn.class_id]?.class_name || '-'}</span>
-                      </div>
-                      <h3 className="text-sm font-extrabold text-slate-800">{asgn.title}</h3>
-                      <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{asgn.description || asgn.instructions || 'No description provided'}</p>
-                    </div>
-                    <span className={`flex-shrink-0 flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${sm.classes}`}>
-                      <Icon className="w-3 h-3" /> {sm.label}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex gap-4 text-xs text-slate-500">
-                      <span>Assigned: {formatSafeDate(asgn.assigned_on || asgn.created_at)}</span>
-                      <span className="font-semibold text-red-600">Due: {formatSafeDate(asgn.due_date)}</span>
-                      <span>Marks: {asgn.total_marks || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        disabled={attachmentCount === 0}
-                        onClick={() => openAttachmentView(asgn)}
-                      >
-                        <Paperclip className="w-3.5 h-3.5 mr-1" /> Files ({attachmentCount})
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => openEditModal(asgn)}>
-                        <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
-                      </Button>
-                      <Button type="button" variant="destructive" size="sm" className="h-7 text-xs" onClick={() => setDeleteTarget(asgn)}>
-                        <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Submission progress */}
-                  <div className="mt-3">
-                    <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                      <span>Submissions: {submitted}/{totalStudents}</span>
-                      <span>{submissionPct}%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full ${submissionPct >= 90 ? 'bg-emerald-500' : submissionPct >= 60 ? 'bg-amber-500' : 'bg-red-400'}`}
-                        style={{ width: `${submissionPct}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <AssignmentCard
+                key={asgn.id}
+                assignment={asgn}
+                status={status}
+                sm={sm}
+                Icon={Icon}
+                submitted={submitted}
+                total={total}
+                pct={pct}
+                config={config}
+                onViewAttachments={() => {
+                  const mats = (asgn.attachments || []).map((f, idx) => ({ 
+                    id: f.id || idx, 
+                    name: f.name || 'File', 
+                    url: f.url || f.file_url, 
+                    type: getFileType(f.url || f.file_url) 
+                  }));
+                  setActiveAttachmentView({ 
+                    title: asgn.title, 
+                    materials: mats, 
+                    activeUrl: mats[0]?.url, 
+                    activeType: mats[0]?.type 
+                  });
+                  setIsAttachmentViewOpen(true);
+                }}
+                onEdit={() => {
+                  setEditingItem(asgn);
+                  setRemovedAttachmentIds([]);
+                  setPublishNow(asgn.is_published);
+                  setForm({ 
+                    title: asgn.title, 
+                    subject: asgn.subject, 
+                    class_id: asgn.class_id, 
+                    section_id: asgn.section_id || '',
+                    batch_id: asgn.batch_id || '',
+                    program_id: asgn.program_id || '',
+                    description: asgn.description || '',
+                    instructions: asgn.instructions || '',
+                    due_date: asgn.due_date?.split('T')[0], 
+                    due_time: asgn.due_time || '',
+                    total_marks: asgn.total_marks,
+                    passing_marks: asgn.passing_marks,
+                    difficulty_level: asgn.difficulty_level || 'intermediate',
+                    estimated_time: asgn.estimated_time || '',
+                    allow_late_submission: asgn.allow_late_submission || false,
+                    late_submission_penalty: asgn.late_submission_penalty || 0,
+                    max_files: asgn.max_files || 10,
+                    max_file_size: asgn.max_file_size || 50,
+                    grading_type: asgn.grading_type || 'marks'
+                  });
+                  setModalOpen(true);
+                }}
+                onDelete={() => setDeleteTarget(asgn)}
+                onViewSubmissions={() => handleViewSubmissions(asgn)}
+              />
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
 
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
-        loading={deleting}
-        title="Delete Assignment"
-        description={`This will permanently delete "${deleteTarget?.title || 'this assignment'}".`}
-        confirmLabel="Delete"
-        variant="destructive"
+      {/* Assignment Modal */}
+      <AssignmentModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        form={form}
+        setForm={setForm}
+        files={files}
+        setFiles={setFiles}
+        saving={saving}
+        publishNow={publishNow}
+        setPublishNow={setPublishNow}
+        editingItem={editingItem}
+        existingAttachments={existingAttachments}
+        removedAttachmentIds={removedAttachmentIds}
+        setRemovedAttachmentIds={setRemovedAttachmentIds}
+        onSubmit={handleFormSubmit}
+        config={config}
+        t={t}
+        classes={normalizedClasses}
+        batches={normalizedBatches}
+        programs={normalizedPrograms}
+        sectionOptions={sectionOptions}
+        subjectOptions={subjectOptions}
+        selectedClass={selectedClass}
+        selectedBatch={selectedBatch}
+        selectedProgram={selectedProgram}
       />
 
-      <AppModal
+      {/* Submissions Modal */}
+      <SubmissionsModal
+        open={submissionsModalOpen}
+        onClose={() => setSubmissionsModalOpen(false)}
+        assignment={selectedAssignment}
+        onGradeSubmission={handleGradeSubmission}
+        config={config}
+      />
+
+      {/* Grading Modal */}
+      <GradingModal
+        open={gradingModalOpen}
+        onClose={() => setGradingModalOpen(false)}
+        submission={selectedSubmission}
+        assignment={selectedAssignment}
+        config={config}
+      />
+
+      {/* Attachment Viewer Modal */}
+      <AttachmentViewerModal
         open={isAttachmentViewOpen}
-        onClose={() => {
-          setIsAttachmentViewOpen(false);
-          setActiveAttachmentView(null);
-        }}
-        title={activeAttachmentView ? `${activeAttachmentView.title} Attachments` : 'Attachments'}
-        description={activeAttachmentView ? `${activeAttachmentView.className} - Uploaded Materials` : 'Attachment details'}
-        size="xl"
-        footer={
-          <Button
-            variant="outline"
-            onClick={() => {
-              setIsAttachmentViewOpen(false);
-              setActiveAttachmentView(null);
-            }}
-          >
-            Close
+        onClose={() => setIsAttachmentViewOpen(false)}
+        activeAttachmentView={activeAttachmentView}
+        setActiveAttachmentView={setActiveAttachmentView}
+      />
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog 
+        open={!!deleteTarget} 
+        onClose={() => setDeleteTarget(null)} 
+        onConfirm={async () => { 
+          await deleteAssignment(deleteTarget.id); 
+          setDeleteTarget(null); 
+        }} 
+        title="Delete Assignment?" 
+        description="This action cannot be undone. All submissions will also be deleted." 
+      />
+    </div>
+  );
+}
+
+// Assignment Card Component
+function AssignmentCard({ 
+  assignment, status, sm, Icon, submitted, total, pct, config,
+  onViewAttachments, onEdit, onDelete, onViewSubmissions
+}) {
+  const hasAttachments = assignment.attachments?.length > 0;
+  
+  return (
+    <div className={`p-5 rounded-2xl border bg-white shadow-sm hover:shadow-md transition-all ${
+      SUBJECT_COLORS[Math.floor(Math.random() * SUBJECT_COLORS.length)]
+    }`}>
+      <div className="flex justify-between items-start flex-wrap gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className="text-[10px] font-bold bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600 uppercase tracking-wider">
+              {assignment.subject || config.defaultSubject || 'Subject'}
+            </span>
+            <span className={`flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${sm.classes}`}>
+              <Icon className="w-2.5 h-2.5" /> {sm.label}
+            </span>
+            {assignment.difficulty_level && (
+              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                assignment.difficulty_level === 'beginner' ? 'bg-green-100 text-green-700' :
+                assignment.difficulty_level === 'intermediate' ? 'bg-blue-100 text-blue-700' :
+                assignment.difficulty_level === 'advanced' ? 'bg-orange-100 text-orange-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                {assignment.difficulty_level}
+              </span>
+            )}
+          </div>
+          <h3 className="font-extrabold text-slate-800 text-base truncate">{assignment.title}</h3>
+          <p className="text-xs text-slate-500 mt-1 line-clamp-1">{assignment.description || 'No description provided'}</p>
+        </div>
+        <div className="flex items-center gap-2 ml-4">
+          <Button variant="outline" size="sm" className="h-8 rounded-lg bg-white" onClick={onViewAttachments} disabled={!hasAttachments}>
+            <Paperclip className="w-3 h-3 mr-1.5" /> {assignment.attachments?.length || 0}
           </Button>
-        }
-      >
-        {!activeAttachmentView ? null : (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 p-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Materials</p>
-              {activeAttachmentView.materials.length === 0 ? (
-                <p className="text-sm text-slate-500">No material uploaded for this assignment.</p>
-              ) : (
-                <div className="space-y-2">
-                  {activeAttachmentView.materials.map((material) => (
-                    <div key={material.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
-                      <div className="min-w-0 flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                        <p className="text-sm text-slate-700 truncate">{material.name}</p>
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg bg-white" onClick={onEdit}>
+            <Pencil className="w-3 h-3" />
+          </Button>
+          <Button variant="destructive" size="sm" className="h-8 w-8 p-0 rounded-lg" onClick={onDelete}>
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="mt-5 space-y-2">
+        <div className="flex justify-between items-end text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <span>Submission Progress</span>
+          <span className="text-slate-700">{submitted} / {total} Students</span>
+        </div>
+        <Progress value={pct} className="h-2" />
+      </div>
+
+      {/* Footer */}
+      <div className="mt-4 flex items-center justify-between text-[11px] font-bold text-slate-500 border-t border-slate-100 pt-3 flex-wrap gap-2">
+        <div className="flex gap-4 flex-wrap">
+          <span>DUE: <span className="text-red-500">{format(parseISO(assignment.due_date), 'dd MMM yyyy')}</span></span>
+          <span>MARKS: <span className="text-slate-800">{assignment.total_marks || 'N/A'}</span></span>
+          {assignment.estimated_time && (
+            <span>⏱️ {assignment.estimated_time} min</span>
+          )}
+        </div>
+        <button 
+          onClick={onViewSubmissions}
+          className="flex items-center gap-1 text-blue-600 hover:underline cursor-pointer"
+        >
+          View Submissions <ChevronRight className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Assignment Modal Component (Simplified version)
+function AssignmentModal({
+  open, onClose, form, setForm, files, setFiles, saving, publishNow, setPublishNow,
+  editingItem, existingAttachments, removedAttachmentIds, setRemovedAttachmentIds,
+  onSubmit, config, t, classes, batches, programs, sectionOptions, subjectOptions
+}) {
+  const fileInputRef = useRef(null);
+  const [activeTab, setActiveTab] = useState('basic');
+
+  const handleFileSelect = (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    setFiles(prev => [...prev, ...selectedFiles]);
+  };
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const getTargetOptions = () => {
+    if (config.structure === 'classes-sections') return classes;
+    if (config.structure === 'batches') return batches;
+    if (config.structure === 'programs') return programs;
+    return [];
+  };
+
+  const getTargetLabel = () => {
+    if (config.structure === 'classes-sections') return config.classLabel;
+    if (config.structure === 'batches') return 'Batch';
+    if (config.structure === 'programs') return 'Program';
+    return 'Target';
+  };
+
+  const getTargetValue = () => {
+    if (config.structure === 'classes-sections') return form.class_id;
+    if (config.structure === 'batches') return form.batch_id;
+    if (config.structure === 'programs') return form.program_id;
+    return '';
+  };
+
+  const setTargetValue = (value) => {
+    if (config.structure === 'classes-sections') setForm({ ...form, class_id: value });
+    if (config.structure === 'batches') setForm({ ...form, batch_id: value });
+    if (config.structure === 'programs') setForm({ ...form, program_id: value });
+  };
+
+  return (
+    <AppModal open={open} onClose={onClose} title={editingItem ? 'Update Assignment' : 'Create Assignment'} size="lg">
+      <form onSubmit={onSubmit} className="space-y-5">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="basic">Basic Info</TabsTrigger>
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="grading">Grading</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
+
+          {/* Basic Info Tab */}
+          <TabsContent value="basic" className="space-y-4 pt-4">
+            <InputField 
+              label="Assignment Title" 
+              required 
+              value={form.title} 
+              onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))} 
+              placeholder="Enter assignment title"
+            />
+            
+            {config.hasSubjects && subjectOptions.length > 0 && (
+              <SelectField 
+                label="Subject" 
+                required 
+                value={form.subject} 
+                onChange={(v) => setForm(p => ({ ...p, subject: v }))} 
+                options={subjectOptions.map(s => ({ value: s, label: s }))}
+                placeholder="Select subject"
+              />
+            )}
+            
+            {getTargetOptions().length > 0 && (
+              <SelectField 
+                label={getTargetLabel()} 
+                required 
+                value={getTargetValue()} 
+                onChange={setTargetValue} 
+                options={getTargetOptions().map(item => ({ 
+                  value: item.class_id || item.batch_id || item.program_id, 
+                  label: item.class_name || item.batch_name || item.program_name 
+                }))}
+                placeholder={`Select ${getTargetLabel().toLowerCase()}`}
+              />
+            )}
+            
+            {config.hasSections && sectionOptions.length > 0 && (
+              <SelectField 
+                label="Section" 
+                value={form.section_id} 
+                onChange={(v) => setForm(p => ({ ...p, section_id: v }))} 
+                options={sectionOptions.map(s => ({ value: s.id, label: s.name }))}
+                placeholder="Select section (optional)"
+              />
+            )}
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Due Date *</Label>
+                <input 
+                  type="date" 
+                  className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm focus:ring-2 ring-blue-100 outline-none transition-all" 
+                  value={form.due_date} 
+                  onChange={(e) => setForm(p => ({ ...p, due_date: e.target.value }))} 
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Due Time (Optional)</Label>
+                <input 
+                  type="time" 
+                  className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm focus:ring-2 ring-blue-100 outline-none transition-all" 
+                  value={form.due_time} 
+                  onChange={(e) => setForm(p => ({ ...p, due_time: e.target.value }))} 
+                />
+              </div>
+            </div>
+            
+            <SelectField 
+              label="Difficulty Level" 
+              value={form.difficulty_level} 
+              onChange={(v) => setForm(p => ({ ...p, difficulty_level: v }))} 
+              options={[
+                { value: 'beginner', label: 'Beginner' },
+                { value: 'intermediate', label: 'Intermediate' },
+                { value: 'advanced', label: 'Advanced' },
+                { value: 'expert', label: 'Expert' }
+              ]}
+            />
+            
+            <InputField 
+              label="Estimated Time (minutes)" 
+              type="number" 
+              value={form.estimated_time} 
+              onChange={(e) => setForm(p => ({ ...p, estimated_time: e.target.value }))} 
+              placeholder="e.g., 30"
+            />
+          </TabsContent>
+
+          {/* Content Tab */}
+          <TabsContent value="content" className="space-y-4 pt-4">
+            <TextareaField 
+              label="Description" 
+              rows={3} 
+              value={form.description} 
+              onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} 
+              placeholder="Describe what students need to do..."
+            />
+            
+            <TextareaField 
+              label="Instructions" 
+              rows={4} 
+              value={form.instructions} 
+              onChange={(e) => setForm(p => ({ ...p, instructions: e.target.value }))} 
+              placeholder="Provide detailed instructions, formatting requirements, submission guidelines..."
+            />
+            
+            {/* Existing Attachments */}
+            {editingItem && existingAttachments.length > removedAttachmentIds.length && (
+              <div className="p-3 bg-slate-50 rounded-xl border space-y-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Current Attachments</p>
+                {existingAttachments.filter(f => !removedAttachmentIds.includes(f.id)).map(f => (
+                  <div key={f.id} className="flex items-center justify-between p-2 bg-white border rounded-lg shadow-sm">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {f.type === 'image' ? <ImageIcon className="w-3.5 h-3.5 text-pink-500" /> :
+                       f.type === 'pdf' ? <FileText className="w-3.5 h-3.5 text-red-500" /> :
+                       <Paperclip className="w-3.5 h-3.5 text-slate-400" />}
+                      <span className="text-xs font-medium truncate">{f.name}</span>
+                    </div>
+                    <button type="button" onClick={() => setRemovedAttachmentIds(p => [...p, f.id])} className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* New Attachments */}
+            <div className="space-y-1.5">
+              <Label>New Attachments</Label>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                multiple 
+                onChange={handleFileSelect} 
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-blue-300 hover:bg-blue-50 transition-all"
+              >
+                <Upload className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">Click to upload files</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  PDF, Images, Documents, Videos (Max {form.max_file_size}MB each, up to {form.max_files} files)
+                </p>
+              </button>
+              
+              {/* File List */}
+              {files.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {files.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                        <span className="text-sm truncate">{file.name}</span>
+                        <span className="text-xs text-slate-400 flex-shrink-0">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </span>
                       </div>
-                      {material.url ? (
-                        <a
-                          href={material.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
-                        >
-                          Open <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      ) : (
-                        <span className="text-xs text-slate-400">No file URL</span>
-                      )}
+                      <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-700 p-1">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+          </TabsContent>
 
-            {activeAttachmentView.pdfUrl && (
-              <div className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="px-4 py-2 bg-slate-50 border-b text-xs font-semibold text-slate-600">
-                  PDF Preview
-                </div>
-                <iframe
-                  title="Assignment Attachment PDF Preview"
-                  src={activeAttachmentView.pdfUrl}
-                  className="w-full h-[60vh]"
-                />
-              </div>
+          {/* Grading Tab */}
+          <TabsContent value="grading" className="space-y-4 pt-4">
+            <div className="grid grid-cols-2 gap-3">
+              <InputField 
+                label="Total Marks" 
+                type="number" 
+                value={form.total_marks} 
+                onChange={(e) => setForm(p => ({ ...p, total_marks: e.target.value }))} 
+                placeholder="e.g., 100"
+              />
+              <InputField 
+                label="Passing Marks" 
+                type="number" 
+                value={form.passing_marks} 
+                onChange={(e) => setForm(p => ({ ...p, passing_marks: e.target.value }))} 
+                placeholder="e.g., 40"
+              />
+            </div>
+            
+            <SelectField 
+              label="Grading Type" 
+              value={form.grading_type} 
+              onChange={(v) => setForm(p => ({ ...p, grading_type: v }))} 
+              options={[
+                { value: 'marks', label: 'Marks Only' },
+                { value: 'grades', label: 'Grades (A-F)' },
+                { value: 'pass_fail', label: 'Pass/Fail' }
+              ]}
+            />
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-4 pt-4">
+            <SwitchField 
+              label="Allow Late Submissions" 
+              value={form.allow_late_submission} 
+              onChange={(v) => setForm(p => ({ ...p, allow_late_submission: v }))} 
+              hint="Students can submit after due date"
+            />
+            
+            {form.allow_late_submission && (
+              <InputField 
+                label="Late Submission Penalty (%)" 
+                type="number" 
+                value={form.late_submission_penalty} 
+                onChange={(e) => setForm(p => ({ ...p, late_submission_penalty: e.target.value }))} 
+                placeholder="e.g., 10 for 10% deduction"
+                hint="Percentage of marks to deduct for late submissions"
+              />
             )}
+            
+            <div className="grid grid-cols-2 gap-3">
+              <InputField 
+                label="Max Files per Submission" 
+                type="number" 
+                value={form.max_files} 
+                onChange={(e) => setForm(p => ({ ...p, max_files: e.target.value }))} 
+              />
+              <InputField 
+                label="Max File Size (MB)" 
+                type="number" 
+                value={form.max_file_size} 
+                onChange={(e) => setForm(p => ({ ...p, max_file_size: e.target.value }))} 
+              />
+            </div>
+            
+            <SwitchField 
+              label="Publish Instantly" 
+              value={publishNow} 
+              onChange={setPublishNow} 
+              hint="Disable to save as draft (not visible to students)"
+            />
+          </TabsContent>
+        </Tabs>
+
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button variant="outline" type="button" onClick={onClose}>Cancel</Button>
+          <Button className="bg-blue-600 hover:bg-blue-700 min-w-[120px]" type="submit" disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            {saving ? 'Saving...' : (editingItem ? 'Update' : 'Create')}
+          </Button>
+        </div>
+      </form>
+    </AppModal>
+  );
+}
+
+// Submissions Modal Component (Simplified)
+function SubmissionsModal({ open, onClose, assignment, onGradeSubmission, config }) {
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState('all');
+
+  const extractSubmissionsList = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.submissions)) return payload.submissions;
+    if (Array.isArray(payload?.data?.submissions)) return payload.data.submissions;
+    return [];
+  };
+
+  const normalizeSubmission = (item, index) => {
+    const through =
+      item?.AssignmentSubmission
+      || item?.assignment_submission
+      || item?.assignment_submissions
+      || item?.AssignmentSubmissions
+      || {};
+    const status = String(item?.status || through?.status || 'submitted').toLowerCase();
+    const files = Array.isArray(item?.files)
+      ? item.files
+      : Array.isArray(through?.files)
+        ? through.files
+        : [];
+    const studentName =
+      item?.student_name
+      || [item?.first_name, item?.last_name].filter(Boolean).join(' ').trim()
+      || item?.name
+      || 'Student';
+
+    return {
+      ...item,
+      id: through?.id || item?.submission_id || item?.id || `submission-${index}`,
+      submission_id: through?.id || item?.submission_id || item?.id,
+      student_id: item?.student_id || item?.user_id || item?.id || null,
+      student_name: studentName,
+      roll_number: item?.roll_number || item?.registration_no || item?.roll_no || 'N/A',
+      submitted_at: item?.submitted_at || through?.submitted_at || null,
+      marks: item?.marks ?? through?.marks ?? null,
+      feedback: item?.feedback ?? through?.feedback ?? '',
+      submission_text: item?.submission_text || through?.submission_text || '',
+      status,
+      files
+    };
+  };
+
+  useEffect(() => {
+    if (open && assignment) {
+      fetchSubmissions();
+    }
+  }, [open, assignment]);
+
+  const fetchSubmissions = async () => {
+    setLoading(true);
+    try {
+      const data = await teacherPortalService.getAssignmentSubmissions(assignment.id);
+      const normalized = extractSubmissionsList(data).map(normalizeSubmission);
+      setSubmissions(normalized);
+    } catch (error) {
+      toast.error('Failed to load submissions');
+      setSubmissions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredSubmissions = submissions.filter(sub => {
+    if (filter === 'all') return true;
+    if (filter === 'graded') return sub.status === 'graded';
+    if (filter === 'pending') return ['submitted', 'late'].includes(sub.status);
+    return true;
+  });
+
+  const stats = {
+    total: submissions.length,
+    submitted: submissions.filter(s => ['submitted', 'late', 'graded'].includes(s.status)).length,
+    graded: submissions.filter(s => s.status === 'graded').length,
+    pending: submissions.filter(s => ['submitted', 'late'].includes(s.status)).length
+  };
+
+  return (
+    <AppModal open={open} onClose={onClose} title={`Submissions: ${assignment?.title}`} size="xl">
+      <div className="space-y-4">
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-3">
+          <div className="bg-blue-50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+            <p className="text-xs text-blue-600">Total Students</p>
+          </div>
+          <div className="bg-amber-50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-amber-600">{stats.submitted}</p>
+            <p className="text-xs text-amber-600">Submitted</p>
+          </div>
+          <div className="bg-green-50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-green-600">{stats.graded}</p>
+            <p className="text-xs text-green-600">Graded</p>
+          </div>
+          <div className="bg-red-50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-red-600">{stats.pending}</p>
+            <p className="text-xs text-red-600">Pending</p>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex gap-2 border-b">
+          {['all', 'pending', 'graded'].map(filterType => (
+            <button
+              key={filterType}
+              onClick={() => setFilter(filterType)}
+              className={`px-4 py-2 text-sm font-medium transition-all ${
+                filter === filterType
+                  ? 'border-b-2 border-blue-500 text-blue-600'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Submissions List */}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        ) : filteredSubmissions.length === 0 ? (
+          <div className="text-center py-12 text-slate-400">
+            <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>No submissions found</p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[500px] overflow-y-auto">
+            {filteredSubmissions.map(submission => (
+              <SubmissionCard
+                key={submission.id}
+                submission={submission}
+                assignment={assignment}
+                onGrade={() => onGradeSubmission(submission)}
+                config={config}
+              />
+            ))}
           </div>
         )}
-      </AppModal>
+      </div>
+    </AppModal>
+  );
+}
+
+// Submission Card Component
+function SubmissionCard({ submission, assignment, onGrade, config }) {
+  const hasFiles = submission.files?.length > 0;
+  const isGraded = submission.status === 'graded';
+  const isLate = submission.status === 'late';
+  
+  return (
+    <div className={`p-4 border rounded-xl bg-white hover:shadow-md transition-all ${
+      isLate ? 'border-orange-200 bg-orange-50/30' : ''
+    }`}>
+      <div className="flex items-start justify-between flex-wrap gap-2">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h4 className="font-bold text-slate-800">{submission.student_name}</h4>
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+              isGraded ? 'bg-green-100 text-green-700' :
+              isLate ? 'bg-orange-100 text-orange-700' :
+              'bg-amber-100 text-amber-700'
+            }`}>
+              {isGraded ? 'Graded' : isLate ? 'Late' : 'Pending'}
+            </span>
+            {isLate && (
+              <span className="text-[9px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                Late Submission
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500">Roll No: {submission.roll_number || 'N/A'}</p>
+          <p className="text-xs text-slate-500">Submitted: {submission.submitted_at && format(parseISO(submission.submitted_at), 'dd MMM yyyy, hh:mm a')}</p>
+          
+          {submission.submission_text && (
+            <div className="mt-2 p-2 bg-slate-50 rounded-lg">
+              <p className="text-xs font-semibold text-slate-600 mb-1">Submission Notes:</p>
+              <p className="text-xs text-slate-500">{submission.submission_text}</p>
+            </div>
+          )}
+          
+          {hasFiles && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {submission.files.map((file, idx) => (
+                <a
+                  key={idx}
+                  href={file.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:underline bg-blue-50 px-2 py-1 rounded-lg"
+                >
+                  <Paperclip className="w-3 h-3" />
+                  {file.name}
+                </a>
+              ))}
+            </div>
+          )}
+          
+          {isGraded && (
+            <div className="mt-2 p-2 bg-green-50 rounded-lg">
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-xs text-green-600">Marks Obtained</p>
+                  <p className="font-bold text-green-700">{submission.marks}/{assignment?.total_marks}</p>
+                </div>
+                {submission.grade && (
+                  <div>
+                    <p className="text-xs text-green-600">Grade</p>
+                    <p className="font-bold text-green-700">{submission.grade}</p>
+                  </div>
+                )}
+              </div>
+              {submission.feedback && (
+                <p className="text-xs text-green-600 mt-1">Feedback: {submission.feedback}</p>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {!isGraded && (
+          <Button size="sm" onClick={onGrade} className="bg-blue-600 hover:bg-blue-700">
+            <Award className="w-4 h-4 mr-1" /> Grade
+          </Button>
+        )}
+      </div>
     </div>
+  );
+}
+
+// Grading Modal Component
+function GradingModal({ open, onClose, submission, assignment, config }) {
+  const [marks, setMarks] = useState('');
+  const [grade, setGrade] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (submission) {
+      setMarks(submission.marks || '');
+      setGrade(submission.grade || '');
+      setFeedback(submission.feedback || '');
+    }
+  }, [submission]);
+
+  const handleSubmit = async () => {
+    if (!marks && assignment?.grading_type !== 'pass_fail') {
+      toast.error('Please enter marks');
+      return;
+    }
+    
+    setSubmitting(true);
+    try {
+      const submissionId = submission?.submission_id || submission?.id;
+      if (!submissionId) {
+        throw new Error('Submission id is missing');
+      }
+      await teacherPortalService.gradeSubmission(submissionId, {
+        marks: parseFloat(marks),
+        grade,
+        feedback,
+        assignment_id: assignment?.id,
+        student_id: submission?.student_id
+      });
+      toast.success('Submission graded successfully');
+      onClose();
+    } catch (error) {
+      toast.error('Failed to grade submission');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getGradeOptions = () => {
+    if (config.gradingSystem === 'letter') {
+      return ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
+    } else if (config.gradingSystem === 'percentage') {
+      return ['90-100%', '80-89%', '70-79%', '60-69%', '50-59%', 'Below 50%'];
+    }
+    return [];
+  };
+
+  return (
+    <AppModal open={open} onClose={onClose} title="Grade Submission" size="md">
+      <div className="space-y-4">
+        <div className="bg-slate-50 rounded-lg p-3">
+          <p className="text-sm font-semibold">Student: {submission?.student_name}</p>
+          <p className="text-xs text-slate-500">Assignment: {assignment?.title}</p>
+          <p className="text-xs text-slate-500">Submitted: {submission?.submitted_at && format(parseISO(submission.submitted_at), 'dd MMM yyyy, hh:mm a')}</p>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3">
+          <InputField
+            label="Marks Obtained"
+            type="number"
+            value={marks}
+            onChange={(e) => setMarks(e.target.value)}
+            placeholder={`Max: ${assignment?.total_marks || 'N/A'}`}
+            required={assignment?.grading_type !== 'pass_fail'}
+          />
+          
+          {config.gradingSystem !== 'none' && (
+            <SelectField
+              label="Grade"
+              value={grade}
+              onChange={setGrade}
+              options={getGradeOptions().map(g => ({ value: g, label: g }))}
+              placeholder="Select grade"
+            />
+          )}
+        </div>
+        
+        <TextareaField
+          label="Feedback"
+          rows={4}
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          placeholder="Provide feedback to the student..."
+        />
+        
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Submit Grade
+          </Button>
+        </div>
+      </div>
+    </AppModal>
+  );
+}
+
+// Attachment Viewer Modal Component
+function AttachmentViewerModal({ open, onClose, activeAttachmentView, setActiveAttachmentView }) {
+  if (!activeAttachmentView) return null;
+
+  return (
+    <AppModal open={open} onClose={onClose} title={activeAttachmentView.title} size="xl">
+      <div className="flex flex-col md:flex-row gap-4 h-[70vh]">
+        <div className="w-full md:w-[250px] border-r pr-2 overflow-y-auto flex-shrink-0">
+          <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 px-1">Attachments ({activeAttachmentView.materials?.length || 0})</p>
+          <div className="flex md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0">
+            {activeAttachmentView.materials?.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setActiveAttachmentView(p => ({ ...p, activeUrl: m.url, activeType: m.type }))}
+                className={`flex-shrink-0 md:w-full p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                  activeAttachmentView.activeUrl === m.url 
+                    ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' 
+                    : 'bg-white hover:bg-slate-50'
+                }`}
+              >
+                {m.type === 'image' ? <ImageIcon className="w-4 h-4 text-pink-500" /> : 
+                 m.type === 'video' ? <PlayCircle className="w-4 h-4 text-orange-500" /> : 
+                 <FileText className="w-4 h-4 text-blue-500" />}
+                <span className="text-[11px] font-medium truncate">{m.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="flex-1 bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center relative border shadow-inner">
+          {activeAttachmentView.activeUrl ? (
+            <>
+              {activeAttachmentView.activeType === 'image' ? (
+                <img src={activeAttachmentView.activeUrl} className="max-w-full max-h-full object-contain" alt="Preview" />
+              ) : activeAttachmentView.activeType === 'video' ? (
+                <video src={activeAttachmentView.activeUrl} controls className="w-full h-full" />
+              ) : (
+                <iframe 
+                  src={`${activeAttachmentView.activeUrl}#toolbar=1&view=FitH`} 
+                  className="w-full h-full border-none" 
+                  title="Document Preview" 
+                />
+              )}
+              <a 
+                href={activeAttachmentView.activeUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="absolute top-3 right-3 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold backdrop-blur-md border border-white/20"
+              >
+                <ExternalLink className="w-3 h-3 inline mr-1" /> Full Screen
+              </a>
+            </>
+          ) : (
+            <p className="text-white/40 text-xs italic font-medium">Select a file to preview</p>
+          )}
+        </div>
+      </div>
+    </AppModal>
   );
 }

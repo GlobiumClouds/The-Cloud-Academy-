@@ -192,12 +192,16 @@ export const academicYearService = {
     try {
       const params = { institute_id: instituteId, limit: 100, sortBy: 'start_date', sortOrder: 'DESC' };
       if (onlyActive) params.is_active = true;
-      const response = await api.get('/academic-years', { params });
-      const years = (response.data?.data || []).map(y => ({
-        value: y.id,
-        label: y.name,
-        is_current: y.is_current
-      }));
+      const response = await api.get('/academic-years/options', { params });
+      const years = (response.data?.data || [])
+        .map((y) => ({
+          value: y?.value || y?.id,
+          label: y?.label || y?.name,
+          is_current: !!y?.is_current,
+          start_date: y?.start_date,
+          end_date: y?.end_date,
+        }))
+        .filter((y) => y.value && y.label);
       return { data: years };
     } catch (error) {
       console.error('Error fetching academic year options:', error);

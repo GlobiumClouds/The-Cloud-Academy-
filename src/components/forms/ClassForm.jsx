@@ -24,6 +24,7 @@ import { z } from 'zod';
 import {
   InputField,
   SelectField,
+  StatusBadge,
   TextareaField,
   FormSubmitButton,
 } from '@/components/common';
@@ -171,6 +172,11 @@ export default function ClassForm({
     resolver: zodResolver(classSchema),
     defaultValues: getInitialValues(),
   });
+
+  const selectedAcademicYearId = watch('academic_year_id');
+  const selectedAcademicYear = (academicYearOptions || []).find(
+    (option) => String(option.value) === String(selectedAcademicYearId)
+  );
 
   // ✅ FIXED: Reset form when defaultValues change (important for edit mode)
   useEffect(() => {
@@ -431,6 +437,11 @@ export default function ClassForm({
                     placeholder="Select"
                     required
                   />
+                  {selectedAcademicYear?.is_current ? (
+                    <div className="-mt-2">
+                      <StatusBadge status="current" label="Current Academic Year" />
+                    </div>
+                  ) : null}
                   
                   <div className="col-span-1 md:col-span-2">
                     <TextareaField

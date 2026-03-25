@@ -1,20 +1,21 @@
-/**
- * StudentForm — Create / Edit student
- * ─────────────────────────────────────────────────────────────────
- * Props:
- *   defaultValues      object          Pre-filled values for edit mode
- *   onSubmit           (data) => void  Called with form data
- *   onCancel           () => void
- *   loading            boolean
- *   classOptions       { value, label }[]
- *   sectionOptions     { value, label }[]
- *   academicYearOptions{ value, label }[]
- *   isEdit             boolean
- */
+// /**
+//  * StudentForm — Create / Edit student
+//  * ─────────────────────────────────────────────────────────────────
+//  * Props:
+//  *   defaultValues      object          Pre-filled values for edit mode
+//  *   onSubmit           (data) => void  Called with form data
+//  *   onCancel           () => void
+//  *   loading            boolean
+//  *   classOptions       { value, label }[]
+//  *   sectionOptions     { value, label }[]
+//  *   academicYearOptions{ value, label }[]
+//  *   isEdit             boolean
+//  */
 'use client';
 
-import { useForm } from 'react-hook-form';
-import { useState } from 'react';
+import { useForm, Controller, useFieldArray } from 'react-hook-form'; // Added useFieldArray
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   InputField,
   SelectField,
@@ -26,39 +27,56 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { PlusCircle, X, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
-import { GENDER_OPTIONS, RELIGION_OPTIONS, BLOOD_GROUP_OPTIONS, DOCUMENT_TYPES } from '@/constants';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { 
+  PlusCircle, X, Upload, ChevronLeft, ChevronRight, Plus, Trash2, // Added Plus, Trash2
+  User, GraduationCap, Users, Phone, MapPin, Heart, DollarSign, BookOpen 
+} from 'lucide-react';
+import { 
+  GENDER_OPTIONS, RELIGION_OPTIONS, BLOOD_GROUP_OPTIONS, DOCUMENT_TYPES ,CONCESSION_OPTIONS,GUARDIAN_TYPES
+} from '@/constants';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useRef, useMemo } from 'react'; 
+import { classService, academicYearService } from '@/services'; 
+
+const generateUniqueId = (prefix = 'doc') => `${prefix}-${new Date().getTime()}-${Math.floor(Math.random() * 1000)}`;
+const VALID_DOCUMENT_TYPES = new Set(DOCUMENT_TYPES.map((d) => d.value));
 
 export default function StudentForm({
   defaultValues = {},
   onSubmit,
   onCancel,
   loading = false,
-  classOptions = [],
-  sectionOptions = [],
-  academicYearOptions = [],
-  courseOptions = [],
-  batchOptions = [],
-  programOptions = [],
+  instituteId,
   instituteType = 'school',
   isEdit = false,
 }) {
   const [activeTab, setActiveTab] = useState('personal');
-  const [documents, setDocuments] = useState(defaultValues.documents || []);
+  // const [documents, setDocuments] = useState(defaultValues.documents || []); // Using useFieldArray now
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(
+    defaultValues.details?.studentDetails?.academic_year_id || ''
+  );
+  
+  // Use refs to track previous values for reset logic without triggering re-renders
+  const prevClassRef = useRef(defaultValues.details?.studentDetails?.class_id || '');
+
   const isMobile = useMediaQuery('(max-width: 640px)');
   const isTablet = useMediaQuery('(max-width: 1024px)');
-  
+
   const {
     register,
     control,
     handleSubmit,
     watch,
     setValue,
+    getValues,
+    reset,
     formState: { errors },
   } = useForm({ 
     defaultValues: {
       documents: [],
+      guardians: [{ name: '', relation: 'guardian', phone: '', cnic: '', email: '', type: 'guardian' }],
       ...defaultValues,
       details: {
         studentDetails: {
@@ -67,8 +85,201 @@ export default function StudentForm({
       }
     } 
   });
+  
+  // Guardians Array
+  const { fields: guardianFields, append: appendGuardian, remove: removeGuardian } = useFieldArray({
+    control,
+    name: 'guardians'
+  });
 
-  // Mobile tab navigation
+  // Documents Array (Syncing with TeacherForm pattern)
+  const { fields: docFields, append: appendDoc, remove: removeDoc } = useFieldArray({
+    control,
+    name: 'documents'
+  });
+  
+  // Watch documents for preview
+  const watchDocuments = watch('documents');
+  const watchGuardians = watch('guardians');
+
+  // Reset form when defaultValues change
+  useEffect(() => {
+    if (defaultValues && Object.keys(defaultValues).length > 0) {
+      console.log('🔄 Resetting form with:', defaultValues);
+      reset(defaultValues);
+      
+      // Set selected values
+      if (defaultValues.details?.studentDetails?.academic_year_id) {
+        setSelectedAcademicYear(defaultValues.details.studentDetails.academic_year_id);
+      }
+      // Re-init prevClassRef
+      if (defaultValues.details?.studentDetails?.class_id) {
+        prevClassRef.current = defaultValues.details.studentDetails.class_id;
+      }
+    }
+  }, [defaultValues?.id, reset]);
+
+  // ─────────────────────────────────────────────────────────────────
+  // FETCH ACADEMIC YEARS
+  // ─────────────────────────────────────────────────────────────────
+  const { data: academicYears = [], isLoading: yearsLoading } = useQuery({
+    queryKey: ['academic-years', instituteId],
+    queryFn: async () => {
+      try {
+        const response = await academicYearService.getAll({ 
+          institute_id: instituteId, 
+          is_active: true 
+        });
+        const years = response.data || [];
+        return years.map(y => ({
+          value: y.id,
+          label: y.name
+        }));
+      } catch (error) {
+        console.error('Error fetching academic years:', error);
+        return [];
+      }
+    },
+    enabled: !!instituteId,
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // FETCH CLASSES with their SECTIONS
+  // ─────────────────────────────────────────────────────────────────
+  const { data: classes = [], isLoading: classesLoading } = useQuery({
+    queryKey: ['classes', instituteId, selectedAcademicYear],
+    queryFn: async () => {
+      if (!selectedAcademicYear) return [];
+      
+      try {
+        // Yeh wahi ClassForm wala endpoint hai jo sections bhi return karta hai
+        const response = await classService.getAll({ 
+          academic_year_id: selectedAcademicYear,
+          include_sections: true 
+        });
+        
+        // Response structure: { data: rows }
+        const classList = response.data?.rows || response.data || [];
+        
+        console.log('📚 Classes with sections:', classList);
+        return classList;
+      } catch (error) {
+        console.error('Error fetching classes:', error);
+        return [];
+      }
+    },
+    enabled: !!selectedAcademicYear,
+  });
+
+  // Watch values
+  const watchAcademicYear = watch('academic_year_id');
+  const watchClass = watch('class_id');
+  const watchSection = watch('section_id');
+
+  // Sections are embedded inside selected class payload.
+  const sections = useMemo(() => {
+    if (!watchClass || !classes.length) return [];
+
+    const selectedClass = classes.find((c) => String(c?.id) === String(watchClass));
+    const rawSections = Array.isArray(selectedClass?.sections) ? selectedClass.sections : [];
+
+    return rawSections
+      .map((section) => ({
+        id: section?.id || section?.section_id || null,
+        name: section?.name || section?.section_name || 'Section',
+        is_active: section?.is_active !== false
+      }))
+      .filter((section) => section.id)
+      .filter((section) => section.is_active);
+  }, [watchClass, classes]);
+
+  const selectedClassData = useMemo(() => {
+    return classes.find((c) => String(c?.id) === String(watchClass)) || null;
+  }, [classes, watchClass]);
+
+  const selectedSectionData = useMemo(() => {
+    return sections.find((s) => String(s?.id) === String(watchSection)) || null;
+  }, [sections, watchSection]);
+
+  // Handle academic year change
+  useEffect(() => {
+    // Only update if academic year actually changes and is different from selected state
+    if (watchAcademicYear && watchAcademicYear !== selectedAcademicYear) {
+      setSelectedAcademicYear(watchAcademicYear);
+      // Reset dependent fields when academic year changes
+      setValue('class_id', '');
+      setValue('section_id', '');
+    }
+  }, [watchAcademicYear, selectedAcademicYear, setValue]);
+
+  // Handle class change (for resetting section)
+  useEffect(() => {
+    if (watchClass && watchClass !== prevClassRef.current) {
+      // Only reset section if class changed
+      setValue('section_id', '');
+      prevClassRef.current = watchClass;
+    } else if (watchClass && !prevClassRef.current) {
+      // Initial load or first selection
+      prevClassRef.current = watchClass;
+    }
+  }, [watchClass, setValue]);
+
+  // Keep class/section names synced with current selected IDs (prevents stale names in edit payload).
+  useEffect(() => {
+    const className = selectedClassData?.name || '';
+    const sectionName = selectedSectionData?.name || '';
+
+    setValue('class_name', className, { shouldDirty: false });
+    setValue('section_name', sectionName, { shouldDirty: false });
+    setValue('details.studentDetails.class_name', className, { shouldDirty: false });
+    setValue('details.studentDetails.section_name', sectionName, { shouldDirty: false });
+  }, [selectedClassData, selectedSectionData, setValue]);
+
+  // Keep guardian relation aligned with guardian type
+  useEffect(() => {
+    if (!Array.isArray(watchGuardians)) return;
+
+    watchGuardians.forEach((g, index) => {
+      const normalizedType = String(g?.type || 'guardian').toLowerCase();
+      if (g?.type !== normalizedType) {
+        setValue(`guardians.${index}.type`, normalizedType, { shouldDirty: true });
+      }
+      if (g?.relation !== normalizedType) {
+        setValue(`guardians.${index}.relation`, normalizedType, { shouldDirty: true });
+      }
+    });
+  }, [watchGuardians, setValue]);
+
+
+  // ─────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
+  // Document Handlers
+  // ─────────────────────────────────────────────────────────────────
+  const handleDocumentUpload = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      appendDoc({
+        id: generateUniqueId(),
+        type: 'other',
+        title: file.name,
+        file_name: file.name,
+        file_url: URL.createObjectURL(file), // Preview URL
+        uploaded_at: new Date().toISOString(),
+        verified: false,
+        file: file // Keep file object for upload
+      });
+    });
+    // Reset file input value so same file can be selected again
+    e.target.value = '';
+  };
+
+  const removeDocument = (index) => {
+    removeDoc(index);
+  };
+
+  // ─────────────────────────────────────────────────────────────────
+  // Navigation for mobile tabs
+  // ─────────────────────────────────────────────────────────────────
   const nextTab = () => {
     const tabs = ['personal', 'academic', 'guardian', 'contact', 'fee', 'documents'];
     const currentIndex = tabs.indexOf(activeTab);
@@ -85,282 +296,246 @@ export default function StudentForm({
     }
   };
 
-  // Document handlers
-  const handleDocumentUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const newDocs = files.map(file => ({
-      id: Date.now() + Math.random(),
-      type: 'other',
-      title: file.name,
-      file_name: file.name,
-      file_url: URL.createObjectURL(file),
-      uploaded_at: new Date().toISOString(),
-      verified: false
-    }));
-    
-    const updatedDocs = [...documents, ...newDocs];
-    setDocuments(updatedDocs);
-    setValue('documents', updatedDocs);
-  };
-
-  const removeDocument = (docId) => {
-    const updatedDocs = documents.filter(doc => doc.id !== docId);
-    setDocuments(updatedDocs);
-    setValue('documents', updatedDocs);
-  };
-
-  // Render academic fields based on institute type
-  const renderAcademicFields = () => {
-    const fieldClass = isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-3';
-    
-    switch(instituteType) {
-      case 'school':
-        return (
-          <div className={`grid grid-cols-1 gap-4 ${isMobile ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-            <SelectField 
-              label="Class" 
-              name="details.studentDetails.class_id" 
-              control={control} 
-              error={errors.details?.studentDetails?.class_id} 
-              options={classOptions} 
-              placeholder="Select class" 
-              required
-            />
-            <SelectField 
-              label="Section" 
-              name="details.studentDetails.section_id" 
-              control={control} 
-              error={errors.details?.studentDetails?.section_id} 
-              options={sectionOptions} 
-              placeholder="Select section" 
-            />
-            <InputField 
-              label="House" 
-              name="details.studentDetails.house" 
-              register={register} 
-              error={errors.details?.studentDetails?.house} 
-              placeholder="e.g. Iqbal House" 
-            />
-            <InputField 
-              label="Previous School" 
-              name="details.studentDetails.previous_school" 
-              register={register} 
-              error={errors.details?.studentDetails?.previous_school} 
-              placeholder="Previous school name" 
-            />
-          </div>
-        );
-      
-      case 'college':
-      case 'university':
-        return (
-          <div className={`grid grid-cols-1 gap-4 ${isMobile ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-            <SelectField 
-              label="Program" 
-              name="details.studentDetails.program_id" 
-              control={control} 
-              error={errors.details?.studentDetails?.program_id} 
-              options={programOptions} 
-              placeholder="Select program" 
-              required
-            />
-            <SelectField 
-              label="Semester" 
-              name="details.studentDetails.semester" 
-              control={control} 
-              error={errors.details?.studentDetails?.semester} 
-              options={Array.from({ length: 8 }, (_, i) => ({ value: i+1, label: `Semester ${i+1}` }))} 
-              placeholder="Select semester" 
-            />
-            <SelectField 
-              label="Shift" 
-              name="details.studentDetails.shift" 
-              control={control} 
-              error={errors.details?.studentDetails?.shift} 
-              options={[
-                { value: 'morning', label: 'Morning' },
-                { value: 'evening', label: 'Evening' }
-              ]} 
-              placeholder="Select shift" 
-            />
-            <InputField 
-              label="Specialization" 
-              name="details.studentDetails.specialization" 
-              register={register} 
-              error={errors.details?.studentDetails?.specialization} 
-              placeholder="e.g. Computer Science" 
-            />
-          </div>
-        );
-      
-      case 'coaching':
-      case 'academy':
-        return (
-          <div className={`grid grid-cols-1 gap-4 ${isMobile ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-            <SelectField 
-              label="Course" 
-              name="details.studentDetails.course_id" 
-              control={control} 
-              error={errors.details?.studentDetails?.course_id} 
-              options={courseOptions} 
-              placeholder="Select course" 
-              required
-            />
-            <SelectField 
-              label="Batch" 
-              name="details.studentDetails.batch_id" 
-              control={control} 
-              error={errors.details?.studentDetails?.batch_id} 
-              options={batchOptions} 
-              placeholder="Select batch" 
-            />
-            <InputField 
-              label="Target Exam" 
-              name="details.studentDetails.target_exam" 
-              register={register} 
-              error={errors.details?.studentDetails?.target_exam} 
-              placeholder="e.g. MDCAT, CSS" 
-            />
-          </div>
-        );
-      
-      case 'tuition_center':
-        return (
-          <div className={`grid grid-cols-1 gap-4 ${isMobile ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-            <InputField 
-              label="Grade/Class" 
-              name="details.studentDetails.grade" 
-              register={register} 
-              error={errors.details?.studentDetails?.grade} 
-              placeholder="e.g. 10th, A-Levels" 
-              required
-            />
-            <SelectField 
-              label="Tuition Type" 
-              name="details.studentDetails.tuition_type" 
-              control={control} 
-              error={errors.details?.studentDetails?.tuition_type} 
-              options={[
-                { value: 'individual', label: 'Individual' },
-                { value: 'group', label: 'Group' }
-              ]} 
-              placeholder="Select type" 
-            />
-            <InputField 
-              label="Subjects" 
-              name="details.studentDetails.subjects" 
-              register={register} 
-              error={errors.details?.studentDetails?.subjects} 
-              placeholder="e.g. Math, Physics" 
-            />
-            <InputField 
-              label="Preferred Timings" 
-              name="details.studentDetails.timings" 
-              register={register} 
-              error={errors.details?.studentDetails?.timings} 
-              placeholder="e.g. 4-6 PM" 
-            />
-          </div>
-        );
-      
-      default:
-        return null;
-    }
-  };
-
-  const onSubmitForm = (data) => {
-    const formattedData = {
-      ...data,
-      user_type: 'STUDENT',
-      registration_no: data.registration_no || data.gr_number,
-      details: {
-        studentDetails: {
-          ...data.details?.studentDetails,
-          date_of_birth: data.dob,
-          gender: data.gender,
-          blood_group: data.blood_group,
-          religion: data.religion,
-          nationality: data.nationality,
-          cnic: data.cnic,
-          father_name: data.father_name,
-          father_cnic: data.father_cnic,
-          father_phone: data.father_phone,
-          father_occupation: data.father_occupation,
-          mother_name: data.mother_name,
-          mother_phone: data.mother_phone,
-          guardian_name: data.guardian_name,
-          guardian_relation: data.guardian_relation,
-          guardian_phone: data.guardian_phone,
-          present_address: data.present_address,
-          permanent_address: data.permanent_address,
-          city: data.city,
-          medical_conditions: data.medical_conditions,
-          allergies: data.allergies,
-          fee_plan_id: data.fee_plan_id,
-          monthly_fee: data.monthly_fee,
-          concession_type: data.concession_type,
-          concession_percentage: data.concession_percentage,
-          admission_date: data.admission_date,
-          previous_school: data.previous_school,
-          // academic_sessions:[
-          //   class_info{
-          //     academic_year_id: data.academic_year_id,
-          //     class_id: data.class_id,
-          //     section_id: data.section_id,
-          //     roll_no: data.roll_no,
-          //   }
-          // ]
-        }
+  // ─────────────────────────────────────────────────────────────────
+  // Get terms based on institute type
+  // ─────────────────────────────────────────────────────────────────
+  const getTerm = (key) => {
+    const terms = {
+      school: {
+        class: 'Class',
+        section: 'Section',
+        student: 'Student',
       },
-      documents: documents,
+      college: {
+        class: 'Program',
+        section: 'Batch',
+        student: 'Student',
+      },
+      university: {
+        class: 'Department',
+        section: 'Semester',
+        student: 'Student',
+      },
+      coaching: {
+        class: 'Course',
+        section: 'Batch',
+        student: 'Candidate',
+      },
+      academy: {
+        class: 'Program',
+        section: 'Batch',
+        student: 'Trainee',
+      },
     };
-    
-    onSubmit(formattedData);
+    return terms[instituteType]?.[key] || key;
   };
 
-  // Responsive tabs list - horizontal scroll on mobile
-  const renderTabsList = () => {
-    if (isMobile) {
-      return (
-        <div className="overflow-x-auto pb-2 mb-4">
-          <TabsList className="inline-flex w-auto min-w-full">
-            <TabsTrigger value="personal" className="px-3 py-1.5 text-xs">Personal</TabsTrigger>
-            <TabsTrigger value="academic" className="px-3 py-1.5 text-xs">Academic</TabsTrigger>
-            <TabsTrigger value="guardian" className="px-3 py-1.5 text-xs">Guardian</TabsTrigger>
-            <TabsTrigger value="contact" className="px-3 py-1.5 text-xs">Contact</TabsTrigger>
-            <TabsTrigger value="fee" className="px-3 py-1.5 text-xs">Fee</TabsTrigger>
-            <TabsTrigger value="documents" className="px-3 py-1.5 text-xs">Docs</TabsTrigger>
-          </TabsList>
-        </div>
-      );
+  // ─────────────────────────────────────────────────────────────────
+  // Form Submit
+  // ─────────────────────────────────────────────────────────────────
+  const onSubmitForm = (data) => {
+    console.log('📤 Submitting form data:', data);
+    
+    // Create FormData for multipart/form-data submission (required for files)
+    const formData = new FormData();
+
+    const editableKeys = new Set([
+      'first_name',
+      'last_name',
+      'email',
+      'phone',
+      'registration_no',
+      'dob',
+      'gender',
+      'blood_group',
+      'religion',
+      'nationality',
+      'cnic',
+      'academic_year_id',
+      'class_id',
+      'section_id',
+      'roll_no',
+      'admission_date',
+      'father_name',
+      'father_cnic',
+      'father_phone',
+      'father_occupation',
+      'father_education',
+      'mother_name',
+      'mother_cnic',
+      'mother_phone',
+      'mother_occupation',
+      'present_address',
+      'permanent_address',
+      'city',
+      'fee_plan_id',
+      'monthly_fee',
+      'admission_fee',
+      'concession_type',
+      'concession_percentage',
+      'concession_reason',
+      'medical_conditions',
+      'allergies',
+      'previous_school',
+      'previous_class',
+      'status',
+      'is_active'
+    ]);
+    
+    // 1. Basic Fields
+    Object.keys(data).forEach((key) => {
+      if (!editableKeys.has(key)) return;
+      if (data[key] === undefined || data[key] === null) return;
+      formData.append(key, data[key]);
+    });
+
+    // Force class/section IDs and names from currently selected options.
+    const classId = selectedClassData?.id || data.class_id || '';
+    const sectionId = selectedSectionData?.id || data.section_id || '';
+    const className = selectedClassData?.name || '';
+    const sectionName = selectedSectionData?.name || '';
+
+    if (classId) formData.set('class_id', classId);
+    if (sectionId) formData.set('section_id', sectionId);
+    if (className) formData.set('class_name', className);
+    if (sectionName) formData.set('section_name', sectionName);
+    
+    // 2. Guardians (normalize: guardian type == relation + include email)
+    const normalizedGuardians = (Array.isArray(data.guardians) ? data.guardians : [])
+      .map((g) => {
+        const normalizedType = String(g?.type || g?.relation || 'guardian').toLowerCase();
+        return {
+          name: g?.name || '',
+          type: normalizedType,
+          relation: normalizedType,
+          phone: g?.phone || '',
+          cnic: g?.cnic || '',
+          email: g?.email || ''
+        };
+      })
+      .filter((g) => g.name || g.phone || g.cnic || g.email);
+
+    if (normalizedGuardians.length > 0) {
+      formData.append('guardians', JSON.stringify(normalizedGuardians));
     }
     
-    return (
-      <TabsList className={`grid grid-cols-6 mb-6 ${isTablet ? 'text-sm' : ''}`}>
-        <TabsTrigger value="personal">Personal</TabsTrigger>
-        <TabsTrigger value="academic">Academic</TabsTrigger>
-        <TabsTrigger value="guardian">Guardian</TabsTrigger>
-        <TabsTrigger value="contact">Contact</TabsTrigger>
-        <TabsTrigger value="fee">Fee</TabsTrigger>
-        <TabsTrigger value="documents">Docs</TabsTrigger>
-      </TabsList>
-    );
+    // 3. Details (Send as JSON string or flat fields? Backend expects flat for some, JSON for others?)
+    // The previous implementation sent `details` object. If strict multipart, we might need to stringify it.
+    // However, `student.controller.js` parses body... let's see.
+    // Ideally, we should stringify complex objects.
+    if (data.details) {
+      const nextDetails = {
+        ...(data.details || {}),
+        studentDetails: {
+          ...(data.details?.studentDetails || {}),
+          class_id: classId || data.details?.studentDetails?.class_id || null,
+          class_name: className || data.details?.studentDetails?.class_name || null,
+          section_id: sectionId || data.details?.studentDetails?.section_id || null,
+          section_name: sectionName || data.details?.studentDetails?.section_name || null,
+        }
+      };
+
+      // Never send root-level academicSessions from stale defaultValues.
+      delete nextDetails.academicSessions;
+
+      formData.append('details', JSON.stringify(nextDetails));
+    }
+
+    // 4. Documents & Files
+    // The `documents` array contains metadata. The actual files are in `doc.file`.
+    // We need to separate metadata and files.
+    
+    const documentMetadata = [];
+    
+    if (data.documents && Array.isArray(data.documents)) {
+      data.documents.forEach((doc, index) => {
+        // Add file to FormData if it exists and is a File object
+        if (doc.file instanceof File) {
+          // Append file with a specific name or just 'documents' array
+          // calculate index or just append all to 'files' or 'documents'
+          // teacher.routes uses uploadMultiple('documents'). 
+          // Multer will populate req.files with these files.
+          formData.append('documents', doc.file);
+        }
+        
+        // Add metadata (excluding the File object itself to avoid circular json issues or huge payload)
+        const { file, ...meta } = doc;
+        const normalizedType = VALID_DOCUMENT_TYPES.has(meta.type)
+          ? meta.type
+          : String(meta.type || '').toLowerCase().replace(/\s+/g, '_') || 'other';
+
+        documentMetadata.push({
+          ...meta,
+          type: VALID_DOCUMENT_TYPES.has(normalizedType) ? normalizedType : 'other'
+        });
+      });
+    }
+    
+    // Append document metadata as JSON string
+    const documentsJson = JSON.stringify(documentMetadata);
+    formData.append('documents_meta', documentsJson);
+    formData.append('documents', documentsJson);
+    formData.append('institute_id', instituteId);
+    formData.append('institute_type', instituteType);
+    
+    // Submit FormData
+    onSubmit(formData);
   };
 
+  // ─────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────
   return (
     <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4 sm:space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        {renderTabsList()}
+        {/* Tabs List */}
+        <div className="overflow-x-auto pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-auto sm:grid sm:grid-cols-6 min-w-full">
+            <TabsTrigger value="personal" className="px-3 py-1.5 text-xs sm:text-sm">
+              Personal
+            </TabsTrigger>
+            <TabsTrigger value="academic" className="px-3 py-1.5 text-xs sm:text-sm">
+              Academic
+            </TabsTrigger>
+            <TabsTrigger value="guardian" className="px-3 py-1.5 text-xs sm:text-sm">
+              Guardian
+            </TabsTrigger>
+            <TabsTrigger value="contact" className="px-3 py-1.5 text-xs sm:text-sm">
+              Contact
+            </TabsTrigger>
+            <TabsTrigger value="fee" className="px-3 py-1.5 text-xs sm:text-sm">
+              Fee
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="px-3 py-1.5 text-xs sm:text-sm">
+              Docs
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Mobile Navigation */}
+        {isMobile && (
+          <div className="flex items-center justify-between mb-4">
+            <Button type="button" variant="outline" size="sm" onClick={prevTab} disabled={activeTab === 'personal'}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium capitalize">{activeTab}</span>
+            <Button type="button" variant="outline" size="sm" onClick={nextTab} disabled={activeTab === 'documents'}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         {/* Tab 1: Personal Information */}
         <TabsContent value="personal">
           <Card>
             <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4 sm:space-y-5">
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Basic Information
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Basic Information</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InputField 
                     label="First Name" 
                     name="first_name" 
@@ -382,7 +557,6 @@ export default function StudentForm({
                     name="registration_no"  
                     register={register} 
                     error={errors.registration_no}  
-                    required 
                     placeholder="e.g. 2024-001" 
                   />
                   <DatePickerField 
@@ -438,24 +612,60 @@ export default function StudentForm({
           </Card>
         </TabsContent>
 
-        {/* Tab 2: Academic Information */}
+        {/* Tab 2: Academic Information - IMPORTANT: Class aur Section yahan hain */}
         <TabsContent value="academic">
           <Card>
             <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4 sm:space-y-5">
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Academic Details ({instituteType.replace('_', ' ').toUpperCase()})
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Academic Details</h3>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {/* Academic Year */}
                   <SelectField 
                     label="Academic Year" 
-                    name="details.studentDetails.academic_year_id" 
+                    name="academic_year_id" 
                     control={control} 
-                    error={errors.details?.studentDetails?.academic_year_id} 
-                    options={academicYearOptions} 
-                    placeholder="Select year"    
+                    error={errors.academic_year_id} 
+                    options={academicYears} 
+                    placeholder={yearsLoading ? "Loading..." : "Select"}    
                     required
                   />
+
+                  {/* Class - ismein sections embedded hain */}
+                  <SelectField 
+                    label={getTerm('class')} 
+                    name="class_id" 
+                    control={control} 
+                    error={errors.class_id} 
+                    options={classes.map(c => ({ value: c.id, label: c.name }))} 
+                    placeholder={!selectedAcademicYear ? "Select year first" : (classesLoading ? "Loading..." : `Select ${getTerm('class')}`)}    
+                    required
+                    disabled={!selectedAcademicYear}
+                  />
+
+                  {/* Section - yeh class ke sections se aayega */}
+                  <SelectField 
+                    label={getTerm('section')} 
+                    name="section_id" 
+                    control={control} 
+                    error={errors.section_id} 
+                    options={sections.map(s => ({ value: s.id, label: s.name }))} 
+                    placeholder={!watchClass ? `Select ${getTerm('class')} first` : 'Select section'}    
+                    disabled={!watchClass}
+                  />
+
+                  {/* Roll Number */}
+                  <InputField 
+                    label="Roll Number" 
+                    name="roll_no" 
+                    register={register} 
+                    error={errors.roll_no} 
+                  />
+
+                  {/* Admission Date */}
                   <DatePickerField 
                     label="Admission Date" 
                     name="admission_date" 
@@ -463,17 +673,26 @@ export default function StudentForm({
                     error={errors.admission_date} 
                     required
                   />
+                </div>
+
+                {/* Previous School Info */}
+                <Separator className="my-4" />
+                
+                <h4 className="text-sm font-medium">Previous Education</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <InputField 
-                    label="Roll Number" 
-                    name="details.studentDetails.roll_no" 
+                    label="Previous School/College" 
+                    name="previous_school" 
                     register={register} 
-                    error={errors.details?.studentDetails?.roll_no} 
-                    placeholder="e.g. 101" 
+                    error={errors.previous_school} 
+                  />
+                  <InputField 
+                    label="Previous Class/Grade" 
+                    name="previous_class" 
+                    register={register} 
+                    error={errors.previous_class} 
                   />
                 </div>
-                
-                {/* Institute-specific academic fields */}
-                {renderAcademicFields()}
               </div>
             </CardContent>
           </Card>
@@ -483,124 +702,102 @@ export default function StudentForm({
         <TabsContent value="guardian">
           <Card>
             <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4 sm:space-y-5">
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Father's Information
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField 
-                    label="Father's Name" 
-                    name="father_name" 
-                    register={register} 
-                    error={errors.father_name} 
-                    required 
-                    placeholder="e.g. Muhammad Ahmed" 
-                  />
-                  <InputField 
-                    label="Father's CNIC" 
-                    name="father_cnic" 
-                    register={register} 
-                    error={errors.father_cnic} 
-                    placeholder="00000-0000000-0" 
-                  />
-                  <InputField 
-                    label="Father's Phone" 
-                    name="father_phone" 
-                    register={register} 
-                    error={errors.father_phone} 
-                    required 
-                    placeholder="e.g. 03001234567" 
-                    type="tel"
-                  />
-                  <InputField 
-                    label="Father's Occupation" 
-                    name="father_occupation" 
-                    register={register} 
-                    error={errors.father_occupation} 
-                    placeholder="e.g. Businessman" 
-                  />
-                  <InputField 
-                    label="Father's Education" 
-                    name="father_education" 
-                    register={register} 
-                    error={errors.father_education} 
-                    placeholder="e.g. Masters" 
-                  />
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold">Guardian Information</h3>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => appendGuardian({ name: '', relation: 'guardian', phone: '', cnic: '', email: '', type: 'guardian' })}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Guardian
+                  </Button>
                 </div>
+                
+                {guardianFields.map((field, index) => (
+                  <div key={field.id} className="relative border p-4 rounded-lg mb-4">
+                    <div className="flex justify-between items-start mb-4">
+                      <h4 className="text-sm font-medium">Guardian {index + 1}</h4>
+                      {guardianFields.length > 1 && (
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => removeGuardian(index)}
+                          className="text-destructive h-8 w-8 p-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
 
-                <Separator className="my-4" />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <SelectField
+                        label="Type *"
+                        name={`guardians.${index}.type`}
+                        control={control}
+                        error={errors.guardians?.[index]?.type}
+                        options={GUARDIAN_TYPES}
+                        placeholder="Select Type"
+                        required
+                      />
+                      <InputField 
+                        label="Name *" 
+                        name={`guardians.${index}.name`} 
+                        register={register} 
+                        error={errors.guardians?.[index]?.name} 
+                        required 
+                      />
+                      <InputField 
+                        label="Relation" 
+                        name={`guardians.${index}.relation`} 
+                        register={register} 
+                        error={errors.guardians?.[index]?.relation} 
+                        disabled
+                      />
+                      <InputField 
+                        label="CNIC" 
+                        name={`guardians.${index}.cnic`} 
+                        register={register} 
+                        error={errors.guardians?.[index]?.cnic} 
+                        placeholder="00000-0000000-0"
+                      />
+                      <InputField 
+                        label="Phone *" 
+                        name={`guardians.${index}.phone`} 
+                        register={register} 
+                        error={errors.guardians?.[index]?.phone} 
+                        required 
+                        type="tel" 
+                      />
+                      <InputField
+                        label="Email"
+                        name={`guardians.${index}.email`}
+                        register={register}
+                        error={errors.guardians?.[index]?.email}
+                        type="email"
+                      />
+                    </div>
+                  </div>
+                ))}
 
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Mother's Information
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField 
-                    label="Mother's Name" 
-                    name="mother_name" 
-                    register={register} 
-                    error={errors.mother_name} 
-                    placeholder="e.g. Fatima Ahmed" 
-                  />
-                  <InputField 
-                    label="Mother's CNIC" 
-                    name="mother_cnic" 
-                    register={register} 
-                    error={errors.mother_cnic} 
-                    placeholder="00000-0000000-0" 
-                  />
-                  <InputField 
-                    label="Mother's Phone" 
-                    name="mother_phone" 
-                    register={register} 
-                    error={errors.mother_phone} 
-                    placeholder="e.g. 03001234567" 
-                    type="tel"
-                  />
-                  <InputField 
-                    label="Mother's Occupation" 
-                    name="mother_occupation" 
-                    register={register} 
-                    error={errors.mother_occupation} 
-                    placeholder="e.g. Housewife" 
-                  />
-                </div>
-
-                <Separator className="my-4" />
-
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Guardian Information
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField 
-                    label="Guardian Name" 
-                    name="guardian_name" 
-                    register={register} 
-                    error={errors.guardian_name} 
-                    placeholder="e.g. Aslam Khan" 
-                  />
-                  <InputField 
-                    label="Relation" 
-                    name="guardian_relation" 
-                    register={register} 
-                    error={errors.guardian_relation} 
-                    placeholder="e.g. Uncle" 
-                  />
-                  <InputField 
-                    label="Guardian Phone" 
-                    name="guardian_phone" 
-                    register={register} 
-                    error={errors.guardian_phone} 
-                    placeholder="e.g. 03001234567" 
-                    type="tel"
-                  />
-                  <InputField 
-                    label="Guardian CNIC" 
-                    name="guardian_cnic" 
-                    register={register} 
-                    error={errors.guardian_cnic} 
-                    placeholder="00000-0000000-0" 
-                  />
-                </div>
+                {guardianFields.length === 0 && (
+                   <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                    <p className="text-sm text-muted-foreground">No guardians added</p>
+                    <Button 
+                      type="button" 
+                      variant="link" 
+                      onClick={() => appendGuardian({ name: '', relation: 'father', phone: '', cnic: '', email: '', type: 'father' })}
+                    >
+                      Add Primary Guardian
+                    </Button>
+                   </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -610,51 +807,21 @@ export default function StudentForm({
         <TabsContent value="contact">
           <Card>
             <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4 sm:space-y-5">
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Contact Details
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-                  <InputField 
-                    label="Phone Number" 
-                    name="phone" 
-                    register={register} 
-                    error={errors.phone} 
-                    required 
-                    placeholder="e.g. 03001234567" 
-                    type="tel"
-                  />
-                  <InputField 
-                    label="Email Address" 
-                    name="email" 
-                    register={register} 
-                    error={errors.email} 
-                    placeholder="e.g. student@example.com" 
-                    type="email"
-                  />
-                  <InputField 
-                    label="Alternate Phone" 
-                    name="alternate_phone" 
-                    register={register} 
-                    error={errors.alternate_phone} 
-                    placeholder="e.g. 03123456789" 
-                    type="tel"
-                  />
-                  <InputField 
-                    label="City" 
-                    name="city" 
-                    register={register} 
-                    error={errors.city} 
-                    required 
-                    placeholder="e.g. Karachi" 
-                  />
-                  <InputField 
-                    label="Postal Code" 
-                    name="postal_code" 
-                    register={register} 
-                    error={errors.postal_code} 
-                    placeholder="e.g. 75500" 
-                  />
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Contact Details</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <InputField label="Phone" name="phone" register={register} error={errors.phone} required type="tel" />
+                  <InputField label="Email" name="email" register={register} error={errors.email} type="email" />
+                  <InputField label="City" name="city" register={register} error={errors.city} required />
+                </div>
+
+                <div className="flex items-center gap-2 mt-4">
+                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Address</h3>
                 </div>
 
                 <TextareaField 
@@ -663,8 +830,7 @@ export default function StudentForm({
                   register={register} 
                   error={errors.present_address} 
                   required 
-                  placeholder="Full residential address" 
-                  rows={isMobile ? 2 : 2} 
+                  rows={2} 
                 />
 
                 <TextareaField 
@@ -672,38 +838,20 @@ export default function StudentForm({
                   name="permanent_address" 
                   register={register} 
                   error={errors.permanent_address} 
-                  placeholder="If different from present address" 
-                  rows={isMobile ? 2 : 2} 
+                  rows={2} 
                 />
 
                 <Separator className="my-4" />
 
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Emergency Contact
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField 
-                    label="Contact Person" 
-                    name="emergency_contact_name" 
-                    register={register} 
-                    error={errors.emergency_contact_name} 
-                    placeholder="e.g. Kamran Khan" 
-                  />
-                  <InputField 
-                    label="Relation" 
-                    name="emergency_contact_relation" 
-                    register={register} 
-                    error={errors.emergency_contact_relation} 
-                    placeholder="e.g. Brother" 
-                  />
-                  <InputField 
-                    label="Emergency Phone" 
-                    name="emergency_contact_phone" 
-                    register={register} 
-                    error={errors.emergency_contact_phone} 
-                    placeholder="e.g. 03001234567" 
-                    type="tel"
-                  />
+                <div className="flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Emergency Contact</h3>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <InputField label="Contact Person" name="emergency_contact_name" register={register} error={errors.emergency_contact_name} />
+                  <InputField label="Relation" name="emergency_contact_relation" register={register} error={errors.emergency_contact_relation} />
+                  <InputField label="Emergency Phone" name="emergency_contact_phone" register={register} error={errors.emergency_contact_phone} type="tel" />
                 </div>
               </div>
             </CardContent>
@@ -714,86 +862,45 @@ export default function StudentForm({
         <TabsContent value="fee">
           <Card>
             <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4 sm:space-y-5">
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Fee Details
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InputField 
-                    label="Fee Plan" 
-                    name="fee_plan_id" 
-                    register={register} 
-                    error={errors.fee_plan_id} 
-                    placeholder="Select fee plan" 
-                  />
-                  <InputField 
-                    label="Monthly Fee (PKR)" 
-                    name="monthly_fee" 
-                    register={register} 
-                    error={errors.monthly_fee} 
-                    type="number" 
-                    placeholder="e.g. 5000" 
-                  />
-                  <InputField 
-                    label="Admission Fee" 
-                    name="admission_fee" 
-                    register={register} 
-                    error={errors.admission_fee} 
-                    type="number" 
-                    placeholder="e.g. 2000" 
-                  />
-                  <SelectField 
-                    label="Concession Type" 
-                    name="concession_type" 
-                    control={control} 
-                    error={errors.concession_type} 
-                    options={[
-                      { value: 'none', label: 'None' },
-                      { value: 'scholarship', label: 'Scholarship' },
-                      { value: 'discount', label: 'Discount' },
-                      { value: 'waiver', label: 'Fee Waiver' }
-                    ]} 
-                    placeholder="Select type" 
-                  />
-                  <InputField 
-                    label="Concession %" 
-                    name="concession_percentage" 
-                    register={register} 
-                    error={errors.concession_percentage} 
-                    type="number" 
-                    placeholder="e.g. 20" 
-                  />
-                  <TextareaField 
-                    label="Concession Reason" 
-                    name="concession_reason" 
-                    register={register} 
-                    error={errors.concession_reason} 
-                    placeholder="Reason for concession" 
-                    rows={isMobile ? 1 : 1} 
-                  />
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Fee Details</h3>
                 </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <InputField label="Monthly Fee (PKR)" name="monthly_fee" register={register} error={errors.monthly_fee} type="number" />
+                  <InputField label="Admission Fee (PKR)" name="admission_fee" register={register} error={errors.admission_fee} type="number" />
+                  <SelectField label="Concession" name="concession_type" control={control} error={errors.concession_type} options={CONCESSION_OPTIONS} />
+                  <InputField label="Concession %" name="concession_percentage" register={register} error={errors.concession_percentage} type="number" />
+                </div>
+
+                <TextareaField label="Concession Reason" name="concession_reason" register={register} error={errors.concession_reason} rows={1} />
 
                 <Separator className="my-4" />
 
-                <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Medical Information
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                  <TextareaField 
-                    label="Medical Conditions" 
-                    name="medical_conditions" 
-                    register={register} 
-                    error={errors.medical_conditions} 
-                    placeholder="Any medical conditions" 
-                    rows={isMobile ? 2 : 2} 
-                  />
-                  <TextareaField 
-                    label="Allergies" 
-                    name="allergies" 
-                    register={register} 
-                    error={errors.allergies} 
-                    placeholder="Any allergies" 
-                    rows={isMobile ? 2 : 2} 
+                <div className="flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Medical Information</h3>
+                </div>
+
+                <TextareaField label="Medical Conditions" name="medical_conditions" register={register} error={errors.medical_conditions} rows={2} />
+                <TextareaField label="Allergies" name="allergies" register={register} error={errors.allergies} rows={2} />
+
+                <Separator className="my-4" />
+
+                {/* Status */}
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <Label htmlFor="is_active">Active Status</Label>
+                    <p className="text-sm text-muted-foreground">Student can login and access portal</p>
+                  </div>
+                  <Controller
+                    name="is_active"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    )}
                   />
                 </div>
               </div>
@@ -805,115 +912,97 @@ export default function StudentForm({
         <TabsContent value="documents">
           <Card>
             <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4 sm:space-y-5">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Uploaded Documents
-                  </p>
-                  <div className="w-full sm:w-auto">
-                    <input
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold">Documents</h3>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => document.getElementById('document-upload').click()}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload
+                  </Button>
+                  <input
                       type="file"
                       id="document-upload"
                       multiple
                       className="hidden"
                       onChange={handleDocumentUpload}
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size={isMobile ? "default" : "sm"}
-                      className="w-full sm:w-auto"
-                      onClick={() => document.getElementById('document-upload').click()}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Documents
-                    </Button>
-                  </div>
                 </div>
+                
+                <p className="text-sm text-muted-foreground">Upload Student Documents (Results, B-Form, etc.)</p>
 
-                {documents.length === 0 ? (
-                  <div className="text-center py-6 sm:py-8 border-2 border-dashed rounded-lg">
-                    <p className="text-sm text-muted-foreground">No documents uploaded yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Click the button above to upload
-                    </p>
+                {docFields.length === 0 ? (
+                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                    <p className="text-sm text-muted-foreground">No documents uploaded</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 sm:space-y-3">
-                    {documents.map((doc, index) => (
-                      <div key={doc.id || index} className="flex items-center justify-between p-2 sm:p-3 border rounded-lg">
-                        <div className="flex-1 min-w-0 mr-2">
-                          <p className="font-medium text-sm truncate">{doc.file_name || doc.title || 'Document'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(doc.uploaded_at).toLocaleDateString()}
-                          </p>
+                  <div className="space-y-4">
+                    {docFields.map((field, index) => (
+                      <div key={field.id} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <h4 className="font-medium text-sm">Document {index + 1}</h4>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => removeDoc(index)}
+                            className="text-destructive p-0 h-6 w-6"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeDocument(doc.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <SelectField
+                              label="Type *"
+                              name={`documents.${index}.type`}
+                              control={control}
+                              error={errors.documents?.[index]?.type}
+                              options={DOCUMENT_TYPES}
+                              placeholder="Select Type"
+                              required
+                            />
+                            <InputField
+                                label="Title *"
+                                name={`documents.${index}.title`}
+                                register={register}
+                                error={errors.documents?.[index]?.title}
+                                placeholder="Details.."
+                                required
+                            />
+                        </div>
+                        
+                        <div className="mt-2 text-xs text-muted-foreground flex items-center justify-between">
+                           <span>{field.file_name}</span>
+                           {field.file_url && (
+                             <a href={field.file_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">View</a>
+                           )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-
-                <SelectField 
-                  label="Document Type" 
-                  name="next_document_type" 
-                  control={control} 
-                  options={DOCUMENT_TYPES} 
-                  placeholder="Select document type" 
-                />
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Mobile Navigation */}
-      {isMobile && (
-        <div className="flex justify-between items-center gap-2 pt-2">
-          <Button 
-            type="button" 
-            variant="outline" 
-            size="sm"
-            onClick={prevTab}
-            disabled={activeTab === 'personal'}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Previous
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-          </span>
-          <Button 
-            type="button" 
-            variant="outline" 
-            size="sm"
-            onClick={nextTab}
-            disabled={activeTab === 'documents'}
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-      )}
-
       {/* Form Actions */}
-      <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t">
-        <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
+      <div className="flex justify-end gap-3 pt-4 border-t">
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <FormSubmitButton
-          loading={loading}
-          label={isEdit ? 'Save Changes' : 'Add Student'}
-          loadingLabel={isEdit ? 'Saving…' : 'Adding…'}
-          className="w-full sm:w-auto"
-        />
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Saving...' : (isEdit ? 'Update' : 'Create')}
+        </Button>
       </div>
     </form>
   );

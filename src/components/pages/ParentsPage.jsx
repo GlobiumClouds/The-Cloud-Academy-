@@ -8,16 +8,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, UserCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, UserCheck, Search } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
+import { parentService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
 import StatsCard from '@/components/common/StatsCard';
 import { cn } from '@/lib/utils';
-import { DUMMY_PARENTS } from '@/data/dummyData';
 
 const RELATION_OPTS = [{ value:'father', label:'Father' }, { value:'mother', label:'Mother' }, { value:'guardian', label:'Guardian' }, { value:'other', label:'Other' }];
 const STATUS_OPTS   = [{ value:'active', label:'Active' }, { value:'inactive', label:'Inactive' }];
@@ -34,8 +34,6 @@ const schema = z.object({
   status:      z.string().min(1, 'Required'),
 });
 
-
-
 export default function ParentsPage({ type }) {
   const qc    = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
@@ -47,47 +45,105 @@ export default function ParentsPage({ type }) {
   const [modal,   setModal]   = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting,setDeleting]= useState(null);
+  const [foundStudents, setFoundStudents] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [findingStudents, setFindingStudents] = useState(false);
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'active', relation:'father' } });
+  const { register, handleSubmit, control, reset, getValues, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'active', relation:'father' } });
 
   const { data, isLoading } = useQuery({
     queryKey: ['parents', type, page, pageSize, search, status],
-    queryFn: async () => {
-      try { const { parentService } = await import('@/services'); return await parentService.getAll({ page, limit: pageSize, search, status }); }
-      catch {
-        const d = DUMMY_PARENTS.filter(r => (!search || `${r.first_name} ${r.last_name}`.toLowerCase().includes(search.toLowerCase())) && (!status || r.status === status));
-        const slice = d.slice((page-1)*pageSize, page*pageSize);
-        return { data: { rows: slice, total: d.length, totalPages: Math.max(1, Math.ceil(d.length / pageSize)) } };
-      }
-    },
+    queryFn: () => parentService.getAll({ page, limit: pageSize, search, status }),
     placeholderData: (p) => p,
   });
 
-  const rows = data?.data?.rows ?? DUMMY_PARENTS;
-  const total = data?.data?.total ?? rows.length;
-  const totalPages = data?.data?.totalPages ?? 1;
+  const rows = data?.data ?? [];
+  const total = data?.pagination?.total ?? 0;
+  const totalPages = data?.pagination?.totalPages ?? 1;
 
   const save = useMutation({
     mutationFn: async (vals) => {
-      try { const { parentService } = await import('@/services'); return editing ? await parentService.update(editing.id, vals) : await parentService.create(vals); }
-      catch { return { data: vals }; }
+      const payload = {
+        ...vals,
+        student_ids: selectedStudentIds,
+      };
+      return editing ? parentService.update(editing.id, payload) : parentService.create(payload);
     },
     onSuccess: () => { toast.success(editing ? 'Updated' : 'Created'); qc.invalidateQueries({ queryKey: ['parents'] }); closeModal(); },
     onError: () => toast.error('Save failed'),
   });
 
   const remove = useMutation({
-    mutationFn: async (id) => {
-      try { const { parentService } = await import('@/services'); return await parentService.delete(id); }
-      catch { return { success: true }; }
-    },
+    mutationFn: (id) => parentService.delete(id),
     onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['parents'] }); setDeleting(null); },
     onError: () => toast.error('Delete failed'),
   });
 
-  const openAdd  = () => { setEditing(null); reset({ status:'active', relation:'father' }); setModal(true); };
-  const openEdit = (row) => { setEditing(row); reset({ ...row }); setModal(true); };
-  const closeModal = () => { setModal(false); setEditing(null); reset(); };
+  const openAdd  = () => {
+    setEditing(null);
+    setFoundStudents([]);
+    setSelectedStudentIds([]);
+    reset({ status:'active', relation:'father' });
+    setModal(true);
+  };
+
+  const openEdit = (row) => {
+    setEditing(row);
+    setFoundStudents(Array.isArray(row.students) ? row.students : []);
+    setSelectedStudentIds(Array.isArray(row.student_ids) ? row.student_ids : []);
+    reset({ ...row });
+    setModal(true);
+  };
+
+  const closeModal = () => {
+    setModal(false);
+    setEditing(null);
+    setFoundStudents([]);
+    setSelectedStudentIds([]);
+    reset();
+  };
+
+  const findStudents = async () => {
+    try {
+      setFindingStudents(true);
+      const vals = getValues();
+      const result = await parentService.findStudents({
+        first_name: vals.first_name,
+        last_name: vals.last_name,
+        email: vals.email,
+        phone: vals.phone,
+        cnic: vals.cnic,
+      });
+
+      const list = Array.isArray(result?.data) ? result.data : [];
+      setFoundStudents(list);
+      setSelectedStudentIds((prev) => {
+        const existing = new Set(prev);
+        list.forEach((s) => {
+          if (existing.has(s.id)) return;
+        });
+        return prev;
+      });
+
+      if (list.length === 0) {
+        toast.info('No matching students found for this parent info');
+      } else {
+        toast.success(`${list.length} student(s) found`);
+      }
+    } catch (error) {
+      toast.error(error?.message || 'Failed to find students');
+    } finally {
+      setFindingStudents(false);
+    }
+  };
+
+  const toggleStudent = (studentId) => {
+    setSelectedStudentIds((prev) => (
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId]
+    ));
+  };
 
   const columns = useMemo(() => [
     { accessorKey: 'name', header: 'Parent/Guardian', cell: ({ row: { original: r } }) => <div><p className="font-medium">{r.first_name} {r.last_name}</p><p className="text-xs text-muted-foreground">{r.email || r.phone}</p></div> },
@@ -140,6 +196,49 @@ export default function ParentsPage({ type }) {
             <SelectField label="Status *"   name="status"   control={control} error={errors.status}   options={STATUS_OPTS}   required />
           </div>
           <div className="space-y-1.5"><label className="text-sm font-medium">Address</label><input {...register('address')} className="input-base" /></div>
+
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Linked {terms.students}</p>
+                <p className="text-xs text-muted-foreground">Use parent info to find and attach students</p>
+              </div>
+              <button
+                type="button"
+                onClick={findStudents}
+                disabled={findingStudents}
+                className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm hover:bg-accent disabled:opacity-60"
+              >
+                <Search size={14} />
+                {findingStudents ? 'Finding…' : 'Find Students'}
+              </button>
+            </div>
+
+            {foundStudents.length > 0 ? (
+              <div className="max-h-48 overflow-auto space-y-2">
+                {foundStudents.map((s) => (
+                  <label key={s.id} className="flex items-start gap-3 rounded border p-2 cursor-pointer hover:bg-accent/40">
+                    <input
+                      type="checkbox"
+                      checked={selectedStudentIds.includes(s.id)}
+                      onChange={() => toggleStudent(s.id)}
+                      className="mt-1"
+                    />
+                    <div className="text-sm">
+                      <p className="font-medium">{s.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.registration_no || '—'} | {s.class_name || '—'} - {s.section_name || '—'} | Roll: {s.roll_no || '—'}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No linked students selected yet.</p>
+            )}
+
+            <p className="text-xs font-medium">Selected: {selectedStudentIds.length}</p>
+          </div>
         </form>
       </AppModal>
 

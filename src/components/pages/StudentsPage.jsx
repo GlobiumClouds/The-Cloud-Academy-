@@ -14,11 +14,12 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Plus, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
+import useInstituteStore from '@/store/instituteStore'; 
 import { studentService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
@@ -26,7 +27,6 @@ import AppModal from '@/components/common/AppModal';
 import StudentForm from '@/components/forms/StudentForm';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { cn } from '@/lib/utils';
-import { DUMMY_FLAT_STUDENTS } from '@/data/dummyData';
 
 // Status badge color map
 const STATUS_COLORS = {
@@ -36,19 +36,8 @@ const STATUS_COLORS = {
   partial: 'bg-blue-100 text-blue-700',
 };
 
-// Type → primary unit filter key
-const PRIMARY_KEY = {
-  school: 'class_id', coaching: 'course_id', academy: 'program_id',
-  college: 'department_id', university: 'faculty_id',
-};
-// Type → grouping unit filter key
-const GROUP_KEY = {
-  school: 'section_id', coaching: 'batch_id', academy: 'batch_id',
-  college: 'semester_id', university: 'semester_id',
-};
-
 // Build react-table ColumnDef[] dynamically from studentColumns config
-function buildColumns(studentColumns, type, terms, canDo, router, onDelete) {
+function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEdit) {
   const cols = studentColumns.map((col) => ({
     accessorKey: col.key,
     header: col.label,
@@ -73,7 +62,7 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete) {
           </button>
           {canDo('students.update') && (
             <button
-              onClick={() => router.push(`/${type}/students/${stu.id}/edit`)}
+              onClick={() => onEdit(stu)} // Call the callback
               className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
               title="Edit"
             >
@@ -99,10 +88,23 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete) {
   return cols;
 }
 
+// Helper to flatten student object
+const flattenStudent = (s) => {
+  if (!s) return s;
+  const details = s.details?.studentDetails || {};
+  const flat = { ...s, ...details, id: s.id }; // Ensure ID is preserved
+  
+  // Map fields for form compatibility
+  if (flat.date_of_birth && !flat.dob) flat.dob = flat.date_of_birth;
+  
+  return flat;
+};
+
 export default function StudentsPage({ type }) {
   const router  = useRouter();
   const qc      = useQueryClient();
   const canDo   = useAuthStore((s) => s.canDo);
+  const { currentInstitute } = useInstituteStore();
   const { terms, studentColumns } = useInstituteConfig();
 
   const [search,   setSearch]   = useState('');
@@ -111,71 +113,12 @@ export default function StudentsPage({ type }) {
   const [pageSize, setPageSize] = useState(10);
   const [deleting, setDeleting] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-  // Fetch classes/sections etc for form
-  const { data: classOptions = [] } = useQuery({
-    queryKey: ['classes', type],
-    queryFn: async () => {
-      try {
-        const res = await fetch(`/api/${type}/classes`);
-        const data = await res.json();
-        return data.map(c => ({ value: c.id, label: c.name }));
-      } catch {
-        // Dummy data
-        return [
-          { value: '1', label: 'Class 1' },
-          { value: '2', label: 'Class 2' },
-          { value: '3', label: 'Class 3' },
-        ];
-      }
-    },
-    enabled: isAddModalOpen, // Only fetch when modal opens
-  });
-
-  const { data: sectionOptions = [] } = useQuery({
-    queryKey: ['sections', type],
-    queryFn: async () => {
-      try {
-        const res = await fetch(`/api/${type}/sections`);
-        const data = await res.json();
-        return data.map(s => ({ value: s.id, label: s.name }));
-      } catch {
-        return [
-          { value: 'A', label: 'Section A' },
-          { value: 'B', label: 'Section B' },
-          { value: 'C', label: 'Section C' },
-        ];
-      }
-    },
-    enabled: isAddModalOpen,
-  });
-
-  const { data: academicYearOptions = [] } = useQuery({
-    queryKey: ['academicYears', type],
-    queryFn: async () => {
-      try {
-        const res = await fetch(`/api/${type}/academic-years`);
-        const data = await res.json();
-        return data.map(y => ({ value: y.id, label: y.name }));
-      } catch {
-        return [
-          { value: '2024', label: '2024-2025' },
-          { value: '2023', label: '2023-2024' },
-        ];
-      }
-    },
-    enabled: isAddModalOpen,
-  });
+  const [editingId, setEditingId] = useState(null);
 
   const addStudent = useMutation({
     mutationFn: async (data) => {
-      try {
-        return await studentService.create(data, type);
-      } catch {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return { success: true, id: Math.random().toString() };
-      }
+      // Direct API call without dummy fallback
+      return await studentService.create(data, type);
     },
     onSuccess: () => {
       toast.success(`${terms.student} added successfully`);
@@ -187,19 +130,33 @@ export default function StudentsPage({ type }) {
     },
   });
 
+  const updateStudent = useMutation({
+    mutationFn: async (data) => {
+       return await studentService.update(editingId, data);
+    },
+    onSuccess: () => {
+      toast.success(`${terms.student} updated successfully`);
+      setEditingId(null);
+      qc.invalidateQueries({ queryKey: ['students', type] });
+      qc.invalidateQueries({ queryKey: ['student', editingId] });
+    },
+    onError: (error) => {
+      toast.error(error.message || `Failed to update ${terms.student}`);
+    },
+  });
+
   const remove = useMutation({
     mutationFn: async (id) => {
-      try { 
-        return await studentService.delete(id, type); 
-      } catch { 
-        return { success: true }; 
-      }
+      return await studentService.delete(id, type);
     },
     onSuccess: () => { 
       toast.success('Deleted'); 
       qc.invalidateQueries({ queryKey: ['students', type] }); 
       setDeleting(null); 
     },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete');
+    }
   });
 
   const filters = useMemo(() => ({
@@ -209,25 +166,33 @@ export default function StudentsPage({ type }) {
   const { data, isLoading } = useQuery({
     queryKey: ['students', type, filters],
     queryFn:  async () => {
-      try { 
-        return await studentService.getAll(filters, type); 
-      } catch {
-        const d = DUMMY_FLAT_STUDENTS.filter(r =>
-          (!filters.search || `${r.first_name} ${r.last_name}`.toLowerCase().includes(filters.search.toLowerCase()))
-        );
-        const slice = d.slice((page-1)*pageSize, page*pageSize);
-        return { data: { rows: slice, total: d.length, totalPages: Math.max(1, Math.ceil(d.length / pageSize)) } };
+      const res = await studentService.getAll(filters, type);
+      // Flatten rows for easier consumption
+      if (res.data && Array.isArray(res.data)) {
+        res.data = res.data.map(flattenStudent);
       }
+      return res;
     },
     placeholderData: (prev) => prev,
   });
 
-  const students   = data?.data?.rows       ?? DUMMY_FLAT_STUDENTS;
-  const total      = data?.data?.total      ?? students.length;
-  const totalPages = data?.data?.totalPages ?? 1;
+  const { data: studentToEditData, isLoading: isLoadingEdit } = useQuery({
+    queryKey: ['student', editingId],
+    queryFn: () => studentService.getById(editingId),
+    enabled: !!editingId,
+  });
+
+  const studentToEdit = useMemo(() => {
+    return flattenStudent(studentToEditData?.data || studentToEditData);
+  }, [studentToEditData]);
+
+
+  const students   = data?.data             ?? [];
+  const total      = data?.pagination?.total      ?? 0;
+  const totalPages = data?.pagination?.totalPages ?? 1;
 
   const columns = useMemo(
-    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting),
+    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting, (stu) => setEditingId(stu.id)),
     [studentColumns, type, terms, canDo, router],
   );
 
@@ -238,6 +203,10 @@ export default function StudentsPage({ type }) {
 
   const handleAddStudent = (formData) => {
     addStudent.mutate(formData);
+  };
+
+  const handleUpdateStudent = (formData) => {
+    updateStudent.mutate(formData);
   };
 
   const addButton = canDo('students.create') ? (
@@ -299,11 +268,35 @@ export default function StudentsPage({ type }) {
           onSubmit={handleAddStudent}
           onCancel={() => setIsAddModalOpen(false)}
           loading={addStudent.isPending}
-          classOptions={classOptions}
-          sectionOptions={sectionOptions}
-          academicYearOptions={academicYearOptions}
+          instituteType={type}
+          instituteId={currentInstitute?.id}
           isEdit={false}
         />
+      </AppModal>
+
+      {/* Edit Student Modal */}
+      <AppModal
+        open={!!editingId}
+        onClose={() => setEditingId(null)}
+        title={`Edit ${terms.student}`}
+        description={`Update details for ${terms.student.toLowerCase()}`}
+        size="xl"
+      >
+        {isLoadingEdit ? (
+          <div className="flex h-40 items-center justify-center">
+            <Loader2 className="animate-spin text-primary" size={32} />
+          </div>
+        ) : (
+          <StudentForm
+            onSubmit={handleUpdateStudent}
+            onCancel={() => setEditingId(null)}
+            loading={updateStudent.isPending}
+            instituteType={type}
+            instituteId={currentInstitute?.id}
+            isEdit={true}
+            defaultValues={studentToEdit?.data || studentToEdit} /* Handle structure */
+          />
+        )}
       </AppModal>
 
       {/* Delete Confirm */}
@@ -325,6 +318,9 @@ export default function StudentsPage({ type }) {
 // Cell renderer — per-column display logic
 // ─────────────────────────────────────────────────────────────────────────────
 function StudentCell({ student: s, columnKey }) {
+  // Use flattened data where possible
+  const val = (k) => s[k] ?? s.details?.studentDetails?.[k];
+
   switch (columnKey) {
     case 'name':
       return (
@@ -339,42 +335,52 @@ function StudentCell({ student: s, columnKey }) {
         </div>
       );
     case 'roll_number':
-      return <span className="font-mono text-xs">{s.roll_number || s.candidate_id || s.trainee_id || s.reg_number || '—'}</span>;
-    case 'class_name':    return <span>{s.class?.name || '—'}</span>;
-    case 'course_name':   return <span>{s.course?.name || '—'}</span>;
-    case 'program_name':  return <span>{s.program?.name || '—'}</span>;
-    case 'section_name':  return <span>{s.section?.name || '—'}</span>;
-    case 'batch_name':    return <span>{s.batch?.name || '—'}</span>;
-    case 'semester':      return <span>{s.semester?.name || (s.semester_number ? `Semester ${s.semester_number}` : '—')}</span>;
-    case 'department':    return <span>{s.department?.name || '—'}</span>;
-    case 'faculty':       return <span>{s.faculty?.name || '—'}</span>;
-    case 'target_exam':   return <span>{s.target_exam || '—'}</span>;
-    case 'module':        return <span>{s.current_module || '—'}</span>;
-    case 'cgpa':          return <span className="font-mono">{s.cgpa ?? '—'}</span>;
-    case 'fee_status':
-      return s.fee_status ? (
-        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLORS[s.fee_status] ?? 'bg-gray-100 text-gray-700')}>
-          {s.fee_status.charAt(0).toUpperCase() + s.fee_status.slice(1)}
-        </span>
-      ) : <span className="text-muted-foreground">—</span>;
-    case 'guardian_name':
-      return s.guardian_name ? (
-        <div>
-          <p className="text-xs">{s.guardian_name}</p>
-          {s.guardian_phone && <p className="text-[10px] text-muted-foreground">{s.guardian_phone}</p>}
-        </div>
-      ) : <span className="text-muted-foreground">—</span>;
-    case 'is_active':
+      return <span className="font-mono text-xs">{val('roll_no') || val('roll_number') || val('candidate_id') || val('trainee_id') || val('reg_number') || '—'}</span>;
+    case 'class_name':    return <span>{val('class_name') || s.class?.name || '—'}</span>;
+    case 'course_name':   return <span>{val('course_name') || s.course?.name || '—'}</span>;
+    case 'program_name':  return <span>{val('program_name') || s.program?.name || '—'}</span>;
+    case 'section_name':  return <span>{val('section_name') || s.section?.name || '—'}</span>;
+    case 'batch_name':    return <span>{val('batch_name') || s.batch?.name || '—'}</span>;
+    case 'semester':      return <span>{val('semester_name') || s.semester?.name || (val('semester_number') ? `Semester ${val('semester_number')}` : '—')}</span>;
+    case 'department':    return <span>{val('department_name') || s.department?.name || '—'}</span>;
+    case 'faculty':       return <span>{val('faculty_name') || s.faculty?.name || '—'}</span>;
+    case 'target_exam':   return <span>{val('target_exam') || '—'}</span>;
+    case 'module':        return <span>{val('current_module') || '—'}</span>;
+    case 'cgpa':          return <span className="font-mono">{val('cgpa') ?? '—'}</span>;
+    case 'fee_status':    return displayFeeStatus(s.fee_status);
+    case 'status':        
       return (
-        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500')}>
+        <span className={cn(
+          "rounded px-1.5 py-0.5 text-[10px] uppercase font-bold tracking-wide",
+          s.is_active ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+        )}>
           {s.is_active ? 'Active' : 'Inactive'}
         </span>
       );
-    default:
-      return <span className="text-sm">{s[columnKey] ?? '—'}</span>;
+    case 'date_of_birth':
+      return <span>{val('date_of_birth') ? new Date(val('date_of_birth')).toLocaleDateString() : '—'}</span>;
+    case 'guardian': {
+      const g = val('guardians')?.[0] || {};
+      const name = g.name || val('guardian_name');
+      if (!name) return <span className="text-muted-foreground">—</span>;
+      return (
+        <div className="flex flex-col text-[11px] leading-tight">
+          <span className="font-medium">{name}</span>
+          <span className="text-muted-foreground text-[10px]">{g.relation || val('guardian_relation')}</span>
+          <span>{g.phone || val('guardian_phone')}</span>
+        </div>
+      );
+    }
+    default:              return <span>{val(columnKey) ?? '—'}</span>;
   }
 }
 
-
-
-
+function displayFeeStatus(status) {
+  if (!status) return <span className="text-muted-foreground">—</span>;
+  const style = STATUS_COLORS[status.toLowerCase()] || 'bg-gray-100 text-gray-700';
+  return (
+    <span className={cn('rounded px-1.5 py-0.5 text-[10px] uppercase font-bold tracking-wide', style)}>
+      {status}
+    </span>
+  );
+}

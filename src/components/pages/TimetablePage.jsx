@@ -1,17 +1,15 @@
-// src/components/pages/TimetablePage.jsx (FIXED PERIOD CONFIG MODAL)
+// src/components/pages/TimetablePage.jsx (UPDATED WITH DAYS CONFIG)
 
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import {
   Plus, Pencil, Trash2, GripVertical, Calendar, Clock,
-  BookOpen, Users, DoorOpen, Copy, Power, Eye, Filter, Settings
+  BookOpen, Users, DoorOpen, Copy, Power, Eye, Filter, Settings, Sun
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -28,6 +26,7 @@ import FormSubmitButton from '@/components/common/FormSubmitButton';
 import ErrorAlert from '@/components/common/ErrorAlert';
 import PageLoader from '@/components/common/PageLoader';
 import StatusBadge from '@/components/common/StatusBadge';
+import TimePickerField from '@/components/common/TimePickerField';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 // Import services
@@ -42,8 +42,17 @@ import { classService } from '@/services/classService';
 import { teacherService } from '@/services/teacherService';
 import { academicYearService } from '@/services/academicYearService';
 import { timetableService } from '@/services/timetableService';
-import TimePickerField from '@/components/common/TimePickerField';
-import { DAYS } from '@/constants';
+
+// Days Constants
+const ALL_DAYS = [
+  { value: 'monday', label: 'Monday', short: 'Mon' },
+  { value: 'tuesday', label: 'Tuesday', short: 'Tue' },
+  { value: 'wednesday', label: 'Wednesday', short: 'Wed' },
+  { value: 'thursday', label: 'Thursday', short: 'Thu' },
+  { value: 'friday', label: 'Friday', short: 'Fri' },
+  { value: 'saturday', label: 'Saturday', short: 'Sat' },
+  { value: 'sunday', label: 'Sunday', short: 'Sun' }
+];
 
 // Entity type mapping
 const getEntityTypeFromInstitute = (instituteType) => {
@@ -56,14 +65,6 @@ const getEntityTypeFromInstitute = (instituteType) => {
     tuition_center: 'school'
   };
   return mapping[instituteType] || 'school';
-};
-
-const ENTITY_TYPE_LABELS = {
-  school: 'Class + Section',
-  coaching: 'Course + Batch',
-  academy: 'Program + Batch',
-  college: 'Department + Semester',
-  university: 'Faculty + Department'
 };
 
 const TYPE = 'TIMETABLE_SLOT';
@@ -159,23 +160,22 @@ function TimetableCell({ slot, day, period, periodConfig, onDrop, onEdit, onDele
   );
 }
 
-/* ---------- Period Config Modal Component (FIXED) ---------- */
-function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, loading }) {
+/* ---------- Period & Days Config Modal ---------- */
+function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, loading }) {
   const [periods, setPeriods] = useState([]);
   const [breaks, setBreaks] = useState([]);
   const [totalPeriods, setTotalPeriods] = useState(8);
+  const [selectedDays, setSelectedDays] = useState([]);
 
-  // Initialize form when modal opens or initialConfig changes
+  // Initialize form when modal opens
   useEffect(() => {
     if (open) {
       if (initialConfig) {
         // Edit mode - use existing config
         setTotalPeriods(initialConfig.total_periods || 8);
         setPeriods(initialConfig.periods || []);
-        setBreaks(initialConfig.breaks || [
-          { name: 'Break', start_time: '10:00', end_time: '10:30' },
-          { name: 'Lunch', start_time: '12:30', end_time: '13:30' }
-        ]);
+        setBreaks(initialConfig.breaks || []);
+        setSelectedDays(initialConfig.days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
       } else {
         // Create mode - default config
         setTotalPeriods(8);
@@ -193,6 +193,7 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
           { name: 'Break', start_time: '10:00', end_time: '10:30' },
           { name: 'Lunch', start_time: '12:30', end_time: '13:30' }
         ]);
+        setSelectedDays(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
       }
     }
   }, [open, initialConfig]);
@@ -219,6 +220,25 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
       }
     }
     setPeriods(newPeriods);
+  };
+
+  // Toggle day selection
+  const toggleDay = (dayValue) => {
+    setSelectedDays(prev =>
+      prev.includes(dayValue)
+        ? prev.filter(d => d !== dayValue)
+        : [...prev, dayValue]
+    );
+  };
+
+  // Select all days
+  const selectAllDays = () => {
+    setSelectedDays(ALL_DAYS.map(d => d.value));
+  };
+
+  // Clear all days
+  const clearAllDays = () => {
+    setSelectedDays([]);
   };
 
   // Update period field
@@ -248,6 +268,12 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
 
   // Validate form
   const validateForm = () => {
+    // Check days
+    if (selectedDays.length === 0) {
+      toast.error('Please select at least one day');
+      return false;
+    }
+
     // Check periods
     for (let i = 0; i < periods.length; i++) {
       const p = periods[i];
@@ -291,7 +317,9 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
     const config = {
       total_periods: totalPeriods,
       periods: periods,
-      breaks: breaks
+      breaks: breaks,
+      days: selectedDays,
+      days_count: selectedDays.length
     };
 
     onSubmit(config);
@@ -301,7 +329,7 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
     <AppModal
       open={open}
       onClose={onClose}
-      title={initialConfig ? "Edit Timetable Periods" : "Configure Timetable Periods"}
+      title={initialConfig ? "Edit Timetable Configuration" : "Configure Timetable"}
       size="lg"
       footer={
         <div className="flex justify-end gap-3">
@@ -314,10 +342,46 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
         </div>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-6 max-h-[70vh] overflow-y-auto px-1">
+        {/* Days Selection */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-semibold">Working Days</Label>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={selectAllDays}>
+                Select All
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={clearAllDays}>
+                Clear
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {ALL_DAYS.map(day => (
+              <div key={day.value} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`day-${day.value}`}
+                  checked={selectedDays.includes(day.value)}
+                  onCheckedChange={() => toggleDay(day.value)}
+                />
+                <Label htmlFor={`day-${day.value}`} className="text-sm cursor-pointer">
+                  {day.label}
+                </Label>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Selected: {selectedDays.length} days ({selectedDays.map(d => 
+              ALL_DAYS.find(day => day.value === d)?.short
+            ).join(', ')})
+          </p>
+        </div>
+
+        <Separator />
+
         {/* Total Periods */}
         <div className="space-y-2">
-          <Label>Total Periods Per Day</Label>
+          <Label className="text-base font-semibold">Total Periods Per Day</Label>
           <input
             type="number"
             value={totalPeriods}
@@ -341,7 +405,6 @@ function PeriodConfigModal({ open, onClose, onSubmit, initialConfig = null, load
                   onChange={(value) => handlePeriodChange(index, 'start_time', value)}
                 />
                 <span className="text-center">to</span>
-                
                 <TimePickerField
                   mode="google"
                   value={period.end_time}
@@ -426,21 +489,15 @@ export default function TimetablePage({ type }) {
   const [teachers, setTeachers] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedClassData, setSelectedClassData] = useState(null);
+  const [activeDays, setActiveDays] = useState([]);
 
   // Filter Form
-  const filterSchema = z.object({
-    academic_year: z.string().optional(),
-    class: z.string().optional(),
-    section: z.string().optional(),
-  });
-
   const {
     control: filterControl,
     watch: filterWatch,
     setValue: setFilterValue,
     reset: resetFilters
   } = useForm({
-    resolver: zodResolver(filterSchema),
     defaultValues: {
       academic_year: '',
       class: '',
@@ -465,18 +522,12 @@ export default function TimetablePage({ type }) {
     if (watchedClass) {
       const classData = classes.find(c => c.id === watchedClass);
       setSelectedClassData(classData);
-      console.log('Class Data', classData);
-
       setSections(classData?.sections || []);
 
-      // Extract subjects from courses/materials (JSONB safe)
-      // Extract subjects from courses/materials
+      // Extract subjects from courses
       const extractedSubjects = [];
-
       if (classData?.courses?.length) {
         classData.courses.forEach(course => {
-
-          // SUBJECT NAME = COURSE NAME
           if (course?.name) {
             extractedSubjects.push({
               id: course.id,
@@ -484,15 +535,13 @@ export default function TimetablePage({ type }) {
               code: course.course_code || ''
             });
           }
-
         });
       }
 
-      // remove duplicates
+      // Remove duplicates
       const uniqueSubjects = Array.from(
         new Map(extractedSubjects.map(s => [s.id, s])).values()
       );
-
       setSubjects(uniqueSubjects);
     } else {
       setSelectedClassData(null);
@@ -583,19 +632,33 @@ export default function TimetablePage({ type }) {
     );
   }, [timetables, entityType, selectedClass, selectedSection]);
 
+  // Update active days when timetable changes
+  useEffect(() => {
+    if (currentTimetable?.period_config?.days) {
+      setActiveDays(currentTimetable.period_config.days);
+    } else {
+      setActiveDays(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+    }
+  }, [currentTimetable]);
+
+  // Filter days based on active days
+  const displayedDays = useMemo(() => {
+    return ALL_DAYS.filter(day => activeDays.includes(day.value));
+  }, [activeDays]);
+
   // Grid
   const grid = useMemo(() => {
     const g = {};
-    DAYS.forEach(d => { g[d.value] = {}; });
+    displayedDays.forEach(d => { g[d.value] = {}; });
     if (currentTimetable?.slots) {
       currentTimetable.slots.forEach(slot => {
-        if (slot.period) {
+        if (slot.period && displayedDays.some(d => d.value === slot.day)) {
           g[slot.day][slot.period] = slot;
         }
       });
     }
     return g;
-  }, [currentTimetable]);
+  }, [currentTimetable, displayedDays]);
 
   // Mutations
   const createTimetableMutation = useMutation({
@@ -655,7 +718,6 @@ export default function TimetablePage({ type }) {
 
   const watchedDay = watch('day');
   const watchedPeriod = watch('period');
-  const watchedTeacher = watch('teacher_id');
   const watchedIsBreak = watch('is_break');
 
   // Auto-fill room number
@@ -706,33 +768,28 @@ export default function TimetablePage({ type }) {
       return;
     }
 
-    // Existing slot edit
     if (slotData?.id) {
+      // Existing slot edit
       setEditingSlot(slotData);
-
       reset({
         day: slotData.day,
-        period: String(slotData.period), // FIX
+        period: String(slotData.period),
         subject_id: slotData.subject_id || '',
         teacher_id: slotData.teacher_id || '',
         room_no: slotData.room_no || '',
         is_break: slotData.is_break || false,
         break_name: slotData.break_name || ''
       });
-
     } else {
-
       // NEW SLOT (table click)
       setEditingSlot(null);
-
-      const sectionRoom =
-        selectedSection && selectedClassData
-          ? selectedClassData.sections?.find(s => s.id === selectedSection)?.room_no
-          : '';
+      const sectionRoom = selectedSection && selectedClassData
+        ? selectedClassData.sections?.find(s => s.id === selectedSection)?.room_no
+        : '';
 
       reset({
         day: slotData.day,
-        period: String(slotData.period), // FIX
+        period: String(slotData.period),
         subject_id: '',
         teacher_id: '',
         room_no: sectionRoom || '',
@@ -740,7 +797,6 @@ export default function TimetablePage({ type }) {
         break_name: ''
       });
     }
-
     setModalOpen(true);
   };
 
@@ -753,7 +809,7 @@ export default function TimetablePage({ type }) {
       toast.error('Please select a class');
       return;
     }
-    setPeriodConfig(null); // Reset for create mode
+    setPeriodConfig(null);
     setConfigModalOpen(true);
   };
 
@@ -891,7 +947,7 @@ export default function TimetablePage({ type }) {
                   onClick={handleEditConfig}
                 >
                   <Settings className="mr-2 h-4 w-4" />
-                  Configure Periods
+                  Configure
                 </Button>
               )}
               {canDo('timetable.create') && (
@@ -900,7 +956,7 @@ export default function TimetablePage({ type }) {
                   disabled={!selectedAcademicYear || !selectedClass}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Create New Timetable
+                  Create New
                 </Button>
               )}
             </div>
@@ -957,13 +1013,17 @@ export default function TimetablePage({ type }) {
             </div>
 
             {currentTimetable && (
-              <div className="mt-4 flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
+              <div className="mt-4 flex flex-wrap items-center gap-4 p-3 bg-muted/30 rounded-lg">
                 <Badge variant="outline" className="text-sm">
                   {currentTimetable.name}
                 </Badge>
                 <StatusBadge status={currentTimetable.is_active ? 'active' : 'inactive'} />
                 <span className="text-sm text-muted-foreground">
                   Periods: {currentTimetable.period_config?.total_periods || 8}
+                </span>
+                <span className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Sun className="h-3 w-3" />
+                  Days: {currentTimetable.period_config?.days_count || 5}
                 </span>
               </div>
             )}
@@ -986,7 +1046,7 @@ export default function TimetablePage({ type }) {
                 <thead>
                   <tr>
                     <th className="p-3 w-24 text-left font-semibold border-b">Period / Day</th>
-                    {DAYS.map(day => (
+                    {displayedDays.map(day => (
                       <th key={day.value} className="p-3 text-center font-semibold border-b">
                         {day.label}
                       </th>
@@ -1004,7 +1064,7 @@ export default function TimetablePage({ type }) {
                           </p>
                         </div>
                       </td>
-                      {DAYS.map(day => {
+                      {displayedDays.map(day => {
                         const slot = grid[day.value]?.[period.period];
                         return (
                           <td key={day.value} className="p-2">
@@ -1044,8 +1104,8 @@ export default function TimetablePage({ type }) {
           </Card>
         )}
 
-        {/* Period Config Modal */}
-        <PeriodConfigModal
+        {/* Timetable Config Modal */}
+        <TimetableConfigModal
           open={configModalOpen}
           onClose={() => {
             setConfigModalOpen(false);
@@ -1069,7 +1129,7 @@ export default function TimetablePage({ type }) {
                 label="Day"
                 name="day"
                 control={control}
-                options={DAYS}
+                options={displayedDays.map(d => ({ value: d.value, label: d.label }))}
                 error={errors.day}
                 required
               />
@@ -1088,7 +1148,7 @@ export default function TimetablePage({ type }) {
 
             <Separator />
 
-            <div className="flex items-center space-x-2">
+            {/* <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 id="is_break"
@@ -1096,7 +1156,7 @@ export default function TimetablePage({ type }) {
                 className="h-4 w-4 rounded border-gray-300"
               />
               <Label htmlFor="is_break">This is a break period</Label>
-            </div>
+            </div> */}
 
             {watchedIsBreak ? (
               <InputField
@@ -1104,7 +1164,7 @@ export default function TimetablePage({ type }) {
                 name="break_name"
                 register={register}
                 error={errors.break_name}
-                placeholder="e.g. Lunch, Madani Channel, Prayer Break"
+                placeholder="e.g. Lunch, Prayer Break"
                 required
               />
             ) : (

@@ -483,3 +483,17 @@ export const STATUS_OPTS = [
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' }
 ];
+
+export const CONCESSION_OPTIONS = [
+  { value: 'none', label: 'None' },
+  { value: 'merit', label: 'Merit' },
+  { value: 'need_based', label: 'Need Based' },
+  { value: 'staff_child', label: 'Staff Child' },
+  { value: 'sibling', label: 'Sibling' }
+];
+
+export const GUARDIAN_TYPES = [
+  { value: 'father', label: 'Father' },
+  { value: 'mother', label: 'Mother' },
+  { value: 'guardian', label: 'Guardian' }
+];

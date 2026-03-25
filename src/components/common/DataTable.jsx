@@ -164,6 +164,7 @@ export default function DataTable({
   searchPlaceholder,
   filters               = [],
   action,
+  onRowClick,
   // ── Export ──
   exportConfig          = null,   // { fileName: string, dateField?: string }
 }) {
@@ -432,7 +433,8 @@ export default function DataTable({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() ? 'selected' : undefined}
-                  className="hover:bg-muted/30 transition-colors"
+                  className={`hover:bg-muted/30 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                  onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

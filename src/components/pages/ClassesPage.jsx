@@ -35,6 +35,7 @@ import PageLoader from '@/components/common/PageLoader';
 import ClassForm from '@/components/forms/ClassForm';
 import SectionHeader from '@/components/common/SectionHeader';
 import SelectField from '@/components/common/SelectField'; // ✅ Original SelectField
+import StatusBadge from '@/components/common/StatusBadge';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -98,6 +99,28 @@ export default function ClassesPage({ type }) {
     enabled: !!currentInstitute?.id,
   });
 
+  const normalizedAcademicYearOptions = useMemo(() => {
+    return (academicYears?.data || []).map((year) => ({
+      ...year,
+      value: String(year.value),
+      label: year.label,
+      badgeStatus: year.is_current ? 'current' : undefined,
+      badgeLabel: 'Current',
+    }));
+  }, [academicYears?.data]);
+
+  const selectedAcademicYearMeta = useMemo(
+    () => normalizedAcademicYearOptions.find((year) => String(year.value) === String(selectedAcademicYear)),
+    [normalizedAcademicYearOptions, selectedAcademicYear]
+  );
+
+  const academicYearFilterValue = selectedAcademicYear && selectedAcademicYear !== 'all'
+    ? selectedAcademicYear
+    : undefined;
+  const statusFilterValue = selectedStatus && selectedStatus !== 'all'
+    ? selectedStatus
+    : undefined;
+
   // Fetch classes
   const { 
     data, 
@@ -113,8 +136,8 @@ export default function ClassesPage({ type }) {
         page,
         limit: pageSize,
         search: search || undefined,
-        status: selectedStatus || undefined,
-        academic_year_id: selectedAcademicYear || undefined,
+        status: statusFilterValue,
+        academic_year_id: academicYearFilterValue,
       });
       
       const response = await classService.getAll({
@@ -122,8 +145,8 @@ export default function ClassesPage({ type }) {
         page,
         limit: pageSize,
         search: search || undefined,
-        status: selectedStatus || undefined,
-        academic_year_id: selectedAcademicYear || undefined,
+        status: statusFilterValue,
+        academic_year_id: academicYearFilterValue,
       });
       
       console.log('📥 Classes response:', response);
@@ -564,10 +587,15 @@ export default function ClassesPage({ type }) {
                 control={filterControl}  // ✅ control prop from filter form
                 options={[
                   { value: 'all', label: 'All Academic Years' },
-                  ...(academicYears?.data || [])
+                  ...normalizedAcademicYearOptions
                 ]}
                 placeholder="Select Academic Year"
               />
+              {selectedAcademicYearMeta?.is_current ? (
+                <div className="mt-2">
+                  <StatusBadge status="current" label="Current Academic Year" />
+                </div>
+              ) : null}
             </div>
 
             {/* Status Filter - WITH control from filter form */}
@@ -649,7 +677,7 @@ export default function ClassesPage({ type }) {
           onSubmit={handleSubmit}
           onCancel={closeModal}
           loading={createMutation.isPending || updateMutation.isPending}
-          academicYearOptions={academicYears?.data || []}
+          academicYearOptions={normalizedAcademicYearOptions}
           instituteType={type}
           isEdit={!!editingClass && !editingClass.isCopy}
         />

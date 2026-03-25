@@ -346,9 +346,10 @@ export const STUDENT_LIST_COLUMNS = {
     { key: 'roll_number', label: 'Roll No.' },
     { key: 'class_name', label: 'Class' },
     { key: 'section_name', label: 'Section' },
-    { key: 'guardian_name', label: 'Guardian' },
+    { key: 'date_of_birth', label: 'DOB' },
+    { key: 'guardian', label: 'Guardian' },
+    { key: 'status', label: 'Status' },
     { key: 'fee_status', label: 'Fee Status' },
-    { key: 'is_active', label: 'Status' },
   ],
   coaching: [
     { key: 'name', label: 'Candidate Name' },
