@@ -6,7 +6,7 @@
  *
  * This layout:
  *  1. Verifies access_token (redirect to /login if missing)
- *  2. Checks user type from cookies
+*  2. Checks user type from cookies
 /**
  * (institute) route group — shared layout for all institute types
  * Handles: /school/*, /coaching/*, /academy/*, /college/*, /university/*

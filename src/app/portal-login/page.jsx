@@ -75,9 +75,9 @@ const PORTAL_TYPES = [
 const DEMO_ACCOUNTS = [
   { role: 'STUDENT', email: 'sajood483@gmail.com', password: 'The123456', name: 'Hassan Raza', institute_type: 'school' },
   { role: 'PARENT', email: 'father.ali@parent.tca', password: 'parent123', name: 'Mr. Khan', institute_type: 'school' },
-  { role: 'TEACHER', email: 'shoaibrazamemon160@gmail.com', password: '123456', name: 'Hassan Ahmed', institute_type: 'school' },
-  { role: 'TEACHER', email: 'hafizshoaibraza180@gmail.com', password: 'Shoaib0320', name: 'Shoaib Raza', institute_type: 'school' },
-  // { role: 'STUDENT', email: 'hafizshoaibraza180@gmail.com', password: '', name: 'Shoaib (Dual)', institute_type: 'school' },
+  { role: 'TEACHER', email: 'shoaibrazamemon160@gmail.com', password: '123456', name: 'Shoaib Raza', institute_type: 'school' },
+  // { role: 'TEACHER', email: 'hafizshoaibraza180@gmail.com', password: 'Shoaib0320', name: 'Shoaib Raza', institute_type: 'school' },
+  { role: 'STUDENT', email: 'hafizshoaibraza180@gmail.com', password: '', name: 'Shoaib (Dual)', institute_type: 'school' },
 ];
 
 const INSTITUTE_TABS = [
@@ -98,26 +98,26 @@ export default function PortalLoginPage() {
   // const router = useRouter();
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Get portal type from URL parameter
   const urlType = searchParams?.get('type');
-  
+
   // Set active type based on URL parameter
   useEffect(() => {
     if (urlType && ['STUDENT', 'TEACHER', 'PARENT'].includes(urlType)) {
       setActiveType(urlType);
     }
   }, [urlType]);
-  
+
   const setPortalUser = usePortalStore((s) => s.setPortalUser);
   const setAuthUser = useAuthStore((s) => s.setUser);
-  
+
   const [activeType, setActiveType] = useState('STUDENT');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [demoInstitute, setDemoInstitute] = useState('school');
   const [loginMode, setLoginMode] = useState('single'); // 'single' or 'dual'
-  
+
   // Dual account state
   const [showAccountSelector, setShowAccountSelector] = useState(false);
   const [accounts, setAccounts] = useState([]);
@@ -139,129 +139,79 @@ export default function PortalLoginPage() {
     setActiveType(account.role);
     setValue('email', account.email);
     setValue('password', account.password || '');
-    
+
     if (!account.password) {
       // No password means dual account
       setLoginMode('dual');
     } else {
       setLoginMode('single');
     }
-    
+
     toast.info(`${account.role} credentials filled!`);
   };
 
-  // // Complete login function
-  // const completeLogin = async (user, accessToken) => {
-  //   if (!user || !user.id) {
-  //     toast.error('Invalid user data');
-  //     return;
-  //   }
+  const completeLogin = async (user, accessToken) => {
+    if (!user || !user.id) {
+      toast.error('Invalid user data');
+      return false;
+    }
 
-  //   // Verify user type matches selected portal
-  //   if (user.user_type !== activeType) {
-  //     toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
-  //     return false;
-  //   }
+    // Verify user type matches selected portal
+    if (user.user_type !== activeType) {
+      toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
+      return false;
+    }
 
-  //   // Clear cookies
-  //   Cookies.remove('portal_token');
-  //   Cookies.remove('portal_type');
-  //   Cookies.remove('access_token');
-  //   Cookies.remove('user_type');
-    
-  //   // Set auth store
-  //   setAuthUser(user, accessToken);
-    
-  //   // Set in portal store
-  //   setPortalUser(
-  //     user,
-  //     user.user_type,
-  //     user.institute?.institute_type || 'school'
-  //   );
-    
-  //   // Set cookies
-  //   Cookies.set('portal_token', accessToken, { expires: 1 });
-  //   Cookies.set('portal_type', user.user_type, { expires: 1 });
-  //   Cookies.set('access_token', accessToken, { expires: 7 });
-  //   Cookies.set('user_type', user.user_type, { expires: 7 });
-    
-  //   toast.success(`Welcome, ${user.first_name}!`);
-    
-  //   // Redirect based on user type
-  //   const redirectPaths = {
-  //     STUDENT: '/student',
-  //     PARENT: '/parent',
-  //     TEACHER: '/teacher'
-  //   };
-    
-  //   router.replace(redirectPaths[user.user_type] || '/portal');
-  //   return true;
-  // };
+    // ✅ IMPORTANT: Clear ALL existing cookies first
+    const allCookies = Cookies.get();
+    Object.keys(allCookies).forEach(cookieName => {
+      Cookies.remove(cookieName);
+    });
 
-  // frontend/src/app/portal-login/page.jsx - Update completeLogin function
+    // Set portal specific cookies
+    Cookies.set('portal_token', accessToken, { expires: 7, path: '/' });
+    Cookies.set('portal_type', user.user_type, { expires: 7, path: '/' });
+    Cookies.set('user_type', user.user_type, { expires: 7, path: '/' });
 
-const completeLogin = async (user, accessToken) => {
-  if (!user || !user.id) {
-    toast.error('Invalid user data');
-    return false;
-  }
+    // Also set institute info if available
+    const instType = user.institute?.institute_type || user.institute_type || 'school';
+    Cookies.set('institute_type', instType, { expires: 7, path: '/' });
 
-  // Verify user type matches selected portal
-  if (user.user_type !== activeType) {
-    toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
-    return false;
-  }
+    // Set auth store
+    setAuthUser(user, accessToken);
 
-  // ✅ IMPORTANT: Clear ALL existing cookies first
-  const allCookies = Cookies.get();
-  Object.keys(allCookies).forEach(cookieName => {
-    Cookies.remove(cookieName);
-  });
-  
-  // Set portal specific cookies
-  Cookies.set('portal_token', accessToken, { expires: 7, path: '/' });
-  Cookies.set('portal_type', user.user_type, { expires: 7, path: '/' });
-  Cookies.set('user_type', user.user_type, { expires: 7, path: '/' });
-  
-  // Also set institute info if available
-  const instType = user.institute?.institute_type || user.institute_type || 'school';
-  Cookies.set('institute_type', instType, { expires: 7, path: '/' });
-  
-  // Set auth store
-  setAuthUser(user, accessToken);
-  
-  // Set in portal store
-  setPortalUser(
-    user,
-    user.user_type,
-    instType
-  );
-  
-  toast.success(`Welcome, ${user.first_name}!`);
-  
-  // Redirect based on user type
-  const redirectPaths = {
-    STUDENT: '/student/dashboard',
-    PARENT: '/parent/dashboard',
-    TEACHER: '/teacher/dashboard'
+    // Set in portal store
+    setPortalUser(
+      user,
+      user.user_type,
+      instType
+    );
+
+    toast.success(`Welcome, ${user.first_name}!`);
+
+    // Redirect based on user type
+    const redirectPaths = {
+      STUDENT: '/student/dashboard',
+      PARENT: '/parent/dashboard',
+      TEACHER: '/teacher/dashboard'
+    };
+
+    const redirectPath = redirectPaths[user.user_type] || '/portal';
+    console.log('✅ Portal login successful, redirecting to:', redirectPath);
+    router.replace(redirectPath);
+    return true;
   };
-  
-  const redirectPath = redirectPaths[user.user_type] || '/portal';
-  console.log('✅ Portal login successful, redirecting to:', redirectPath);
-  router.replace(redirectPath);
-  return true;
-};
 
   // Single Account Login
   const onSingleLogin = async (data) => {
     try {
       setLoading(true);
-      
+
       const response = await authService.login({
         email: data.email,
         password: data.password
       });
-      
+
       if (response?.user) {
         await completeLogin(response.user, response.accessToken);
       } else {
@@ -280,25 +230,25 @@ const completeLogin = async (user, accessToken) => {
     try {
       setLoading(true);
       setTempEmail(data.email);
-      
+
       const response = await authService.login({ email: data.email });
-      
+
       console.log('🔍 Dual response:', response);
-      
+
       // Check both property names
       const requiresSelection = response?.requiresSelection || response?.requiresAccountSelection;
       const accountsList = response?.accounts || [];
-      
+
       if (requiresSelection && accountsList.length > 0) {
         // Filter accounts by selected portal type
         const filteredAccounts = accountsList.filter(acc => acc.user_type === activeType);
-        
+
         if (filteredAccounts.length === 0) {
           toast.error(`No ${activeType.toLowerCase()} account found with this email`);
           setLoading(false);
           return;
         }
-        
+
         if (filteredAccounts.length === 1) {
           // Single account of this type
           setSelectedAccount(filteredAccounts[0]);
@@ -306,14 +256,14 @@ const completeLogin = async (user, accessToken) => {
           setLoading(false);
           return;
         }
-        
+
         // Multiple accounts of this type (rare but possible)
         setAccounts(filteredAccounts);
         setShowAccountSelector(true);
         setLoading(false);
         return;
       }
-      
+
       // Handle single account that needs password
       if (response?.requiresPassword && response?.account) {
         if (response.account.user_type === activeType) {
@@ -325,7 +275,7 @@ const completeLogin = async (user, accessToken) => {
         setLoading(false);
         return;
       }
-      
+
       toast.error(response?.message || 'No account found');
     } catch (err) {
       console.error('Dual login error:', err);
@@ -341,22 +291,22 @@ const completeLogin = async (user, accessToken) => {
     setShowAccountSelector(false);
     setShowPasswordDialog(true);
   };
-  
+
   // Handle password submission
   const handlePasswordSubmit = async () => {
     if (!accountPassword) {
       toast.error('Please enter password');
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       const response = await authService.loginWithAccount({
         accountId: selectedAccount.id,
         password: accountPassword
       });
-      
+
       if (response?.user) {
         setShowPasswordDialog(false);
         setAccountPassword('');
@@ -441,11 +391,10 @@ const completeLogin = async (user, accessToken) => {
                   <button
                     key={pt.type}
                     onClick={() => setActiveType(pt.type)}
-                    className={`flex items-center justify-center gap-2.5 py-4 text-sm font-semibold transition-all duration-200 ${
-                      isActive
+                    className={`flex items-center justify-center gap-2.5 py-4 text-sm font-semibold transition-all duration-200 ${isActive
                         ? `bg-gradient-to-r ${pt.gradient} text-white`
                         : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     <Icon className={`w-4 h-4 ${isActive ? 'text-white' : ''}`} />
                     {pt.label}
@@ -475,7 +424,7 @@ const completeLogin = async (user, accessToken) => {
               <div className="mb-6">
                 <h2 className="text-xl font-bold text-slate-900">Sign in to {activePt.label}</h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  {loginMode === 'dual' 
+                  {loginMode === 'dual'
                     ? 'Enter your email to see available accounts'
                     : 'Enter your credentials to login'}
                 </p>
@@ -560,11 +509,10 @@ const completeLogin = async (user, accessToken) => {
                       key={tab.value}
                       type="button"
                       onClick={() => setDemoInstitute(tab.value)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
-                        demoInstitute === tab.value
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${demoInstitute === tab.value
                           ? 'bg-slate-800 text-white'
                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
+                        }`}
                     >
                       {tab.label}
                     </button>
@@ -632,7 +580,7 @@ const completeLogin = async (user, accessToken) => {
               Enter password for {selectedAccount?.display_role} account
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
               <div className={`w-10 h-10 rounded-lg ${ROLE_ICONS[selectedAccount?.user_type]?.color || 'bg-slate-100'} flex items-center justify-center`}>
@@ -647,7 +595,7 @@ const completeLogin = async (user, accessToken) => {
                 <p className="text-xs text-slate-400 font-mono">{selectedAccount?.email}</p>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label>Password</Label>
               <div className="relative">
@@ -670,7 +618,7 @@ const completeLogin = async (user, accessToken) => {
                 </button>
               </div>
             </div>
-            
+
             <Button onClick={handlePasswordSubmit} disabled={!accountPassword} className="w-full">
               Sign In
             </Button>
