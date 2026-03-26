@@ -1,9 +1,9 @@
-//src/app/portal-login/page.jsx
+// frontend/src/app/portal-login/page.jsx (COMPLETE FIXED VERSION)
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,19 +12,33 @@ import Cookies from 'js-cookie';
 import Link from 'next/link';
 import {
   GraduationCap, Users, BookOpen, Eye, EyeOff,
-  ArrowLeft, CheckCircle, Mail, Lock, Briefcase,
+  ArrowLeft, CheckCircle, Mail, Lock, Briefcase, Users2, Loader2
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import usePortalStore from '@/store/portalStore';
-import useAuthStore from '@/store/authStore'; // ✅ Use auth store
-import { authService } from '@/services'; // ✅ Real auth service
+import useAuthStore from '@/store/authStore';
+import { authService } from '@/services';
+import AccountSelectionModal from '@/components/auth/AccountSelectionModal';
+
+// Role icons mapping for modal
+const ROLE_ICONS = {
+  MASTER_ADMIN: { color: 'bg-purple-100 text-purple-600', label: 'Master Admin' },
+  INSTITUTE_ADMIN: { color: 'bg-blue-100 text-blue-600', label: 'Institute Admin' },
+  BRANCH_ADMIN: { color: 'bg-cyan-100 text-cyan-600', label: 'Branch Admin' },
+  TEACHER: { color: 'bg-blue-100 text-blue-600', label: 'Teacher' },
+  STUDENT: { color: 'bg-emerald-100 text-emerald-600', label: 'Student' },
+  PARENT: { color: 'bg-indigo-100 text-indigo-600', label: 'Parent' },
+  STAFF: { color: 'bg-slate-100 text-slate-600', label: 'Staff' },
+};
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
-  password: z.string().min(4, 'Minimum 4 characters'),
+  password: z.string().optional(),
 });
 
 const PORTAL_TYPES = [
@@ -33,12 +47,7 @@ const PORTAL_TYPES = [
     icon: Users,
     label: 'Parent Portal',
     tagline: 'Track your child\'s progress',
-    color: 'indigo',
     gradient: 'from-indigo-600 to-violet-600',
-    bg: 'bg-indigo-50',
-    ic: 'text-indigo-600',
-    border: 'border-indigo-200',
-    activeBg: 'bg-gradient-to-r from-indigo-600 to-violet-600',
     redirectTo: '/parent',
     features: ['Child attendance', 'Fee status', 'Exam results', 'Announcements'],
   },
@@ -47,12 +56,7 @@ const PORTAL_TYPES = [
     icon: BookOpen,
     label: 'Student Portal',
     tagline: 'View your own academic data',
-    color: 'emerald',
     gradient: 'from-emerald-600 to-teal-600',
-    bg: 'bg-emerald-50',
-    ic: 'text-emerald-600',
-    border: 'border-emerald-200',
-    activeBg: 'bg-gradient-to-r from-emerald-600 to-teal-600',
     redirectTo: '/student',
     features: ['My attendance', 'My fee record', 'My exam results', 'Class timetable'],
   },
@@ -61,43 +65,19 @@ const PORTAL_TYPES = [
     icon: Briefcase,
     label: 'Teacher Portal',
     tagline: 'Manage your classes & students',
-    color: 'blue',
     gradient: 'from-blue-600 to-sky-600',
-    bg: 'bg-blue-50',
-    ic: 'text-blue-600',
-    border: 'border-blue-200',
-    activeBg: 'bg-gradient-to-r from-blue-600 to-sky-600',
     redirectTo: '/teacher',
     features: ['My classes & subjects', 'Upload notes', 'Assign homework', 'Mark attendance'],
   },
 ];
 
-// 🔥 Demo accounts for quick login (will be removed in production)
+// Demo accounts
 const DEMO_ACCOUNTS = [
-  // School
-  { role: 'STUDENT', email: 'sajood483@gmail.com', password: 'The123456', name: 'Hassan Raza Attari', institute_type: 'school' },
+  { role: 'STUDENT', email: 'sajood483@gmail.com', password: 'The123456', name: 'Hassan Raza', institute_type: 'school' },
   { role: 'PARENT', email: 'father.ali@parent.tca', password: 'parent123', name: 'Mr. Khan', institute_type: 'school' },
   { role: 'TEACHER', email: 'shoaibrazamemon160@gmail.com', password: '123456', name: 'Hassan Ahmed', institute_type: 'school' },
-
-  // Coaching
-  { role: 'STUDENT', email: 'sara@coaching.tca', password: 'student123', name: 'Sara Khan', institute_type: 'coaching' },
-  { role: 'PARENT', email: 'mother.sara@parent.tca', password: 'parent123', name: 'Mrs. Khan', institute_type: 'coaching' },
-  { role: 'TEACHER', email: 'usman@coaching.tca', password: 'teacher123', name: 'Usman Ali', institute_type: 'coaching' },
-
-  // Academy
-  { role: 'STUDENT', email: 'ahmed@academy.tca', password: 'student123', name: 'Ahmed Raza', institute_type: 'academy' },
-  { role: 'PARENT', email: 'father.ahmed@parent.tca', password: 'parent123', name: 'Mr. Raza', institute_type: 'academy' },
-  { role: 'TEACHER', email: 'fatima@academy.tca', password: 'teacher123', name: 'Fatima Ali', institute_type: 'academy' },
-
-  // College
-  { role: 'STUDENT', email: 'bilal@college.tca', password: 'student123', name: 'Bilal Ahmed', institute_type: 'college' },
-  { role: 'PARENT', email: 'father.bilal@parent.tca', password: 'parent123', name: 'Mr. Ahmed', institute_type: 'college' },
-  { role: 'TEACHER', email: 'zainab@college.tca', password: 'teacher123', name: 'Zainab Ali', institute_type: 'college' },
-
-  // University
-  { role: 'STUDENT', email: 'omar@uni.tca', password: 'student123', name: 'Omar Farooq', institute_type: 'university' },
-  { role: 'PARENT', email: 'father.omar@parent.tca', password: 'parent123', name: 'Mr. Farooq', institute_type: 'university' },
-  { role: 'TEACHER', email: 'dr.kamran@uni.tca', password: 'teacher123', name: 'Dr. Kamran', institute_type: 'university' },
+  { role: 'TEACHER', email: 'hafizshoaibraza180@gmail.com', password: 'Shoaib0320', name: 'Shoaib Raza', institute_type: 'school' },
+  // { role: 'STUDENT', email: 'hafizshoaibraza180@gmail.com', password: '', name: 'Shoaib (Dual)', institute_type: 'school' },
 ];
 
 const INSTITUTE_TABS = [
@@ -115,89 +95,289 @@ const ROLE_STYLES = {
 };
 
 export default function PortalLoginPage() {
+  // const router = useRouter();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Get portal type from URL parameter
+  const urlType = searchParams?.get('type');
+  
+  // Set active type based on URL parameter
+  useEffect(() => {
+    if (urlType && ['STUDENT', 'TEACHER', 'PARENT'].includes(urlType)) {
+      setActiveType(urlType);
+    }
+  }, [urlType]);
+  
   const setPortalUser = usePortalStore((s) => s.setPortalUser);
-  const setAuthUser = useAuthStore((s) => s.setUser); // ✅ Also set auth store
-  const [activeType, setActiveType] = useState('STUDENT'); // Default to student
+  const setAuthUser = useAuthStore((s) => s.setUser);
+  
+  const [activeType, setActiveType] = useState('STUDENT');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [demoInstitute, setDemoInstitute] = useState('school');
+  const [loginMode, setLoginMode] = useState('single'); // 'single' or 'dual'
+  
+  // Dual account state
+  const [showAccountSelector, setShowAccountSelector] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [accountPassword, setAccountPassword] = useState('');
+  const [showAccountPass, setShowAccountPass] = useState(false);
+  const [tempEmail, setTempEmail] = useState('');
 
   const activePt = PORTAL_TYPES.find((p) => p.type === activeType);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
+    defaultValues: { email: '', password: '' }
   });
 
-  // Handle form submission
-  const onSubmit = async (data) => {
+  // Fill demo account
+  const fillDemoAccount = (account) => {
+    setActiveType(account.role);
+    setValue('email', account.email);
+    setValue('password', account.password || '');
+    
+    if (!account.password) {
+      // No password means dual account
+      setLoginMode('dual');
+    } else {
+      setLoginMode('single');
+    }
+    
+    toast.info(`${account.role} credentials filled!`);
+  };
+
+  // // Complete login function
+  // const completeLogin = async (user, accessToken) => {
+  //   if (!user || !user.id) {
+  //     toast.error('Invalid user data');
+  //     return;
+  //   }
+
+  //   // Verify user type matches selected portal
+  //   if (user.user_type !== activeType) {
+  //     toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
+  //     return false;
+  //   }
+
+  //   // Clear cookies
+  //   Cookies.remove('portal_token');
+  //   Cookies.remove('portal_type');
+  //   Cookies.remove('access_token');
+  //   Cookies.remove('user_type');
+    
+  //   // Set auth store
+  //   setAuthUser(user, accessToken);
+    
+  //   // Set in portal store
+  //   setPortalUser(
+  //     user,
+  //     user.user_type,
+  //     user.institute?.institute_type || 'school'
+  //   );
+    
+  //   // Set cookies
+  //   Cookies.set('portal_token', accessToken, { expires: 1 });
+  //   Cookies.set('portal_type', user.user_type, { expires: 1 });
+  //   Cookies.set('access_token', accessToken, { expires: 7 });
+  //   Cookies.set('user_type', user.user_type, { expires: 7 });
+    
+  //   toast.success(`Welcome, ${user.first_name}!`);
+    
+  //   // Redirect based on user type
+  //   const redirectPaths = {
+  //     STUDENT: '/student',
+  //     PARENT: '/parent',
+  //     TEACHER: '/teacher'
+  //   };
+    
+  //   router.replace(redirectPaths[user.user_type] || '/portal');
+  //   return true;
+  // };
+
+  // frontend/src/app/portal-login/page.jsx - Update completeLogin function
+
+const completeLogin = async (user, accessToken) => {
+  if (!user || !user.id) {
+    toast.error('Invalid user data');
+    return false;
+  }
+
+  // Verify user type matches selected portal
+  if (user.user_type !== activeType) {
+    toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
+    return false;
+  }
+
+  // ✅ IMPORTANT: Clear ALL existing cookies first
+  const allCookies = Cookies.get();
+  Object.keys(allCookies).forEach(cookieName => {
+    Cookies.remove(cookieName);
+  });
+  
+  // Set portal specific cookies
+  Cookies.set('portal_token', accessToken, { expires: 7, path: '/' });
+  Cookies.set('portal_type', user.user_type, { expires: 7, path: '/' });
+  Cookies.set('user_type', user.user_type, { expires: 7, path: '/' });
+  
+  // Also set institute info if available
+  const instType = user.institute?.institute_type || user.institute_type || 'school';
+  Cookies.set('institute_type', instType, { expires: 7, path: '/' });
+  
+  // Set auth store
+  setAuthUser(user, accessToken);
+  
+  // Set in portal store
+  setPortalUser(
+    user,
+    user.user_type,
+    instType
+  );
+  
+  toast.success(`Welcome, ${user.first_name}!`);
+  
+  // Redirect based on user type
+  const redirectPaths = {
+    STUDENT: '/student/dashboard',
+    PARENT: '/parent/dashboard',
+    TEACHER: '/teacher/dashboard'
+  };
+  
+  const redirectPath = redirectPaths[user.user_type] || '/portal';
+  console.log('✅ Portal login successful, redirecting to:', redirectPath);
+  router.replace(redirectPath);
+  return true;
+};
+
+  // Single Account Login
+  const onSingleLogin = async (data) => {
     try {
       setLoading(true);
-
-      // 🔥 Use real auth service
+      
       const response = await authService.login({
         email: data.email,
         password: data.password
       });
-
-      const user = response.user;
-
-      // Verify user type matches selected portal
-      if (user.user_type !== activeType) {
-        toast.error(`This account is not a ${activeType.toLowerCase()} account. Please select correct portal.`);
-        setLoading(false);
-        return;
+      
+      if (response?.user) {
+        await completeLogin(response.user, response.accessToken);
+      } else {
+        toast.error('Invalid email or password');
       }
-
-      // Log the user object to see permissions
-      console.log('👤 Logged in user:', {
-        id: user.id,
-        type: user.user_type,
-        permissionsCount: user.permissions?.length,
-        permissions: user.permissions
-      });
-
-      // Set in auth store (for token management)
-      setAuthUser(user, response.access_token);
-
-      // Set in portal store - now permissions will be passed correctly
-      setPortalUser(
-        user,
-        user.user_type,
-        user.institute?.institute_type || 'school'
-      );
-
-      // Set cookies
-      Cookies.set('portal_token', response.access_token, { expires: 1 });
-      Cookies.set('portal_type', user.user_type, { expires: 1 });
-      Cookies.set('access_token', response.access_token, { expires: 7 });
-      Cookies.set('user_type', user.user_type, { expires: 7 });
-
-      toast.success(`Welcome, ${user.first_name}!`);
-
-      // Redirect based on user type
-      const redirectPaths = {
-        STUDENT: '/student',
-        PARENT: '/parent',
-        TEACHER: '/teacher'
-      };
-
-      router.replace(redirectPaths[user.user_type] || '/portal');
-
     } catch (err) {
       console.error('Login error:', err);
-      toast.error(err?.response?.data?.message || err?.message || 'Login failed. Check your credentials.');
+      toast.error(err?.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // Quick fill demo account
-  const fillDemoAccount = (account) => {
-    setActiveType(account.role);
-    setValue('email', account.email);
-    setValue('password', account.password);
-    toast.success(`${account.role.toLowerCase()} account filled!`);
+  // Dual Account Login
+  const onDualLogin = async (data) => {
+    try {
+      setLoading(true);
+      setTempEmail(data.email);
+      
+      const response = await authService.login({ email: data.email });
+      
+      console.log('🔍 Dual response:', response);
+      
+      // Check both property names
+      const requiresSelection = response?.requiresSelection || response?.requiresAccountSelection;
+      const accountsList = response?.accounts || [];
+      
+      if (requiresSelection && accountsList.length > 0) {
+        // Filter accounts by selected portal type
+        const filteredAccounts = accountsList.filter(acc => acc.user_type === activeType);
+        
+        if (filteredAccounts.length === 0) {
+          toast.error(`No ${activeType.toLowerCase()} account found with this email`);
+          setLoading(false);
+          return;
+        }
+        
+        if (filteredAccounts.length === 1) {
+          // Single account of this type
+          setSelectedAccount(filteredAccounts[0]);
+          setShowPasswordDialog(true);
+          setLoading(false);
+          return;
+        }
+        
+        // Multiple accounts of this type (rare but possible)
+        setAccounts(filteredAccounts);
+        setShowAccountSelector(true);
+        setLoading(false);
+        return;
+      }
+      
+      // Handle single account that needs password
+      if (response?.requiresPassword && response?.account) {
+        if (response.account.user_type === activeType) {
+          setSelectedAccount(response.account);
+          setShowPasswordDialog(true);
+        } else {
+          toast.error(`This is a ${response.account.user_type.toLowerCase()} account. Please select ${activeType.toLowerCase()} portal.`);
+        }
+        setLoading(false);
+        return;
+      }
+      
+      toast.error(response?.message || 'No account found');
+    } catch (err) {
+      console.error('Dual login error:', err);
+      toast.error(err?.response?.data?.message || 'Failed to fetch accounts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle account selection
+  const handleSelectAccount = (account) => {
+    setSelectedAccount(account);
+    setShowAccountSelector(false);
+    setShowPasswordDialog(true);
+  };
+  
+  // Handle password submission
+  const handlePasswordSubmit = async () => {
+    if (!accountPassword) {
+      toast.error('Please enter password');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const response = await authService.loginWithAccount({
+        accountId: selectedAccount.id,
+        password: accountPassword
+      });
+      
+      if (response?.user) {
+        setShowPasswordDialog(false);
+        setAccountPassword('');
+        await completeLogin(response.user, response.accessToken);
+      } else {
+        toast.error('Invalid password');
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Invalid password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Form submission handler
+  const onSubmit = async (data) => {
+    if (loginMode === 'dual') {
+      await onDualLogin(data);
+    } else {
+      await onSingleLogin(data);
+    }
   };
 
   return (
@@ -212,10 +392,8 @@ export default function PortalLoginPage() {
         transition: 'background 0.5s ease',
       }}
     >
-      {/* Background grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:50px_50px]" />
 
-      {/* Back button */}
       <div className="relative z-10 p-4">
         <Link href="/" className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors">
           <ArrowLeft className="w-4 h-4" />
@@ -225,7 +403,7 @@ export default function PortalLoginPage() {
 
       <div className="relative flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-4xl grid lg:grid-cols-5 gap-8 items-center">
-          {/* LEFT — Info panel */}
+          {/* LEFT Panel */}
           <div className="lg:col-span-2 text-white hidden lg:block">
             <div className="flex items-center gap-3 mb-8">
               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
@@ -250,18 +428,9 @@ export default function PortalLoginPage() {
                 </li>
               ))}
             </ul>
-
-            <div className="mt-8 p-4 bg-white/10 rounded-xl border border-white/20">
-              <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">Demo Credentials</p>
-              <p className="text-sm font-mono text-white/90">
-                {activeType === 'STUDENT' ? 'sajood483@gmail.com / The123456' :
-                  activeType === 'PARENT' ? 'parent@tca.edu.pk / parent123' :
-                    'shoaibrazamemon160@gmail.com / 123456'}
-              </p>
-            </div>
           </div>
 
-          {/* RIGHT — Login card */}
+          {/* RIGHT Login Card */}
           <div className="lg:col-span-3 bg-white rounded-2xl shadow-2xl overflow-hidden">
             {/* Portal type switcher */}
             <div className="grid grid-cols-3">
@@ -272,10 +441,11 @@ export default function PortalLoginPage() {
                   <button
                     key={pt.type}
                     onClick={() => setActiveType(pt.type)}
-                    className={`flex items-center justify-center gap-2.5 py-4 text-sm font-semibold transition-all duration-200 ${isActive
-                        ? `${pt.activeBg} text-white`
+                    className={`flex items-center justify-center gap-2.5 py-4 text-sm font-semibold transition-all duration-200 ${
+                      isActive
+                        ? `bg-gradient-to-r ${pt.gradient} text-white`
                         : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                      }`}
+                    }`}
                   >
                     <Icon className={`w-4 h-4 ${isActive ? 'text-white' : ''}`} />
                     {pt.label}
@@ -284,14 +454,30 @@ export default function PortalLoginPage() {
               })}
             </div>
 
+            {/* Login Mode Tabs */}
+            <div className="border-b px-6 pt-4">
+              <Tabs defaultValue="single" onValueChange={setLoginMode} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="single" className="flex items-center gap-2">
+                    <Users2 className="w-4 h-4" />
+                    Single Account
+                  </TabsTrigger>
+                  <TabsTrigger value="dual" className="flex items-center gap-2">
+                    <Users2 className="w-4 h-4" />
+                    Multiple Accounts
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
             {/* Form */}
             <div className="p-8">
               <div className="mb-6">
                 <h2 className="text-xl font-bold text-slate-900">Sign in to {activePt.label}</h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  {activeType === 'PARENT' ? 'Enter your registered parent account credentials' :
-                    activeType === 'TEACHER' ? 'Enter your teacher account credentials' :
-                      'Enter your student login credentials'}
+                  {loginMode === 'dual' 
+                    ? 'Enter your email to see available accounts'
+                    : 'Enter your credentials to login'}
                 </p>
               </div>
 
@@ -305,51 +491,62 @@ export default function PortalLoginPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder={activeType === 'PARENT' ? 'parent@tca.edu.pk' :
-                        activeType === 'TEACHER' ? 'teacher@tca.edu' :
-                          'student@tca.edu'}
+                      placeholder="your@email.com"
                       className="pl-10"
                       {...register('email')}
+                      disabled={loading}
                     />
                   </div>
                   {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
                 </div>
 
-                <div>
-                  <Label htmlFor="password" className="text-sm font-semibold text-slate-700">
-                    Password
-                  </Label>
-                  <div className="relative mt-1.5">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input
-                      id="password"
-                      type={showPass ? 'text' : 'password'}
-                      placeholder="Enter your password"
-                      className="pl-10 pr-10"
-                      {...register('password')}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass(!showPass)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                {loginMode === 'single' && (
+                  <div>
+                    <Label htmlFor="password" className="text-sm font-semibold text-slate-700">
+                      Password
+                    </Label>
+                    <div className="relative mt-1.5">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input
+                        id="password"
+                        type={showPass ? 'text' : 'password'}
+                        placeholder="Enter your password"
+                        className="pl-10 pr-10"
+                        {...register('password')}
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPass(!showPass)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>}
                   </div>
-                  {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>}
-                </div>
+                )}
+
+                {loginMode === 'dual' && (
+                  <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
+                    <Users2 className="w-4 h-4 inline mr-2" />
+                    For multiple accounts: Leave password blank. You'll select which account to use.
+                  </div>
+                )}
 
                 <Button
                   type="submit"
                   disabled={loading}
-                  className={`w-full font-semibold py-5 ${activeType === 'PARENT'
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700'
-                      : activeType === 'TEACHER'
-                        ? 'bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700'
-                        : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-                    } text-white`}
+                  className={`w-full font-semibold py-5 bg-gradient-to-r ${activePt.gradient} text-white hover:opacity-90`}
                 >
-                  {loading ? 'Signing in...' : `Sign in to ${activePt.label}`}
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      {loginMode === 'dual' ? 'Checking...' : 'Signing in...'}
+                    </>
+                  ) : (
+                    loginMode === 'dual' ? 'Continue' : `Sign in to ${activePt.label}`
+                  )}
                 </Button>
               </form>
 
@@ -357,24 +554,23 @@ export default function PortalLoginPage() {
               <div className="mt-5 pt-5 border-t border-slate-100">
                 <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">Quick Demo Login</p>
 
-                {/* Institute type tabs */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {INSTITUTE_TABS.map((tab) => (
                     <button
                       key={tab.value}
                       type="button"
                       onClick={() => setDemoInstitute(tab.value)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${demoInstitute === tab.value
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                        demoInstitute === tab.value
                           ? 'bg-slate-800 text-white'
                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                        }`}
+                      }`}
                     >
                       {tab.label}
                     </button>
                   ))}
                 </div>
 
-                {/* Account cards — 3 per institute type */}
                 <div className="grid grid-cols-3 gap-2">
                   {DEMO_ACCOUNTS
                     .filter((a) => a.institute_type === demoInstitute)
@@ -393,7 +589,11 @@ export default function PortalLoginPage() {
                           </div>
                           <p className="text-[11px] font-bold text-slate-800 leading-tight">{acc.name.split(' ')[0]}</p>
                           <p className="text-[10px] text-slate-400 capitalize leading-none">{acc.role.toLowerCase()}</p>
-                          <p className="text-[9px] text-slate-300 leading-none font-mono">{acc.password}</p>
+                          {acc.password ? (
+                            <p className="text-[9px] text-slate-300 leading-none font-mono">{acc.password}</p>
+                          ) : (
+                            <p className="text-[9px] text-amber-500 leading-none">Dual Account</p>
+                          )}
                         </button>
                       );
                     })}
@@ -413,6 +613,70 @@ export default function PortalLoginPage() {
           </div>
         </div>
       </div>
+
+      {/* Account Selection Modal */}
+      <AccountSelectionModal
+        open={showAccountSelector}
+        onOpenChange={setShowAccountSelector}
+        accounts={accounts}
+        email={tempEmail}
+        onSelectAccount={handleSelectAccount}
+      />
+
+      {/* Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Enter Password</DialogTitle>
+            <DialogDescription>
+              Enter password for {selectedAccount?.display_role} account
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+              <div className={`w-10 h-10 rounded-lg ${ROLE_ICONS[selectedAccount?.user_type]?.color || 'bg-slate-100'} flex items-center justify-center`}>
+                {selectedAccount?.user_type === 'STUDENT' && <BookOpen size={20} />}
+                {selectedAccount?.user_type === 'TEACHER' && <Briefcase size={20} />}
+                {selectedAccount?.user_type === 'PARENT' && <Users size={20} />}
+                {!selectedAccount?.user_type && <Users2 size={20} />}
+              </div>
+              <div>
+                <p className="font-medium">{selectedAccount?.display_name}</p>
+                <p className="text-xs text-slate-500">{selectedAccount?.display_role}</p>
+                <p className="text-xs text-slate-400 font-mono">{selectedAccount?.email}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  type={showAccountPass ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  className="pl-9 pr-10"
+                  value={accountPassword}
+                  onChange={(e) => setAccountPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAccountPass(!showAccountPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                >
+                  {showAccountPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+            
+            <Button onClick={handlePasswordSubmit} disabled={!accountPassword} className="w-full">
+              Sign In
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

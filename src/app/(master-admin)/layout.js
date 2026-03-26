@@ -1,3 +1,4 @@
+// src/app/(master-admin)/layout.js
 /**
  * Master Admin layout — fully responsive with mobile sidebar
  */
