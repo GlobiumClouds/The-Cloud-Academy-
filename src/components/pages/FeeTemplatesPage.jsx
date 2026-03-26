@@ -387,21 +387,21 @@ export default function FeeTemplatesPage({ type }) {
       }
     ];
 
-    // ✅ Branch column - ONLY if hasBranches
-    if (hasBranches()) {
-      cols.push({
-        accessorKey: 'branch',
-        header: 'Branch',
-        cell: ({ row }) => {
-          const template = row.original;
-          if (template.branch_id) {
-            const branch = branches.find(b => b.value === template.branch_id);
-            return <Badge variant="outline">{branch?.label || 'Branch'}</Badge>;
-          }
-          return <Badge variant="secondary">All Branches</Badge>;
-        }
-      });
-    }
+    // // ✅ Branch column - ONLY if hasBranches
+    // if (hasBranches()) {
+    //   cols.push({
+    //     accessorKey: 'branch',
+    //     header: 'Branch',
+    //     cell: ({ row }) => {
+    //       const template = row.original;
+    //       if (template.branch_id) {
+    //         const branch = branches.find(b => b.value === template.branch_id);
+    //         return <Badge variant="outline">{branch?.label || 'Branch'}</Badge>;
+    //       }
+    //       return <Badge variant="secondary">All Branches</Badge>;
+    //     }
+    //   });
+    // }
 
     // Add remaining columns
     cols.push(
@@ -438,6 +438,8 @@ export default function FeeTemplatesPage({ type }) {
       },
       {
         accessorKey: 'components',
+        accessorFn: (row) =>            // ← yeh add karo
+          (row.components || []).map(c => c.name).join(', '),
         header: 'Components',
         cell: ({ row }) => {
           const components = row.original.components || [];

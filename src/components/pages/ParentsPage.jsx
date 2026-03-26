@@ -19,37 +19,37 @@ import SelectField from '@/components/common/SelectField';
 import StatsCard from '@/components/common/StatsCard';
 import { cn } from '@/lib/utils';
 
-const RELATION_OPTS = [{ value:'father', label:'Father' }, { value:'mother', label:'Mother' }, { value:'guardian', label:'Guardian' }, { value:'other', label:'Other' }];
-const STATUS_OPTS   = [{ value:'active', label:'Active' }, { value:'inactive', label:'Inactive' }];
+const RELATION_OPTS = [{ value: 'father', label: 'Father' }, { value: 'mother', label: 'Mother' }, { value: 'guardian', label: 'Guardian' }, { value: 'other', label: 'Other' }];
+const STATUS_OPTS = [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }];
 
 const schema = z.object({
-  first_name:  z.string().min(2, 'Required'),
-  last_name:   z.string().min(2, 'Required'),
-  email:       z.string().email().optional().or(z.literal('')),
-  phone:       z.string().min(10, 'Required'),
-  relation:    z.string().min(1, 'Required'),
-  cnic:        z.string().optional(),
-  occupation:  z.string().optional(),
-  address:     z.string().optional(),
-  status:      z.string().min(1, 'Required'),
+  first_name: z.string().min(2, 'Required'),
+  last_name: z.string().min(2, 'Required'),
+  email: z.string().email().optional().or(z.literal('')),
+  phone: z.string().min(10, 'Required'),
+  relation: z.string().min(1, 'Required'),
+  cnic: z.string().optional(),
+  occupation: z.string().optional(),
+  address: z.string().optional(),
+  status: z.string().min(1, 'Required'),
 });
 
 export default function ParentsPage({ type }) {
-  const qc    = useQueryClient();
+  const qc = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
   const { terms } = useInstituteConfig();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [page,   setPage]   = useState(1);
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [modal,   setModal]   = useState(false);
+  const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [deleting,setDeleting]= useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [foundStudents, setFoundStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [findingStudents, setFindingStudents] = useState(false);
 
-  const { register, handleSubmit, control, reset, getValues, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'active', relation:'father' } });
+  const { register, handleSubmit, control, reset, getValues, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status: 'active', relation: 'father' } });
 
   const { data, isLoading } = useQuery({
     queryKey: ['parents', type, page, pageSize, search, status],
@@ -79,11 +79,11 @@ export default function ParentsPage({ type }) {
     onError: () => toast.error('Delete failed'),
   });
 
-  const openAdd  = () => {
+  const openAdd = () => {
     setEditing(null);
     setFoundStudents([]);
     setSelectedStudentIds([]);
-    reset({ status:'active', relation:'father' });
+    reset({ status: 'active', relation: 'father' });
     setModal(true);
   };
 
@@ -146,34 +146,41 @@ export default function ParentsPage({ type }) {
   };
 
   const columns = useMemo(() => [
-    { accessorKey: 'name', header: 'Parent/Guardian', cell: ({ row: { original: r } }) => <div><p className="font-medium">{r.first_name} {r.last_name}</p><p className="text-xs text-muted-foreground">{r.email || r.phone}</p></div> },
-    { accessorKey: 'phone',    header: 'Phone',    cell: ({ getValue }) => getValue() || '—' },
+    {
+      accessorKey: 'name',
+      accessorFn: (row) =>                          // ← add karo
+        `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+      header: 'Parent/Guardian', cell: ({ row: { original: r } }) => <div><p className="font-medium">{r.first_name} {r.last_name}</p><p className="text-xs text-muted-foreground">{r.email || r.phone}</p></div>
+    },
+    { accessorKey: 'phone', header: 'Phone', cell: ({ getValue }) => getValue() || '—' },
     { accessorKey: 'relation', header: 'Relation', cell: ({ getValue }) => <span className="capitalize">{getValue()}</span> },
     { accessorKey: 'children', header: `${terms.students}`, cell: ({ getValue }) => getValue() ?? 0 },
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', getValue() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}>{getValue()}</span> },
-    { id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        {canDo('parents.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
-        {canDo('parents.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
-      </div>
-    )},
+    {
+      id: 'actions', header: 'Actions', enableHiding: false, cell: ({ row }) => (
+        <div className="flex items-center justify-end gap-1">
+          {canDo('parents.update') && <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit"><Pencil size={13} /></button>}
+          {canDo('parents.delete') && <button onClick={() => setDeleting(row.original)} className="rounded p-1.5 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={13} /></button>}
+        </div>
+      )
+    },
   ], [canDo, terms]);
 
   return (
     <div className="space-y-5">
       <PageHeader title="Parents & Guardians" description={`${total} registered`} />
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label="Total Parents"  value={total}                                         icon={<UserCheck size={18} />} />
-        <StatsCard label="Active"         value={rows.filter(r => r.status === 'active').length}    icon={<UserCheck size={18} />} />
-        <StatsCard label="Linked Students"value={rows.reduce((s, r) => s + (r.children ?? 0), 0)}  icon={<UserCheck size={18} />} />
+        <StatsCard label="Total Parents" value={total} icon={<UserCheck size={18} />} />
+        <StatsCard label="Active" value={rows.filter(r => r.status === 'active').length} icon={<UserCheck size={18} />} />
+        <StatsCard label="Linked Students" value={rows.reduce((s, r) => s + (r.children ?? 0), 0)} icon={<UserCheck size={18} />} />
       </div>
       <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No parents found"
         search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder="Search parents…"
-        filters={[{ name:'status', label:'Status', value:status, onChange:(v) => { setStatus(v); setPage(1); }, options:STATUS_OPTS }]}
+        filters={[{ name: 'status', label: 'Status', value: status, onChange: (v) => { setStatus(v); setPage(1); }, options: STATUS_OPTS }]}
         action={canDo('parents.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add Parent</button> : null}
         enableColumnVisibility
         exportConfig={{ fileName: 'parents' }}
-        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} 
+        pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }}
       />
 
       <AppModal open={modal} onClose={closeModal} title={editing ? 'Edit Parent' : 'New Parent'} size="lg"
@@ -193,7 +200,7 @@ export default function ParentsPage({ type }) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <SelectField label="Relation *" name="relation" control={control} error={errors.relation} options={RELATION_OPTS} required />
-            <SelectField label="Status *"   name="status"   control={control} error={errors.status}   options={STATUS_OPTS}   required />
+            <SelectField label="Status *" name="status" control={control} error={errors.status} options={STATUS_OPTS} required />
           </div>
           <div className="space-y-1.5"><label className="text-sm font-medium">Address</label><input {...register('address')} className="input-base" /></div>
 

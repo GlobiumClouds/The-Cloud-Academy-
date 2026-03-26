@@ -7,9 +7,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form'; // ✅ Import useForm for filters
-import { 
-  Plus, 
-  BookOpen, 
+import {
+  Plus,
+  BookOpen,
   Eye,
   Copy,
   Power,
@@ -51,7 +51,7 @@ export default function ClassesPage({ type }) {
   const { canDo, user } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
   const { terms } = useInstituteConfig();
-  
+
   // State Management
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -89,10 +89,10 @@ export default function ClassesPage({ type }) {
   }, []);
 
   // Fetch academic years for dropdown
-  const { 
-    data: academicYears, 
+  const {
+    data: academicYears,
     error: academicYearsError,
-    isLoading: academicYearsLoading 
+    isLoading: academicYearsLoading
   } = useQuery({
     queryKey: ['academic-years-options', currentInstitute?.id],
     queryFn: () => academicYearService.getOptions(currentInstitute?.id, true),
@@ -122,12 +122,12 @@ export default function ClassesPage({ type }) {
     : undefined;
 
   // Fetch classes
-  const { 
-    data, 
-    isLoading, 
-    error, 
+  const {
+    data,
+    isLoading,
+    error,
     refetch,
-    isFetching 
+    isFetching
   } = useQuery({
     queryKey: ['classes', currentInstitute?.id, page, pageSize, search, selectedStatus, selectedAcademicYear],
     queryFn: async () => {
@@ -139,7 +139,7 @@ export default function ClassesPage({ type }) {
         status: statusFilterValue,
         academic_year_id: academicYearFilterValue,
       });
-      
+
       const response = await classService.getAll({
         institute_id: currentInstitute?.id,
         page,
@@ -148,14 +148,14 @@ export default function ClassesPage({ type }) {
         status: statusFilterValue,
         academic_year_id: academicYearFilterValue,
       });
-      
+
       console.log('📥 Classes response:', response);
-      
+
       // Debug: Check if academic_year is coming in response
       if (response?.data?.length > 0) {
         console.log('📥 First class academic_year:', response.data[0].academic_year);
       }
-      
+
       return response;
     },
     enabled: !!currentInstitute?.id,
@@ -235,13 +235,13 @@ export default function ClassesPage({ type }) {
   const handleSubmit = (formData) => {
     console.log('📤 Form submitted:', formData);
     console.log('📤 Editing class:', editingClass);
-    
+
     if (editingClass && editingClass.id && !editingClass.isCopy) {
       // Edit mode
       console.log('📝 Updating class with ID:', editingClass.id);
-      updateMutation.mutate({ 
-        id: editingClass.id, 
-        data: formData 
+      updateMutation.mutate({
+        id: editingClass.id,
+        data: formData
       });
     } else {
       // Create mode
@@ -260,16 +260,16 @@ export default function ClassesPage({ type }) {
   // Normalize API data to form field names
   const normalizeForForm = (classItem) => {
     if (!classItem) return {};
-    
+
     console.log('🔄 Normalizing class item for form:', classItem);
-    
+
     return {
       id: classItem.id,
       name: classItem.name || '',
       description: classItem.description || '',
       academic_year_id: classItem.academic_year_id || '',
       active: classItem.is_active ?? classItem.active ?? true,
-      
+
       // Sections mapping
       sections: (classItem.sections || []).map(s => ({
         id: s.id,
@@ -278,7 +278,7 @@ export default function ClassesPage({ type }) {
         capacity: s.capacity || 30,
         active: s.is_active ?? s.active ?? true,
       })),
-      
+
       // Courses mapping
       courses: (classItem.courses || []).map(c => ({
         id: c.id,
@@ -369,8 +369,56 @@ export default function ClassesPage({ type }) {
         </div>
       ),
     },
+    // {
+    //   accessorKey: 'academic_year',
+    //   header: 'Academic Year',
+    //   cell: ({ row }) => {
+    //     const year = row.original.academic_year;
+    //     // Check both possible formats
+    //     if (year) {
+    //       if (typeof year === 'object') {
+    //         return (
+    //           <div className="flex items-center gap-2">
+    //             <Calendar className="h-4 w-4 text-muted-foreground" />
+    //             <span>{year.name || `${year.start_year} - ${year.end_year}`}</span>
+    //           </div>
+    //         );
+    //       } else if (typeof year === 'string') {
+    //         return <span>{year}</span>;
+    //       }
+    //     }
+
+    //     // If academic_year_id is present but no object, try to get from lookup
+    //     const yearId = row.original.academic_year_id;
+    //     if (yearId && academicYears?.data) {
+    //       const foundYear = academicYears.data.find(y => y.value === yearId);
+    //       if (foundYear) {
+    //         return (
+    //           <div className="flex items-center gap-2">
+    //             <Calendar className="h-4 w-4 text-muted-foreground" />
+    //             <span>{foundYear.label}</span>
+    //           </div>
+    //         );
+    //       }
+    //     }
+
+    //     return <span className="text-muted-foreground">—</span>;
+    //   },
+    // },
+
     {
       accessorKey: 'academic_year',
+      accessorFn: (row) => {                        // ← yeh add karo
+        const ay = row.academic_year;
+        if (!ay) return '';
+        if (typeof ay === 'string') return ay;
+        if (typeof ay === 'object') {
+          return ay.name ||
+            (ay.start_year && ay.end_year ? `${ay.start_year}-${ay.end_year}` : '') ||
+            ay.label || '';
+        }
+        return '';
+      },
       header: 'Academic Year',
       cell: ({ row }) => {
         const year = row.original.academic_year;
@@ -387,7 +435,7 @@ export default function ClassesPage({ type }) {
             return <span>{year}</span>;
           }
         }
-        
+
         // If academic_year_id is present but no object, try to get from lookup
         const yearId = row.original.academic_year_id;
         if (yearId && academicYears?.data) {
@@ -401,7 +449,7 @@ export default function ClassesPage({ type }) {
             );
           }
         }
-        
+
         return <span className="text-muted-foreground">—</span>;
       },
     },
@@ -450,11 +498,11 @@ export default function ClassesPage({ type }) {
         const classItem = row.original;
         const canUpdate = canDo('classes.update');
         const canDelete = canDo('classes.delete');
-        
+
         const extraActions = [];
-        
+
         if (canUpdate) {
-                    
+
           extraActions.push({
             label: classItem.is_active ? 'Deactivate' : 'Activate',
             icon: <Power className="h-4 w-4" />,
@@ -462,7 +510,7 @@ export default function ClassesPage({ type }) {
             variant: classItem.is_active ? 'destructive' : 'default'
           });
         }
-        
+
         return (
           <TableRowActions
             onView={() => openViewModal(classItem)}
@@ -500,18 +548,18 @@ export default function ClassesPage({ type }) {
         description={`Manage ${classTermPlural.toLowerCase()} for your institute`}
         action={
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleRefresh}
               disabled={isFetching}
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleExport}
             >
               <Download className="mr-2 h-4 w-4" />
@@ -529,8 +577,8 @@ export default function ClassesPage({ type }) {
 
       {/* Error Alerts */}
       {(error || academicYearsError) && (
-        <ErrorAlert 
-          message={error?.message || academicYearsError?.message} 
+        <ErrorAlert
+          message={error?.message || academicYearsError?.message}
           onRetry={refetch}
         />
       )}
@@ -666,7 +714,7 @@ export default function ClassesPage({ type }) {
         title={editingClass ? (editingClass.isCopy ? `Copy ${classTerm}` : `Edit ${classTerm}`) : `Add ${classTerm}`}
         size="xl"
         description={
-          editingClass?.isCopy 
+          editingClass?.isCopy
             ? `Create a new ${classTerm.toLowerCase()} based on ${editingClass.name}`
             : undefined
         }
@@ -725,27 +773,27 @@ export default function ClassesPage({ type }) {
                     {viewingClass.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
-                
+
                 {/* Academic Year Display */}
                 <div>
                   <p className="text-sm text-muted-foreground">Academic Year</p>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <p className="text-sm">
-                      {viewingClass.academic_year?.name || 
-                       viewingClass.academic_year || 
-                       '—'}
+                      {viewingClass.academic_year?.name ||
+                        viewingClass.academic_year ||
+                        '—'}
                     </p>
                   </div>
                 </div>
-                
+
                 {viewingClass.code && (
                   <div>
                     <p className="text-sm text-muted-foreground">Code</p>
                     <p className="font-mono text-sm">{viewingClass.code}</p>
                   </div>
                 )}
-                
+
                 {viewingClass.description && (
                   <div className="col-span-2">
                     <p className="text-sm text-muted-foreground">Description</p>
@@ -843,26 +891,26 @@ export default function ClassesPage({ type }) {
                             {course.is_active ? 'Active' : 'Inactive'}
                           </Badge>
                         </div>
-                        
+
                         {course.description && (
                           <p className="mt-2 text-sm text-muted-foreground">
                             {course.description}
                           </p>
                         )}
-                        
+
                         {course.teacher && (
                           <div className="mt-2 text-sm text-muted-foreground">
                             👨‍🏫 Teacher: {course.teacher.name}
                           </div>
                         )}
-                        
+
                         {course.materials && course.materials.length > 0 && (
                           <div className="mt-3">
                             <SectionHeader title="Materials" />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                               {course.materials.map((material, midx) => (
-                                <div 
-                                  key={midx} 
+                                <div
+                                  key={midx}
                                   className="flex items-center justify-between text-sm p-2 bg-muted/30 rounded"
                                 >
                                   <div className="flex items-center gap-2">
@@ -900,7 +948,7 @@ export default function ClassesPage({ type }) {
         title={`Delete ${classTerm}`}
         description={
           <>
-            Are you sure you want to delete <strong>{deleteDialog?.name}</strong>? 
+            Are you sure you want to delete <strong>{deleteDialog?.name}</strong>?
             This action cannot be undone. All associated sections, courses, and student records will be affected.
           </>
         }

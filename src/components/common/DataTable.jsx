@@ -63,10 +63,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Skeleton }  from '@/components/ui/skeleton';
-import { Checkbox }  from '@/components/ui/checkbox';
-import { Button }    from '@/components/ui/button';
-import { Input }     from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -83,7 +83,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import AppPagination from './AppPagination';
-import EmptyState    from './EmptyState';
+import EmptyState from './EmptyState';
 
 // â”€â”€â”€ Selection checkbox column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SELECTION_COLUMN = {
@@ -94,8 +94,8 @@ const SELECTION_COLUMN = {
         table.getIsAllPageRowsSelected()
           ? true
           : table.getIsSomePageRowsSelected()
-          ? 'indeterminate'
-          : false
+            ? 'indeterminate'
+            : false
       }
       onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
       aria-label="Select all"
@@ -150,11 +150,11 @@ function SearchBox({ value: ext = '', onChange, placeholder = 'Searchâ€¦' })
 // â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function DataTable({
   columns,
-  data                  = [],
-  loading               = false,
-  emptyMessage          = 'No records found',
-  pagination            = null,
-  enableRowSelection    = false,
+  data = [],
+  loading = false,
+  emptyMessage = 'No records found',
+  pagination = null,
+  enableRowSelection = false,
   onRowSelectionChange,
   enableColumnVisibility = false,
   selectionActions,
@@ -162,16 +162,16 @@ export default function DataTable({
   search,
   onSearch,
   searchPlaceholder,
-  filters               = [],
+  filters = [],
   action,
   onRowClick,
   // ── Export ──
-  exportConfig          = null,   // { fileName: string, dateField?: string }
+  exportConfig = null,   // { fileName: string, dateField?: string }
 }) {
-  const [sorting,          setSorting]          = useState([]);
-  const [rowSelection,     setRowSelection]      = useState({});
-  const [columnVisibility, setColumnVisibility]  = useState({});
-  const [exportOpen,       setExportOpen]        = useState(false);
+  const [sorting, setSorting] = useState([]);
+  const [rowSelection, setRowSelection] = useState({});
+  const [columnVisibility, setColumnVisibility] = useState({});
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Prepend selection column when enabled
   const finalColumns = useMemo(
@@ -184,11 +184,11 @@ export default function DataTable({
     columns: finalColumns,
     state: { sorting, rowSelection, columnVisibility },
     enableRowSelection,
-    onSortingChange:          setSorting,
-    onRowSelectionChange:     setRowSelection,
+    onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
     onColumnVisibilityChange: setColumnVisibility,
-    getCoreRowModel:     getCoreRowModel(),
-    getSortedRowModel:   getSortedRowModel(),
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     manualPagination: true,
   });
@@ -201,9 +201,82 @@ export default function DataTable({
   }, [rowSelection]); // eslint-disable-line
 
   const selectedCount = table.getSelectedRowModel().rows.length;
-  const totalRows     = pagination?.total ?? data.length;
+  const totalRows = pagination?.total ?? data.length;
 
   const hasToolbar = onSearch || filters.length > 0 || action || enableColumnVisibility || exportConfig;
+
+  // ── Export rows: nested objects/arrays ko flatten karta hai ──────────────
+  const exportRows = useMemo(() => {
+    // Agar page ne khud banaye hain toh wahi use karo
+    if (exportConfig?.exportRows) return exportConfig.exportRows;   // ← add karo
+    return data.map((row) => {
+      const out = {};
+      columns.forEach((col) => {
+        const key = col.accessorKey ?? col.id ?? '';
+        if (!key || key === 'select' || key === 'actions' || key === '__select__') return;
+
+        let value;
+
+        // 1. accessorFn support
+        if (col.accessorFn) {
+          value = col.accessorFn(row, 0);
+        }
+        // 2. nested dotted key: "details.employee_id" → row.details?.employee_id
+        else if (col.accessorKey?.includes('.')) {
+          value = col.accessorKey.split('.').reduce(
+            (obj, k) => (obj != null ? obj[k] : ''),
+            row
+          );
+        }
+        // 3. direct key
+        else {
+          value = row[key];
+        }
+
+        // ── Flatten value ──────────────────────────────────────────
+        if (value === null || value === undefined) {
+          out[key] = '';
+        }
+        // Array → "Section A, Section B"
+        else if (Array.isArray(value)) {
+          out[key] = value
+            .map((item) => {
+              if (typeof item !== 'object') return String(item);
+              return (
+                item.name ||
+                item.label ||
+                item.title ||
+                `${item.first_name || ''} ${item.last_name || ''}`.trim() ||
+                item.email || ''
+              );
+            })
+            .filter(Boolean)
+            .join(', ');
+        }
+        // Object → meaningful string
+        else if (typeof value === 'object') {
+          // Academic year special case
+          if (value.start_year && value.end_year) {
+            out[key] = `${value.start_year}-${value.end_year}`;
+          } else {
+            out[key] =
+              value.name ||
+              value.label ||
+              value.title ||
+              `${value.first_name || ''} ${value.last_name || ''}`.trim() ||
+              value.email ||
+              value.phone ||
+              '';
+          }
+        }
+        // Primitive
+        else {
+          out[key] = value;
+        }
+      });
+      return out;
+    });
+  }, [data, columns]);
 
   return (
     <div className="w-full min-w-0 space-y-3">
@@ -362,7 +435,8 @@ export default function DataTable({
           open={exportOpen}
           onClose={() => setExportOpen(false)}
           columns={columns}
-          rows={data}
+          // rows={data}
+          rows={exportRows}    // ✅ processed, flattened rows
           fileName={exportConfig.fileName ?? 'export'}
           dateField={exportConfig.dateField ?? null}
         />
@@ -381,13 +455,13 @@ export default function DataTable({
               <TableRow key={hg.id} className="bg-muted/40 hover:bg-muted/40">
                 {hg.headers.map((header) => {
                   const isSorted = header.column.getIsSorted();
-                  const canSort  = header.column.getCanSort();
+                  const canSort = header.column.getCanSort();
                   return (
                     <TableHead
                       key={header.id}
                       className="whitespace-nowrap font-semibold text-foreground"
                       style={{
-                        width:  header.column.columnDef.size,
+                        width: header.column.columnDef.size,
                         cursor: canSort ? 'pointer' : 'default',
                       }}
                       onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
@@ -398,9 +472,9 @@ export default function DataTable({
                           : flexRender(header.column.columnDef.header, header.getContext())}
                         {canSort && (
                           <span className="text-muted-foreground">
-                            {isSorted === 'asc'  && <ChevronUp    size={13} />}
-                            {isSorted === 'desc' && <ChevronDown   size={13} />}
-                            {!isSorted           && <ChevronsUpDown size={13} className="opacity-40" />}
+                            {isSorted === 'asc' && <ChevronUp size={13} />}
+                            {isSorted === 'desc' && <ChevronDown size={13} />}
+                            {!isSorted && <ChevronsUpDown size={13} className="opacity-40" />}
                           </span>
                         )}
                       </span>

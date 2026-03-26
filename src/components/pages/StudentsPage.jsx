@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
-import useInstituteStore from '@/store/instituteStore'; 
+import useInstituteStore from '@/store/instituteStore';
 import { studentService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
 
 // Status badge color map
 const STATUS_COLORS = {
-  paid:    'bg-emerald-100 text-emerald-700',
+  paid: 'bg-emerald-100 text-emerald-700',
   pending: 'bg-amber-100 text-amber-700',
   overdue: 'bg-red-100 text-red-700',
   partial: 'bg-blue-100 text-blue-700',
@@ -93,23 +93,23 @@ const flattenStudent = (s) => {
   if (!s) return s;
   const details = s.details?.studentDetails || {};
   const flat = { ...s, ...details, id: s.id }; // Ensure ID is preserved
-  
+
   // Map fields for form compatibility
   if (flat.date_of_birth && !flat.dob) flat.dob = flat.date_of_birth;
-  
+
   return flat;
 };
 
 export default function StudentsPage({ type }) {
-  const router  = useRouter();
-  const qc      = useQueryClient();
-  const canDo   = useAuthStore((s) => s.canDo);
+  const router = useRouter();
+  const qc = useQueryClient();
+  const canDo = useAuthStore((s) => s.canDo);
   const { currentInstitute } = useInstituteStore();
   const { terms, studentColumns } = useInstituteConfig();
 
-  const [search,   setSearch]   = useState('');
-  const [status,   setStatus]   = useState('');
-  const [page,     setPage]     = useState(1);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleting, setDeleting] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -132,7 +132,7 @@ export default function StudentsPage({ type }) {
 
   const updateStudent = useMutation({
     mutationFn: async (data) => {
-       return await studentService.update(editingId, data);
+      return await studentService.update(editingId, data);
     },
     onSuccess: () => {
       toast.success(`${terms.student} updated successfully`);
@@ -149,10 +149,10 @@ export default function StudentsPage({ type }) {
     mutationFn: async (id) => {
       return await studentService.delete(id, type);
     },
-    onSuccess: () => { 
-      toast.success('Deleted'); 
-      qc.invalidateQueries({ queryKey: ['students', type] }); 
-      setDeleting(null); 
+    onSuccess: () => {
+      toast.success('Deleted');
+      qc.invalidateQueries({ queryKey: ['students', type] });
+      setDeleting(null);
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to delete');
@@ -165,7 +165,7 @@ export default function StudentsPage({ type }) {
 
   const { data, isLoading } = useQuery({
     queryKey: ['students', type, filters],
-    queryFn:  async () => {
+    queryFn: async () => {
       const res = await studentService.getAll(filters, type);
       // Flatten rows for easier consumption
       if (res.data && Array.isArray(res.data)) {
@@ -187,8 +187,8 @@ export default function StudentsPage({ type }) {
   }, [studentToEditData]);
 
 
-  const students   = data?.data             ?? [];
-  const total      = data?.pagination?.total      ?? 0;
+  const students = data?.data ?? [];
+  const total = data?.pagination?.total ?? 0;
   const totalPages = data?.pagination?.totalPages ?? 1;
 
   const columns = useMemo(
@@ -197,7 +197,7 @@ export default function StudentsPage({ type }) {
   );
 
   const statusOptions = [
-    { value: 'true',  label: 'Active' },
+    { value: 'true', label: 'Active' },
     { value: 'false', label: 'Inactive' },
   ];
 
@@ -217,6 +217,36 @@ export default function StudentsPage({ type }) {
       <Plus size={14} /> Add {terms.student}
     </button>
   ) : null;
+
+  // StudentsPage mein — DataTable ko pass karne se pehle
+  const studentExportRows = useMemo(() => {
+    return students.map((s) => {
+      const val = (k) => s[k] ?? s.details?.studentDetails?.[k] ?? '';
+      return {
+        name: `${s.first_name || ''} ${s.last_name || ''}`.trim(),
+        roll_number: val('roll_no') || val('roll_number') || val('candidate_id') ||
+          val('trainee_id') || val('reg_number') || '',
+        class_name: val('class_name') || s.class?.name || '',
+        course_name: val('course_name') || s.course?.name || '',
+        section_name: val('section_name') || s.section?.name || '',
+        batch_name: val('batch_name') || s.batch?.name || '',
+        semester: val('semester_name') ||
+          (val('semester_number') ? `Semester ${val('semester_number')}` : ''),
+        department: val('department_name') || s.department?.name || '',
+        fee_status: s.fee_status || '',
+        status: s.is_active ? 'Active' : 'Inactive',
+        date_of_birth: val('date_of_birth')
+          ? new Date(val('date_of_birth')).toLocaleDateString()
+          : '',
+        guardian: (() => {
+          const g = val('guardians')?.[0] || {};
+          const name = g.name || val('guardian_name') || '';
+          const phone = g.phone || val('guardian_phone') || '';
+          return name ? `${name} (${phone})`.trim() : '';
+        })(),
+      };
+    });
+  }, [students]);
 
   return (
     <div className="space-y-4">
@@ -245,7 +275,12 @@ export default function StudentsPage({ type }) {
         ]}
         action={addButton}
         enableColumnVisibility
-        exportConfig={{ fileName: `${type}-${terms.students.toLowerCase()}` }}
+        exportConfig={
+          {
+            fileName: `${type}-${terms.students.toLowerCase()}`,
+            exportRows: studentExportRows,   // ← custom rows pass karo
+          }
+        }
         pagination={{
           page,
           totalPages,
@@ -336,19 +371,19 @@ function StudentCell({ student: s, columnKey }) {
       );
     case 'roll_number':
       return <span className="font-mono text-xs">{val('roll_no') || val('roll_number') || val('candidate_id') || val('trainee_id') || val('reg_number') || '—'}</span>;
-    case 'class_name':    return <span>{val('class_name') || s.class?.name || '—'}</span>;
-    case 'course_name':   return <span>{val('course_name') || s.course?.name || '—'}</span>;
-    case 'program_name':  return <span>{val('program_name') || s.program?.name || '—'}</span>;
-    case 'section_name':  return <span>{val('section_name') || s.section?.name || '—'}</span>;
-    case 'batch_name':    return <span>{val('batch_name') || s.batch?.name || '—'}</span>;
-    case 'semester':      return <span>{val('semester_name') || s.semester?.name || (val('semester_number') ? `Semester ${val('semester_number')}` : '—')}</span>;
-    case 'department':    return <span>{val('department_name') || s.department?.name || '—'}</span>;
-    case 'faculty':       return <span>{val('faculty_name') || s.faculty?.name || '—'}</span>;
-    case 'target_exam':   return <span>{val('target_exam') || '—'}</span>;
-    case 'module':        return <span>{val('current_module') || '—'}</span>;
-    case 'cgpa':          return <span className="font-mono">{val('cgpa') ?? '—'}</span>;
-    case 'fee_status':    return displayFeeStatus(s.fee_status);
-    case 'status':        
+    case 'class_name': return <span>{val('class_name') || s.class?.name || '—'}</span>;
+    case 'course_name': return <span>{val('course_name') || s.course?.name || '—'}</span>;
+    case 'program_name': return <span>{val('program_name') || s.program?.name || '—'}</span>;
+    case 'section_name': return <span>{val('section_name') || s.section?.name || '—'}</span>;
+    case 'batch_name': return <span>{val('batch_name') || s.batch?.name || '—'}</span>;
+    case 'semester': return <span>{val('semester_name') || s.semester?.name || (val('semester_number') ? `Semester ${val('semester_number')}` : '—')}</span>;
+    case 'department': return <span>{val('department_name') || s.department?.name || '—'}</span>;
+    case 'faculty': return <span>{val('faculty_name') || s.faculty?.name || '—'}</span>;
+    case 'target_exam': return <span>{val('target_exam') || '—'}</span>;
+    case 'module': return <span>{val('current_module') || '—'}</span>;
+    case 'cgpa': return <span className="font-mono">{val('cgpa') ?? '—'}</span>;
+    case 'fee_status': return displayFeeStatus(s.fee_status);
+    case 'status':
       return (
         <span className={cn(
           "rounded px-1.5 py-0.5 text-[10px] uppercase font-bold tracking-wide",
@@ -371,7 +406,7 @@ function StudentCell({ student: s, columnKey }) {
         </div>
       );
     }
-    default:              return <span>{val(columnKey) ?? '—'}</span>;
+    default: return <span>{val(columnKey) ?? '—'}</span>;
   }
 }
 

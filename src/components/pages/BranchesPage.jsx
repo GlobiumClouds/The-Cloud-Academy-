@@ -102,7 +102,7 @@ export default function BranchesPage({ type }) {
         status: status !== 'all' ? status : undefined,
         city: city !== 'all' ? city : undefined
       });
-      
+
       console.log('📥 Branches response:', response);
       return response;
     },
@@ -120,7 +120,7 @@ export default function BranchesPage({ type }) {
   const branches = data?.data?.data || data?.data || [];
   const total = data?.data?.pagination?.total || data?.pagination?.total || 0;
   const totalPages = data?.data?.pagination?.totalPages || data?.pagination?.totalPages || 1;
-  
+
   // ✅ FIX: Stats data extraction
   const stats = statsData?.data || statsData || {};
 
@@ -304,13 +304,12 @@ export default function BranchesPage({ type }) {
     },
     {
       id: 'head',
+      accessorFn: (row) => {          // ← yeh add karo
+        if (!row.head) return '';
+        return `${row.head.first_name || ''} ${row.head.last_name || ''}`.trim() || row.head.email || '';
+      },
       header: 'Head',
       cell: ({ row }) => getHeadName(row.original)
-    },
-    {
-      accessorKey: 'student_count',
-      header: 'Students',
-      cell: ({ row }) => row.original.student_count || 0
     },
     {
       accessorKey: 'is_active',
@@ -697,9 +696,9 @@ export default function BranchesPage({ type }) {
       <ConfirmDialog
         open={!!togglingStatus}
         onClose={() => setTogglingStatus(null)}
-        onConfirm={() => toggleStatusMutation.mutate({ 
-          id: togglingStatus.id, 
-          is_active: !togglingStatus.is_active 
+        onConfirm={() => toggleStatusMutation.mutate({
+          id: togglingStatus.id,
+          is_active: !togglingStatus.is_active
         })}
         loading={toggleStatusMutation.isPending}
         title={togglingStatus?.is_active ? `Deactivate ${label.singular}` : `Activate ${label.singular}`}

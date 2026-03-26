@@ -245,11 +245,11 @@ export default function AcademicYearsPage({ type }) {
         }) : '—';
       },
     },
-    {
-      accessorKey: 'description',
-      header: 'Description',
-      cell: ({ getValue }) => getValue() || '—',
-    },
+    // {
+    //   accessorKey: 'description',
+    //   header: 'Description',
+    //   cell: ({ getValue }) => getValue() || '—',
+    // },
     {
       accessorKey: 'is_active',
       header: 'Status',

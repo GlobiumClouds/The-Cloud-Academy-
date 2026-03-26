@@ -359,14 +359,37 @@ const PDF_FONT_SIZES = [
   { value: 11, label: 'Large (11pt)' },
 ];
 
+// function buildCols(columns = []) {
+//   return columns
+//     .map((c, index) => ({
+//       key:   c.accessorKey ?? c.id ?? '',
+//       label: typeof c.header === 'string' ? c.header : (c.accessorKey ?? c.id ?? ''),
+//       originalIndex: index,
+//     }))
+//     .filter((c) => c.key && c.key !== 'select' && c.key !== 'actions');
+// }
+
+// BAAD — id bhi filter karo, aur better label fallback:
 function buildCols(columns = []) {
   return columns
     .map((c, index) => ({
-      key:   c.accessorKey ?? c.id ?? '',
-      label: typeof c.header === 'string' ? c.header : (c.accessorKey ?? c.id ?? ''),
+      key: c.accessorKey ?? c.id ?? '',
+      label:
+        typeof c.header === 'string'
+          ? c.header
+          : c.meta?.exportLabel   // ← optional: column mein meta.exportLabel daal sakte ho
+          ?? c.accessorKey?.split('.').pop()  // nested key ka last part: "student.name" → "name"
+          ?? c.id
+          ?? '',
       originalIndex: index,
     }))
-    .filter((c) => c.key && c.key !== 'select' && c.key !== 'actions');
+    .filter(
+      (c) =>
+        c.key &&
+        c.key !== 'select' &&
+        c.key !== 'actions' &&
+        c.key !== '__select__'  // DataTable ka selection column
+    );
 }
 
 function downloadBlob(blob, name) {
