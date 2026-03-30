@@ -13,6 +13,8 @@ import PageHeader from '@/components/common/PageHeader';
 import StatsCard from '@/components/common/StatsCard';
 import { cn } from '@/lib/utils';
 import { DUMMY_ATTENDANCE } from '@/data/dummyData';
+import Link from 'next/link';
+import { QrCode } from 'lucide-react';
 
 
 
@@ -84,7 +86,19 @@ export default function AttendancePage({ type }) {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Attendance" description={attendanceConfig?.label} />
+      <PageHeader
+        title="Attendance"
+        description={attendanceConfig?.label}
+        action={
+          <Link
+            href={`/${type}/attendance/scan`}
+            className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+          >
+            <QrCode className="h-4 w-4" />
+            Scan QR Student
+          </Link>
+        }
+      />
 
       {/* Date picker */}
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3">
