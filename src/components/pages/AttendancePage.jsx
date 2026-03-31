@@ -65,6 +65,20 @@ export default function AttendancePage({ type }) {
     queryFn: () => academicYearService.getAll({ is_active: true }),
   });
 
+  // Set default current academic year
+  useEffect(() => {
+    if (yearsData?.data && !filters.academic_year_id) {
+      const currentYear = yearsData.data.find(y => {
+        const isCurrent = y.is_current;
+        return isCurrent === true || isCurrent === 1 || String(isCurrent) === 'true' || String(isCurrent) === '1';
+      }) || yearsData.data[0];
+      
+      if (currentYear) {
+        setFilters(prev => ({ ...prev, academic_year_id: currentYear.id }));
+      }
+    }
+  }, [yearsData?.data, filters.academic_year_id]);
+
   // Fetch Classes
   const { data: classesData } = useQuery({
     queryKey: ['classes'],
@@ -107,7 +121,14 @@ export default function AttendancePage({ type }) {
   }, [rows]);
 
   const handleFilterChange = (name, value) => {
-    setFilters(prev => ({ ...prev, [name]: value }));
+    setFilters(prev => {
+      const newFilters = { ...prev, [name]: value };
+      // Reset section if class changes
+      if (name === 'class_id') {
+        newFilters.section_id = '';
+      }
+      return newFilters;
+    });
     setPage(1);
   };
 
