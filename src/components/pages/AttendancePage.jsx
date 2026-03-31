@@ -189,7 +189,8 @@ export default function AttendancePage({ type }) {
         action={
           <div className="flex gap-2">
             <Link href={`/${type}/attendance/scan`}>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20">
+              {/* <Button className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20"> */}
+              <Button variant="emerald">
                 <QrCode className="mr-2 h-4 w-4" />
                 Scan QR Attendance
               </Button>
