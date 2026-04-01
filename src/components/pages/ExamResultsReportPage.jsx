@@ -8,12 +8,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Download, ArrowLeft, TrendingUp, Users, Award } from 'lucide-react';
+import { Download, ArrowLeft, TrendingUp, Users, Award, PrinterIcon, X } from 'lucide-react';
 
 import PageHeader from '@/components/common/PageHeader';
 import PageLoader from '@/components/common/PageLoader';
 import DataTable from '@/components/common/DataTable';
 import StatsCard from '@/components/common/StatsCard';
+import ResultCard from '@/components/cards/ResultCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +24,9 @@ import { examService } from '@/services/examService';
 
 export default function ExamResultsReportPage({ examId, type }) {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, institute } = useAuthStore();
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedResult, setSelectedResult] = useState(null);
 
   // Fetch exam details
   const { data: exam, isLoading: examLoading } = useQuery({
@@ -124,6 +127,24 @@ export default function ExamResultsReportPage({ examId, type }) {
           </div>
         ) : '—';
       }
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setSelectedStudent(row.original.student);
+            setSelectedResult(row.original);
+          }}
+          className="gap-2"
+        >
+          <PrinterIcon className="h-4 w-4" />
+          Print Card
+        </Button>
+      )
     }
   ];
 
@@ -146,99 +167,129 @@ export default function ExamResultsReportPage({ examId, type }) {
   const sortedResults = [...results].sort((a, b) => (b.percentage || 0) - (a.percentage || 0));
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Results - ${exam.name}`}
-        description={`${exam.name} | ${results.length} students | ${exam.total_marks} marks`}
-        action={
-          <div className="flex gap-2">
-            <Button onClick={() => router.back()} variant="outline">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            <Button>
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
+    <>
+      {selectedStudent && selectedResult ? (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto p-6 flex items-center justify-center">
+          <div className="bg-white rounded-lg max-h-[90vh] overflow-auto w-full max-w-4xl">
+            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Result Card</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedStudent(null);
+                  setSelectedResult(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-6">
+              <ResultCard
+                student={selectedStudent}
+                exam={exam}
+                result={selectedResult}
+                institute={institute}
+              />
+            </div>
           </div>
-        }
-      />
+        </div>
+      ) : null}
 
-      {/* Statistics */}
-      <div className="grid gap-4 sm:grid-cols-4">
-        <StatsCard
-          label="Total Students"
-          value={stats.total}
-          icon={<Users size={18} />}
-          variant="info"
+      <div className="space-y-6">
+        <PageHeader
+          title={`Results - ${exam.name}`}
+          description={`${exam.name} | ${results.length} students | ${exam.total_marks} marks`}
+          action={
+            <div className="flex gap-2">
+              <Button onClick={() => router.back()} variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <Button>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </div>
+          }
         />
-        <StatsCard
-          label="Passed"
-          value={stats.passed}
-          icon={<TrendingUp size={18} />}
-          variant="success"
-          subtitle={`${stats.passPercentage}%`}
-        />
-        <StatsCard
-          label="Failed"
-          value={stats.failed}
-          icon={<TrendingUp size={18} />}
-          variant="destructive"
-        />
-        <StatsCard
-          label="Avg Percentage"
-          value={`${stats.avgPercentage}%`}
-          icon={<TrendingUp size={18} />}
-          variant="warning"
-        />
-      </div>
 
-      {/* Subject-wise Analysis */}
-      {exam.subject_schedules && exam.subject_schedules.length > 0 && (
+        {/* Statistics */}
+        <div className="grid gap-4 sm:grid-cols-4">
+          <StatsCard
+            label="Total Students"
+            value={stats.total}
+            icon={<Users size={18} />}
+            variant="info"
+          />
+          <StatsCard
+            label="Passed"
+            value={stats.passed}
+            icon={<TrendingUp size={18} />}
+            variant="success"
+            subtitle={`${stats.passPercentage}%`}
+          />
+          <StatsCard
+            label="Failed"
+            value={stats.failed}
+            icon={<TrendingUp size={18} />}
+            variant="destructive"
+          />
+          <StatsCard
+            label="Avg Percentage"
+            value={`${stats.avgPercentage}%`}
+            icon={<TrendingUp size={18} />}
+            variant="warning"
+          />
+        </div>
+
+        {/* Subject-wise Analysis */}
+        {exam.subject_schedules && exam.subject_schedules.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Subject-wise Analysis</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                {exam.subject_schedules.map(subject => {
+                  const subjectResults = results
+                    .flatMap(r => r.subject_marks || [])
+                    .filter(sm => sm.subject_id === subject.subject_id);
+                  
+                  const avgMarks = subjectResults.length > 0
+                    ? (subjectResults.reduce((sum, sm) => sum + (sm.marks_obtained || 0), 0) / subjectResults.length).toFixed(2)
+                    : 0;
+
+                  return (
+                    <Card key={subject.subject_id} className="border">
+                      <CardContent className="pt-6">
+                        <div className="text-sm font-medium mb-2">{subject.subject_name}</div>
+                        <div className="text-2xl font-bold text-primary">{avgMarks}</div>
+                        <div className="text-xs text-muted-foreground">Average out of {subject.total_marks}</div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Results Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Subject-wise Analysis</CardTitle>
+            <CardTitle>Student Results</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-              {exam.subject_schedules.map(subject => {
-                const subjectResults = results
-                  .flatMap(r => r.subject_marks || [])
-                  .filter(sm => sm.subject_id === subject.subject_id);
-                
-                const avgMarks = subjectResults.length > 0
-                  ? (subjectResults.reduce((sum, sm) => sum + (sm.marks_obtained || 0), 0) / subjectResults.length).toFixed(2)
-                  : 0;
-
-                return (
-                  <Card key={subject.subject_id} className="border">
-                    <CardContent className="pt-6">
-                      <div className="text-sm font-medium mb-2">{subject.subject_name}</div>
-                      <div className="text-2xl font-bold text-primary">{avgMarks}</div>
-                      <div className="text-xs text-muted-foreground">Average out of {subject.total_marks}</div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+            <DataTable
+              columns={columns}
+              data={sortedResults}
+              emptyMessage="No results found"
+              pagination={false}
+            />
           </CardContent>
         </Card>
-      )}
-
-      {/* Results Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Student Results</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={columns}
-            data={sortedResults}
-            emptyMessage="No results found"
-            pagination={false}
-          />
-        </CardContent>
-      </Card>
-    </div>
+      </div>
+    </>
   );
 }
