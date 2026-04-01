@@ -102,11 +102,19 @@ export default function ExamResultsPage({ examId, type }) {
   const subjectSchedules = exam.subject_schedules || [];
 
   const handleMarkChange = (studentId, subjectId, marks) => {
+    // Find the subject to get its max marks
+    const subject = subjectSchedules.find(s => s.subject_id === subjectId);
+    const maxMarks = subject?.total_marks || 0;
+    const markValue = parseInt(marks) || 0;
+    
+    // Cap the marks at the subject's total marks
+    const cappedMarks = Math.min(markValue, maxMarks);
+    
     setMarkEntries(prev => ({
       ...prev,
       [studentId]: {
         ...prev[studentId],
-        [subjectId]: parseInt(marks) || 0
+        [subjectId]: cappedMarks
       }
     }));
   };
@@ -147,6 +155,21 @@ export default function ExamResultsPage({ examId, type }) {
     if (results.length === 0) {
       toast.error('No students found');
       return;
+    }
+
+    // Validate marks - check if any marks exceed the subject's total marks
+    for (const result of results) {
+      if (result.is_present) {
+        for (const subjectMark of result.subject_marks) {
+          const subject = subjectSchedules.find(s => s.subject_id === subjectMark.subject_id);
+          if (subject && subjectMark.marks_obtained > subject.total_marks) {
+            toast.error(
+              `❌ ${subjectMark.subject_name}: Marks (${subjectMark.marks_obtained}) cannot exceed total marks (${subject.total_marks})`
+            );
+            return;
+          }
+        }
+      }
     }
 
     saveMutation.mutate(results);
@@ -254,6 +277,7 @@ export default function ExamResultsPage({ examId, type }) {
                     
                     // Student info can be at student.student or directly on the result
                     const studentInfo = student.student || student;
+                    
                     const studentName = studentInfo?.first_name || 'Unknown';
                     const studentLastName = studentInfo?.last_name || '';
                     const studentEmail = studentInfo?.email || '';
@@ -266,20 +290,31 @@ export default function ExamResultsPage({ examId, type }) {
                           <div className="text-xs text-muted-foreground">{studentEmail}</div>
                         </td>
                         <td className="px-4 py-2 text-center font-medium">{rollNumber || '—'}</td>
-                        {subjectSchedules.map(subject => (
-                          <td key={`${studentId}-${subject.subject_id}`} className="px-4 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max={subject.total_marks}
-                              className="w-14 px-2 py-1 border rounded text-center text-sm"
-                              placeholder="—"
-                              value={markEntries[studentId]?.[subject.subject_id] || ''}
-                              onChange={(e) => handleMarkChange(studentId, subject.subject_id, e.target.value)}
-                              disabled={absentStudents.has(studentId)}
-                            />
-                          </td>
-                        ))}
+                        {subjectSchedules.map(subject => {
+                          const studentMarks = markEntries[studentId]?.[subject.subject_id] || 0;
+                          const isExceeding = studentMarks > subject.total_marks;
+                          
+                          return (
+                            <td key={`${studentId}-${subject.subject_id}`} className="px-4 py-2 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                max={subject.total_marks}
+                                className={`w-14 px-2 py-1 border rounded text-center text-sm ${
+                                  isExceeding ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                }`}
+                                placeholder="—"
+                                value={studentMarks}
+                                onChange={(e) => handleMarkChange(studentId, subject.subject_id, e.target.value)}
+                                disabled={absentStudents.has(studentId)}
+                                title={`Max marks: ${subject.total_marks}`}
+                              />
+                              {isExceeding && (
+                                <div className="text-xs text-red-600 mt-1">Max: {subject.total_marks}</div>
+                              )}
+                            </td>
+                          );
+                        })}
                         <td className="px-4 py-2 text-center">
                           <input
                             type="checkbox"
