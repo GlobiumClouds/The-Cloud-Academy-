@@ -74,7 +74,7 @@ const PORTAL_TYPES = [
 // Demo accounts
 const DEMO_ACCOUNTS = [
   { role: 'STUDENT', email: 'sajood483@gmail.com', password: 'The123456', name: 'Hassan Raza', institute_type: 'school' },
-  { role: 'PARENT', email: 'father.ali@parent.tca', password: 'parent123', name: 'Mr. Khan', institute_type: 'school' },
+  { role: 'PARENT', email: 'hafizshoaibraza200@gmail.com', password: 'Shoaib@0320', name: 'Mr. Khan', institute_type: 'school' },
   { role: 'TEACHER', email: 'shoaibrazamemon160@gmail.com', password: '123456', name: 'Shoaib Raza', institute_type: 'school' },
   // { role: 'TEACHER', email: 'hafizshoaibraza180@gmail.com', password: 'Shoaib0320', name: 'Shoaib Raza', institute_type: 'school' },
   { role: 'STUDENT', email: 'hafizshoaibraza180@gmail.com', password: '', name: 'Shoaib (Dual)', institute_type: 'school' },

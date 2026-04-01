@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { attendanceService } from '@/services/attendanceService';
 import { Loader2, CheckCircle2, XCircle, Camera, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { studentAttendanceService } from '@/services';
 
 /**
  * QRScanner Component 
@@ -45,7 +46,7 @@ export default function QRScanner({ onScan, bulkMode = false }) {
 
       try {
         console.log('🔍 QR Scanned:', decodedText);
-        const response = await attendanceService.scan({
+        const response = await studentAttendanceService.scanQR({
           student_id: decodedText,
           type: "regular"
         });
