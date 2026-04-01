@@ -48,7 +48,7 @@ export default function ExamResultsReportPage({ examId, type }) {
     failed: results.filter(r => r.status === 'fail').length,
     absent: results.filter(r => r.status === 'absent').length,
     avgPercentage: results.length > 0 
-      ? (results.reduce((sum, r) => sum + (r.percentage || 0), 0) / results.length).toFixed(2)
+      ? (results.reduce((sum, r) => sum + (Number(r.percentage) || 0), 0) / results.length).toFixed(2)
       : 0,
     topScore: results.length > 0 
       ? Math.max(...results.map(r => r.total_marks_obtained || 0))
@@ -60,9 +60,9 @@ export default function ExamResultsReportPage({ examId, type }) {
 
   const columns = [
     {
-      accessorKey: 'student.roll_no',
+      accessorKey: 'student.roll_number',
       header: 'Roll No',
-      cell: ({ row }) => row.original.student?.roll_no || '—'
+      cell: ({ row }) => row.original.student?.roll_number || '—'
     },
     {
       accessorKey: 'student.name',
@@ -156,7 +156,7 @@ export default function ExamResultsReportPage({ examId, type }) {
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
-            <Button disabled>
+            <Button>
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
