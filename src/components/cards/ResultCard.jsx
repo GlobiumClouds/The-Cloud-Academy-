@@ -17,139 +17,142 @@ const STYLES = `
   .rc-wrap {
     font-family: 'DM Sans', sans-serif;
     background: #fff;
+    max-width: 100%;
   }
 
   .rc-top-bar {
-    height: 6px;
+    height: 4px;
     background: linear-gradient(90deg, #1a2942 0%, #2d6a9f 50%, #1a7a6e 100%);
   }
 
-  .rc-inner { padding: 36px 40px 32px; }
+  .rc-inner { 
+    padding: 24px 32px 20px; 
+  }
 
   /* ── Header ── */
   .rc-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-bottom: 24px;
+    padding-bottom: 16px;
     border-bottom: 1px solid #e8edf2;
-    margin-bottom: 28px;
+    margin-bottom: 20px;
   }
-  .rc-header-left { display: flex; align-items: center; gap: 18px; }
+  .rc-header-left { display: flex; align-items: center; gap: 14px; }
 
   .rc-logo-circle {
-    width: 64px; height: 64px;
+    width: 52px; height: 52px;
     border-radius: 50%;
     background: #1a2942;
     display: flex; align-items: center; justify-content: center;
     font-family: 'Playfair Display', serif;
-    font-size: 22px; font-weight: 700; color: #fff;
+    font-size: 18px; font-weight: 700; color: #fff;
     flex-shrink: 0;
   }
-  .rc-logo-img { width: 64px; height: 64px; border-radius: 50%; object-fit: contain; }
+  .rc-logo-img { width: 52px; height: 52px; border-radius: 50%; object-fit: contain; }
 
   .rc-inst-name {
     font-family: 'Playfair Display', serif;
-    font-size: 20px; font-weight: 700; color: #1a2942; line-height: 1.2;
+    font-size: 18px; font-weight: 700; color: #1a2942; line-height: 1.2;
   }
-  .rc-inst-sub { font-size: 12px; color: #6b7a8d; margin-top: 3px; letter-spacing: 0.5px; }
+  .rc-inst-sub { font-size: 10px; color: #6b7a8d; margin-top: 2px; letter-spacing: 0.5px; }
 
   .rc-badge {
     display: inline-block;
-    padding: 6px 18px; border-radius: 20px;
-    font-size: 12px; font-weight: 600;
+    padding: 4px 14px; border-radius: 16px;
+    font-size: 10px; font-weight: 600;
     letter-spacing: 0.8px; text-transform: uppercase;
   }
   .rc-badge-pass { background: #e6f7ee; color: #1a7a4a; border: 1px solid #a8e6c3; }
   .rc-badge-fail { background: #fdecea; color: #b32b1a; border: 1px solid #f5b5ae; }
   .rc-badge-absent { background: #f0f4f8; color: #4a5568; border: 1px solid #cbd5e0; }
-  .rc-gen-date { font-size: 11px; color: #9aa5b4; margin-top: 8px; text-align: right; }
+  .rc-gen-date { font-size: 9px; color: #9aa5b4; margin-top: 6px; text-align: right; }
 
   /* ── Title ── */
-  .rc-title { text-align: center; margin-bottom: 28px; }
+  .rc-title { text-align: center; margin-bottom: 20px; }
   .rc-title h2 {
     font-family: 'Playfair Display', serif;
-    font-size: 15px; font-weight: 600;
+    font-size: 13px; font-weight: 600;
     color: #1a2942; letter-spacing: 2px; text-transform: uppercase;
   }
   .rc-divider {
-    display: flex; align-items: center; gap: 10px;
-    margin-top: 8px; justify-content: center;
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 6px; justify-content: center;
   }
-  .rc-divider-line { height: 1px; width: 60px; background: #dde3ea; }
-  .rc-divider-dot { width: 5px; height: 5px; border-radius: 50%; background: #2d6a9f; }
+  .rc-divider-line { height: 1px; width: 50px; background: #dde3ea; }
+  .rc-divider-dot { width: 4px; height: 4px; border-radius: 50%; background: #2d6a9f; }
 
   /* ── Info Grid ── */
   .rc-info-grid {
     display: grid; grid-template-columns: 1fr 1fr;
-    border: 1px solid #e8edf2; border-radius: 10px;
-    overflow: hidden; margin-bottom: 28px;
+    border: 1px solid #e8edf2; border-radius: 8px;
+    overflow: hidden; margin-bottom: 20px;
   }
   .rc-info-cell {
-    padding: 14px 18px;
+    padding: 10px 14px;
     border-right: 1px solid #e8edf2;
     border-bottom: 1px solid #e8edf2;
   }
   .rc-info-cell:nth-child(2n) { border-right: none; }
   .rc-info-cell:nth-last-child(-n+2) { border-bottom: none; }
   .rc-info-label {
-    font-size: 10px; font-weight: 600; color: #8a97a8;
-    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px;
+    font-size: 9px; font-weight: 600; color: #8a97a8;
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px;
   }
-  .rc-info-value { font-size: 15px; font-weight: 600; color: #1a2942; }
+  .rc-info-value { font-size: 13px; font-weight: 600; color: #1a2942; }
   .rc-status-pass { color: #1a7a4a; }
   .rc-status-fail { color: #b32b1a; }
   .rc-status-absent { color: #4a5568; }
 
   /* ── Section Label ── */
   .rc-section-label {
-    font-size: 10px; font-weight: 600; color: #8a97a8;
-    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px;
+    font-size: 9px; font-weight: 600; color: #8a97a8;
+    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px;
   }
 
   .rc-exam-name {
     font-family: 'Playfair Display', serif;
-    font-size: 18px; font-weight: 600; color: #1a2942; margin-bottom: 16px;
+    font-size: 16px; font-weight: 600; color: #1a2942; margin-bottom: 12px;
   }
 
   /* ── Stats Row ── */
   .rc-stats-row {
     display: grid; grid-template-columns: repeat(3,1fr);
-    gap: 12px; margin-bottom: 28px;
+    gap: 10px; margin-bottom: 20px;
   }
   .rc-stat-card {
-    background: #f5f8fc; border-radius: 10px;
-    padding: 16px; text-align: center;
+    background: #f5f8fc; border-radius: 8px;
+    padding: 12px; text-align: center;
     border: 1px solid #e8edf2;
   }
   .rc-stat-label {
-    font-size: 10px; font-weight: 600; color: #8a97a8;
-    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;
+    font-size: 9px; font-weight: 600; color: #8a97a8;
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px;
   }
-  .rc-stat-value { font-size: 28px; font-weight: 600; color: #1a2942; line-height: 1; }
+  .rc-stat-value { font-size: 22px; font-weight: 600; color: #1a2942; line-height: 1; }
   .rc-stat-value.blue  { color: #2d6a9f; }
   .rc-stat-value.green { color: #1a7a4a; }
   .rc-stat-value.amber { color: #b36a00; }
   .rc-stat-value.red   { color: #b32b1a; }
 
   /* ── Marks Table ── */
-  .rc-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 13px; }
+  .rc-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
   .rc-table thead tr { background: #1a2942; }
   .rc-table thead th {
-    padding: 11px 14px; text-align: left;
-    font-size: 10px; font-weight: 600;
+    padding: 8px 10px; text-align: left;
+    font-size: 9px; font-weight: 600;
     color: #c8d4e3; text-transform: uppercase; letter-spacing: 0.8px;
   }
   .rc-table thead th:not(:first-child) { text-align: center; }
   .rc-table tbody tr { border-bottom: 1px solid #edf0f4; }
   .rc-table tbody tr:last-child { border-bottom: none; }
   .rc-table tbody tr:nth-child(even) { background: #f8fafd; }
-  .rc-table td { padding: 11px 14px; color: #2c3e50; font-weight: 500; }
+  .rc-table td { padding: 8px 10px; color: #2c3e50; font-weight: 500; }
   .rc-table td:not(:first-child) { text-align: center; }
 
   .rc-pct-pill {
-    display: inline-block; padding: 2px 10px;
-    border-radius: 12px; font-size: 11px; font-weight: 600;
+    display: inline-block; padding: 2px 8px;
+    border-radius: 10px; font-size: 10px; font-weight: 600;
   }
   .rc-pct-high { background: #e6f7ee; color: #1a7a4a; }
   .rc-pct-mid  { background: #fff8e6; color: #b36a00; }
@@ -158,46 +161,60 @@ const STYLES = `
   /* ── Summary Strip ── */
   .rc-summary {
     background: #1a2942;
-    border-radius: 10px;
+    border-radius: 8px;
     display: grid; grid-template-columns: repeat(3,1fr);
-    overflow: hidden; margin-bottom: 28px;
+    overflow: hidden; margin-bottom: 20px;
   }
   .rc-sum-cell {
-    padding: 20px; text-align: center;
+    padding: 12px; text-align: center;
     border-right: 1px solid rgba(255,255,255,0.1);
   }
   .rc-sum-cell:last-child { border-right: none; }
   .rc-sum-label {
-    font-size: 10px; font-weight: 500;
+    font-size: 9px; font-weight: 500;
     color: rgba(255,255,255,0.55);
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
   }
   .rc-sum-value {
     font-family: 'Playfair Display', serif;
-    font-size: 30px; font-weight: 700; color: #fff;
+    font-size: 24px; font-weight: 700; color: #fff;
   }
 
   /* ── Signatures ── */
   .rc-signatures {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 40px; margin-top: 10px;
-    padding-top: 24px; border-top: 1px solid #e8edf2;
+    gap: 30px; margin-top: 8px;
+    padding-top: 16px; border-top: 1px solid #e8edf2;
   }
   .rc-sig-block { text-align: center; }
-  .rc-sig-line { border-top: 1px dashed #b0bec5; width: 75%; margin: 48px auto 10px; }
+  .rc-sig-line { border-top: 1px dashed #b0bec5; width: 70%; margin: 32px auto 8px; }
   .rc-sig-name {
-    font-size: 12px; font-weight: 600;
+    font-size: 10px; font-weight: 600;
     color: #4a5568; text-transform: uppercase; letter-spacing: 0.5px;
   }
 
   /* ── Footer ── */
-  .rc-footer { text-align: center; margin-top: 20px; font-size: 11px; color: #9aa5b4; }
+  .rc-footer { text-align: center; margin-top: 12px; font-size: 9px; color: #9aa5b4; }
 
-  /* ── Print ── */
+  /* ── Print Optimizations ── */
   @media print {
-    @page { size: A4; margin: 15mm; }
+    @page { 
+      size: A4; 
+      margin: 0.5in;
+    }
     .rc-no-print { display: none !important; }
-    .rc-wrap { box-shadow: none !important; border-radius: 0 !important; }
+    .rc-wrap { 
+      box-shadow: none !important; 
+      border-radius: 0 !important;
+      margin: 0;
+      padding: 0;
+      page-break-after: avoid;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .rc-inner {
+      padding: 0.2in 0.3in 0.2in;
+    }
     .rc-top-bar,
     .rc-summary,
     .rc-table thead tr,
@@ -208,6 +225,48 @@ const STYLES = `
     .rc-logo-circle {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    /* Ensure content fits on one page */
+    .rc-stats-row,
+    .rc-table,
+    .rc-summary,
+    .rc-signatures {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    /* Compact spacing for print */
+    .rc-inner {
+      padding: 0.15in 0.25in;
+    }
+    .rc-header {
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .rc-title {
+      margin-bottom: 12px;
+    }
+    .rc-info-grid {
+      margin-bottom: 12px;
+    }
+    .rc-stats-row {
+      margin-bottom: 12px;
+    }
+    .rc-table {
+      margin-bottom: 12px;
+    }
+    .rc-summary {
+      margin-bottom: 12px;
+    }
+    .rc-signatures {
+      margin-top: 4px;
+      padding-top: 12px;
+    }
+    .rc-sig-line {
+      margin-top: 20px;
     }
   }
 `;
@@ -245,14 +304,32 @@ export default function ResultCard({ student, exam, result, institute }) {
           <meta charset="UTF-8">
           <title>Result Card — ${student?.first_name} ${student?.last_name}</title>
           <style>${STYLES}</style>
+          <style>
+            /* Additional print-specific styles */
+            @media print {
+              body {
+                margin: 0;
+                padding: 0;
+              }
+              .rc-wrap {
+                margin: 0 auto;
+                max-width: 100%;
+              }
+            }
+          </style>
         </head>
-        <body style="background:#fff;padding:0;margin:0;">
-          ${printRef.current?.innerHTML || ''}
+        <body style="background:#fff;padding:0;margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;">
+          <div style="max-width: 100%; margin: 0 auto;">
+            ${printRef.current?.innerHTML || ''}
+          </div>
         </body>
       </html>
     `);
     printWindow.document.close();
-    setTimeout(() => printWindow.print(), 400);
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 400);
   };
 
   if (!student || !exam || !result) {
@@ -299,7 +376,7 @@ export default function ResultCard({ student, exam, result, institute }) {
       </div>
 
       {/* ── Card ── */}
-      <div ref={printRef} className="rc-wrap" style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '0.5px solid #e8edf2' }}>
+      <div ref={printRef} className="rc-wrap" style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '0.5px solid #e8edf2', maxWidth: '100%' }}>
         <style>{STYLES}</style>
 
         <div className="rc-top-bar"></div>
