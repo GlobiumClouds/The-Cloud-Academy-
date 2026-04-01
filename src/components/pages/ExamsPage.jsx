@@ -4,9 +4,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, GraduationCap, Eye, Download, Calendar, BookOpen } from 'lucide-react';
+import { Plus, GraduationCap, Calendar, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
 
 import useAuthStore from '@/store/authStore';
@@ -20,6 +21,7 @@ import StatsCard from '@/components/common/StatsCard';
 import StatusBadge from '@/components/common/StatusBadge';
 import PageLoader from '@/components/common/PageLoader';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
+import TableRowActions from '@/components/common/TableRowActions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -58,6 +60,7 @@ const STATUS_COLORS = {
 };
 
 export default function ExamsPage({ type }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { canDo } = useAuthStore();
   const { currentInstitute } = useInstituteStore();
@@ -71,7 +74,7 @@ export default function ExamsPage({ type }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingExam, setEditingExam] = useState(null);
   const [deletingExam, setDeletingExam] = useState(null);
-  const [viewingResults, setViewingResults] = useState(null);
+  const [publishingExam, setPublishingExam] = useState(null);
 
   const label = type === 'coaching' ? 'Test' : type === 'academy' ? 'Assessment' : 'Exam';
   const labelP = type === 'coaching' ? 'Tests' : type === 'academy' ? 'Assessments' : 'Exams';
@@ -115,11 +118,15 @@ export default function ExamsPage({ type }) {
 
   const publishMutation = useMutation({
     mutationFn: (id) => examService.publish(id),
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success(`${label} published successfully`);
       queryClient.invalidateQueries({ queryKey: ['exams'] });
+      setPublishingExam(null);
     },
-    onError: (error) => toast.error(error.message || `Failed to publish ${label.toLowerCase()}`)
+    onError: (error) => {
+      toast.error(error.message || `Failed to publish ${label.toLowerCase()}`);
+      setPublishingExam(null);
+    }
   });
 
   const handleEdit = (exam) => {
@@ -131,10 +138,16 @@ export default function ExamsPage({ type }) {
     setDeletingExam(exam);
   };
 
-  const handlePublish = async (exam) => {
-    if (confirm(`Are you sure you want to publish ${exam.name}?`)) {
-      publishMutation.mutate(exam.id);
-    }
+  const handlePublish = (exam) => {
+    setPublishingExam(exam);
+  };
+
+  const handleEnterResults = (exam) => {
+    router.push(`exams/${exam.id}/results`);
+  };
+
+  const handleViewResults = (exam) => {
+    router.push(`exams/${exam.id}/results-report`);
   };
 
   const handleSuccess = () => {
@@ -229,46 +242,45 @@ export default function ExamsPage({ type }) {
       id: 'actions',
       header: 'Actions',
       enableHiding: false,
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          {canDo('exams.update') && (
-            <button
-              onClick={() => handleEdit(row.original)}
-              className="rounded p-1.5 hover:bg-accent"
-              title="Edit"
-            >
-              <Pencil size={14} />
-            </button>
-          )}
-          {canDo('exam_results.publish') && row.original.status === 'draft' && (
-            <button
-              onClick={() => handlePublish(row.original)}
-              className="rounded p-1.5 hover:bg-accent text-green-600"
-              title="Publish"
-            >
-              <Eye size={14} />
-            </button>
-          )}
-          {canDo('exam_results.view') && row.original.status === 'results_published' && (
-            <button
-              onClick={() => examService.downloadResults(row.original.id)}
-              className="rounded p-1.5 hover:bg-accent text-blue-600"
-              title="Download Results"
-            >
-              <Download size={14} />
-            </button>
-          )}
-          {canDo('exams.delete') && (
-            <button
-              onClick={() => handleDelete(row.original)}
-              className="rounded p-1.5 text-destructive hover:bg-destructive/10"
-              title="Delete"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
-      )
+      cell: ({ row }) => {
+        const exam = row.original;
+        const extraActions = [];
+
+        // Publish action (draft exams)
+        if (canDo('exam_results.publish') && exam.status === 'draft') {
+          extraActions.push({
+            label: 'Publish',
+            icon: '📢',
+            onClick: () => handlePublish(exam)
+          });
+        }
+
+        // Enter Results (published/ongoing exams)
+        if (canDo('exam_results.enter') && ['scheduled', 'ongoing', 'completed'].includes(exam.status)) {
+          extraActions.push({
+            label: 'Enter Results',
+            icon: '✏️',
+            onClick: () => handleEnterResults(exam)
+          });
+        }
+
+        // View Results (results published or completed)
+        if (canDo('exam_results.view') && ['completed', 'results_published'].includes(exam.status)) {
+          extraActions.push({
+            label: 'View Results',
+            icon: '👁️',
+            onClick: () => handleViewResults(exam)
+          });
+        }
+
+        return (
+          <TableRowActions
+            onEdit={canDo('exams.update') ? () => handleEdit(exam) : undefined}
+            onDelete={canDo('exams.delete') ? () => handleDelete(exam) : undefined}
+            extra={extraActions}
+          />
+        );
+      }
     }
   ], [canDo, label]);
 
@@ -379,6 +391,18 @@ export default function ExamsPage({ type }) {
         description={`Are you sure you want to delete "${deletingExam?.name}"? This action cannot be undone.`}
         confirmLabel="Delete"
         variant="destructive"
+      />
+
+      {/* Publish Confirmation */}
+      <ConfirmDialog
+        open={!!publishingExam}
+        onClose={() => setPublishingExam(null)}
+        onConfirm={() => publishMutation.mutate(publishingExam.id)}
+        loading={publishMutation.isPending}
+        title={`Publish ${label}`}
+        description={`Are you sure you want to publish "${publishingExam?.name}"? Once published, students will be able to view this ${label.toLowerCase()}. You can still enter and modify results after publishing.`}
+        confirmLabel="Publish"
+        variant="info"
       />
     </div>
   );
