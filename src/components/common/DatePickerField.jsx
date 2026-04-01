@@ -12,14 +12,15 @@
  *   className   string
  *   fromYear    number    default 1990
  *   toYear      number    default current year + 10
+ *   disablePastDates  boolean  default false  (disable dates before today)
  *
  * Usage:
- *   <DatePickerField label="Date of Birth" name="dob" control={control} error={errors.dob} required />
+ *   <DatePickerField label="Exam Date" name="exam_date" control={control} error={errors.exam_date} disablePastDates required />
  */
 'use client';
 
 import { Controller } from 'react-hook-form';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, isBefore, startOfDay } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ export default function DatePickerField({
   className,
   fromYear = 1990,
   toYear = new Date().getFullYear() + 10,
+  disablePastDates = false,
 }) {
   const content = (fieldValue, fieldChange) => {
     let dateValue = null;
@@ -48,6 +50,11 @@ export default function DatePickerField({
       dateValue = typeof fieldValue === 'string' ? parseISO(fieldValue) : fieldValue;
       if (!isValid(dateValue)) dateValue = null;
     }
+
+    // Disable past dates if requested
+    const disabledMatcher = disablePastDates 
+      ? (date) => isBefore(date, startOfDay(new Date()))
+      : undefined;
 
     return (
       <Popover>
@@ -74,6 +81,7 @@ export default function DatePickerField({
             toYear={toYear}
             captionLayout="dropdown"
             initialFocus
+            disabled={disabledMatcher}
           />
         </PopoverContent>
       </Popover>
