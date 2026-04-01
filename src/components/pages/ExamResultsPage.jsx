@@ -14,6 +14,7 @@ import { ArrowLeft, Check } from 'lucide-react';
 
 import PageHeader from '@/components/common/PageHeader';
 import PageLoader from '@/components/common/PageLoader';
+import DataTable from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
@@ -248,11 +249,15 @@ export default function ExamResultsPage({ examId, type }) {
                 </thead>
                 <tbody>
                   {students.map(student => {
+                    // Extract student ID and details from the result object
                     const studentId = student.student_id || student.id;
-                    const studentName = student.student?.first_name || student.first_name || 'Unknown';
-                    const studentLastName = student.student?.last_name || student.last_name || '';
-                    const studentEmail = student.student?.email || student.email || '';
-                    const rollNumber = student.student?.roll_number || '';
+                    
+                    // Student info can be at student.student or directly on the result
+                    const studentInfo = student.student || student;
+                    const studentName = studentInfo?.first_name || 'Unknown';
+                    const studentLastName = studentInfo?.last_name || '';
+                    const studentEmail = studentInfo?.email || '';
+                    const rollNumber = studentInfo?.roll_number || '';
                     
                     return (
                       <tr key={studentId} className="border-b hover:bg-muted/50">
@@ -260,7 +265,7 @@ export default function ExamResultsPage({ examId, type }) {
                           <div className="font-medium">{studentName} {studentLastName}</div>
                           <div className="text-xs text-muted-foreground">{studentEmail}</div>
                         </td>
-                        <td className="px-4 py-2 text-center">{rollNumber || '—'}</td>
+                        <td className="px-4 py-2 text-center font-medium">{rollNumber || '—'}</td>
                         {subjectSchedules.map(subject => (
                           <td key={`${studentId}-${subject.subject_id}`} className="px-4 py-2 text-center">
                             <input

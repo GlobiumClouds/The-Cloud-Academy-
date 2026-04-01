@@ -367,42 +367,47 @@ export const examService = {
   // Exam CRUD
   getAll: async (params = {}) => {
     const response = await api.get('/exams', { params });
-    return response.data;
+    // Backend wraps response: { success, message, data, pagination, ... }
+    return response.data.data || response.data;
   },
 
   getById: async (id) => {
     const response = await api.get(`/exams/${id}`);
-    return response.data;
+    // Backend wraps: { success, message, data: { exam with subject_schedules }, timestamp }
+    // Extract the exam object from nested data property
+    return response.data.data || response.data;
   },
 
   create: async (data) => {
     const response = await api.post('/exams', data);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   update: async (id, data) => {
     const response = await api.put(`/exams/${id}`, data);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   delete: async (id) => {
     const response = await api.delete(`/exams/${id}`);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   publish: async (id) => {
     const response = await api.post(`/exams/${id}/publish`);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   updateStatus: async (id, status) => {
     const response = await api.patch(`/exams/${id}/status`, { status });
-    return response.data;
+    return response.data.data || response.data;
   },
 
   // Results Management
   getResults: async (examId, params = {}) => {
     const response = await api.get(`/exams/${examId}/results`, { params });
+    // This endpoint returns: { success, message, data: [...students], pagination, summary }
+    // Keep the wrapper structure as client expects it
     return response.data;
   },
 
