@@ -382,20 +382,73 @@ function AttendanceReportGenerator({ terms, yearsData, classesData, currentYearI
     }, 1500);
   };
 
-  const handleView = () => {
+  const handleView = async () => {
     setIsViewing(true);
-    // Real implementation would fetch from backend /attendance/report
-    setTimeout(() => {
-      // Mocked Backend Response as requested format
-      setReportData({
-        present: Math.floor(Math.random() * 80) + 40,
-        late: Math.floor(Math.random() * 10),
-        holiday: 4,
-        absent: Math.floor(Math.random() * 15),
-        performance_percentage: (Math.random() * 30 + 70).toFixed(1) // 70-100%
+    try {
+      let params = {};
+      
+      if (timeframe === 'monthly') {
+        const [yyyy, mm] = reportFilters.month.split('-');
+        params.year = yyyy;
+        params.month = mm;
+      } else {
+        const selectedYear = yearsData?.data?.find(y => y.id === reportFilters.academic_year_id);
+        const yStr = selectedYear?.name?.split('-')[0] || new Date().getFullYear().toString();
+        params.year = yStr;
+      }
+      
+      if (reportType === 'class') {
+         if (!reportFilters.class_id) {
+            toast.error('Please select a class to view the report.');
+            setIsViewing(false);
+            return;
+         }
+         params.class_id = reportFilters.class_id;
+         if (reportFilters.section_id) params.section_id = reportFilters.section_id;
+      } else {
+         if (!reportFilters.student_id) {
+            toast.error('Please select a student first. (Search integration pending)');
+            setIsViewing(false);
+            return;
+         }
+         params.student_id = reportFilters.student_id;
+      }
+      
+      const res = await studentAttendanceService.getAttendanceReport(params);
+      
+      // Backend returns either { class_summary: {...}, student_wise: [...] } or just [...]
+      const payload = res?.data || res;
+      let studentsList = Array.isArray(payload) ? payload : payload.student_wise;
+      
+      if (!studentsList || studentsList.length === 0) {
+        toast.warning('No attendance records found for the selected criteria.');
+        setIsViewing(false);
+        return;
+      }
+
+      let present = 0, absent = 0, late = 0, holiday = 0, leave = 0, total = 0;
+      studentsList.forEach(s => {
+        present += parseInt(s.present || 0);
+        absent += parseInt(s.absent || 0);
+        late += parseInt(s.late || 0);
+        holiday += parseInt(s.holiday || 0);
+        leave += parseInt(s.leave || 0);
+        total += parseInt(s.total || 0);
       });
+      
+      let performance = "0.0";
+      if (!Array.isArray(payload) && payload.class_summary) {
+         performance = Number(payload.class_summary.overall_present_percentage || 0).toFixed(1);
+      } else if (total > 0) {
+         performance = ((present / total) * 100).toFixed(1);
+      }
+      
+      setReportData({ present, absent, late, holiday, leave, performance_percentage: performance });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to fetch report data');
+    } finally {
       setIsViewing(false);
-    }, 1200);
+    }
   };
 
   if (reportData) {

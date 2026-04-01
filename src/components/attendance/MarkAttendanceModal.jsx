@@ -367,6 +367,17 @@ function BulkScanTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. Class/Section Filter Tab
 // ─────────────────────────────────────────────────────────────────────────────
+const flattenStudent = (s) => {
+  if (!s) return s;
+  const details = s.details?.studentDetails || s.studentDetails || {};
+  const flat = { ...s, ...details, id: s.id }; // Ensure ID is preserved
+  
+  // Normalize roll number
+  flat.roll_no = flat.roll_no || flat.roll_number || flat.candidate_id || flat.trainee_id || flat.reg_number || '';
+  
+  return flat;
+};
+
 function ClassAttendanceTab({ terms, type = 'school' }) {
   const [filters, setFilters] = useState({
     academic_year_id: '',
@@ -377,28 +388,113 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
   
   const [attendanceState, setAttendanceState] = useState({});
 
+  const { data: classesData } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => classService.getAll(),
+  });
+
+  // Fetch student roster
   const { data: studentsData, isLoading: isLoadingStudents } = useQuery({
     queryKey: ['students-for-attendance', filters.class_id, filters.section_id, filters.academic_year_id],
-    queryFn: () => studentService.getAll({ 
-      academic_year_id: filters.academic_year_id,
-      class_id: filters.class_id, 
-      section_id: filters.section_id || undefined,
-      limit: 1000
-    }, type),
-    enabled: !!filters.class_id,
+    queryFn: async () => {
+      const classList = classesData?.data?.rows ?? classesData?.data ?? [];
+      const selectedClass = classList.find(c => String(c.id) === String(filters.class_id));
+
+      const enrich = (stu, section = null) => {
+        const flat = flattenStudent(stu);
+        return {
+          ...flat,
+          class: flat.class || selectedClass,
+          section: flat.section || section || (selectedClass?.sections?.find(sec => String(sec.id) === String(flat.section_id)))
+        };
+      };
+
+      // Try bulk fetch for the whole class if no section is selected
+      if (!filters.section_id) {
+         try {
+           const res = await studentService.getAll({ 
+             academic_year_id: filters.academic_year_id,
+             class_id: filters.class_id,
+             limit: 1000
+           }, type);
+           const rows = res?.data?.rows ?? res?.data ?? [];
+           return { data: { rows: rows.map(r => enrich(r)) } };
+         } catch (err) {
+           console.warn("Class-wide fetch failed, using section parallel fetch", err);
+         }
+      }
+
+      // Fallback: Fetch by specific section
+      if (filters.section_id) {
+        const res = await studentService.getAll({ 
+          academic_year_id: filters.academic_year_id,
+          class_id: filters.class_id, 
+          section_id: filters.section_id,
+          limit: 1000
+        }, type);
+        const rows = res?.data?.rows ?? res?.data ?? [];
+        const currentSec = selectedClass?.sections?.find(sec => String(sec.id) === String(filters.section_id));
+        return { data: { rows: rows.map(r => enrich(r, currentSec)) } };
+      }
+      
+      // Parallel section fetch (last resort)
+      const targetSections = selectedClass?.sections || [];
+      const promises = targetSections.map(sec => studentService.getAll({
+          academic_year_id: filters.academic_year_id,
+          class_id: filters.class_id,
+          section_id: sec.id,
+          limit: 1000
+      }, type));
+      
+      const results = await Promise.all(promises);
+      let allStudents = [];
+      results.forEach((res, idx) => {
+          const rows = res?.data?.rows ?? res?.data ?? [];
+          allStudents = [...allStudents, ...rows.map(r => enrich(r, targetSections[idx]))];
+      });
+      return { data: { rows: allStudents } };
+    },
+    enabled: !!filters.class_id && !!classesData,
+  });
+
+  // Fetch Existing Attendance for the selected criteria
+  const { data: existingAttendanceData, isLoading: isLoadingAttendance } = useQuery({
+    queryKey: ['existing-attendance', filters.class_id, filters.section_id, filters.date],
+    queryFn: async () => {
+      const res = await studentAttendanceService.getAttendance({
+        class_id: filters.class_id,
+        section_id: filters.section_id === '' ? undefined : filters.section_id,
+        date: filters.date,
+        limit: 1000
+      });
+      return res?.data?.rows ?? res?.data ?? [];
+    },
+    enabled: !!filters.class_id && !!filters.date
   });
 
   const students = studentsData?.data?.rows ?? studentsData?.data ?? [];
 
+  // Update attendanceState whenever students OR existing attendance data is loaded
   useEffect(() => {
     if (students.length > 0) {
-      const initial = {};
-      students.forEach(s => { initial[s.id] = 'present'; });
-      setAttendanceState(initial);
+      const newState = {};
+      
+      // 1. Set default 'present' for everyone
+      students.forEach(s => { newState[s.id] = 'present'; });
+
+      // 2. Override with existing attendance records
+      const existingRecords = existingAttendanceData || [];
+      existingRecords.forEach(rec => {
+        if (newState[rec.student_id]) {
+          newState[rec.student_id] = rec.status;
+        }
+      });
+      
+      setAttendanceState(newState);
     } else {
       setAttendanceState({});
     }
-  }, [studentsData]);
+  }, [studentsData, existingAttendanceData, filters.date]);
 
   const markAll = (status) => {
     const nextState = {};
@@ -408,19 +504,33 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const records = Object.entries(attendanceState).map(([student_id, status]) => ({
-        student_id,
-        status,
-        remarks: ''
-      }));
+      const records = Object.entries(attendanceState).map(([student_id, status]) => {
+        const student = students.find(s => s.id === student_id);
+        return {
+          student_id,
+          roll_no: student?.roll_no,
+          class_id: student?.class_id || student?.class?.id || filters.class_id,
+          section_id: student?.section_id || student?.section?.id || filters.section_id,
+          status,
+          remarks: ''
+        };
+      });
 
-      return studentAttendanceService.bulkMarkAttendance({
+      const payload = {
         academic_year_id: filters.academic_year_id,
         class_id: filters.class_id,
         section_id: filters.section_id,
         date: filters.date,
         records
-      });
+      };
+
+      console.log('API Request [studentAttendanceService.bulkMarkAttendance]:');
+      console.log('Payload:', payload);
+
+      const response = await studentAttendanceService.bulkMarkAttendance(payload);
+      
+      console.log('API Response:', response);
+      return response;
     },
     onSuccess: () => {
       toast.success('Attendance submitted successfully!');
@@ -432,7 +542,7 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
   });
 
   const stats = useMemo(() => {
-    const counts = { present: 0, absent: 0, late: 0 };
+    const counts = { present: 0, absent: 0, late: 0, leave: 0 };
     Object.values(attendanceState).forEach(val => {
       if (counts[val] !== undefined) counts[val]++;
     });
@@ -463,10 +573,10 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
           <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">No {terms.class || 'Class'} Selected</h3>
           <p className="text-slate-500 mt-1 max-w-sm mx-auto">Please select a {terms.class || 'class'} from the filters above to load the student list.</p>
         </div>
-      ) : isLoadingStudents ? (
+      ) : (isLoadingStudents || isLoadingAttendance) ? (
         <div className="py-24 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50 animate-pulse">
           <div className="w-12 h-12 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-medium text-slate-600 dark:text-slate-400">Loading student roster...</p>
+          <p className="font-medium text-slate-600 dark:text-slate-400">Loading records...</p>
         </div>
       ) : students.length === 0 ? (
         <div className="py-24 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50">
@@ -494,6 +604,10 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
                 <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Late</p>
                 <p className="text-2xl font-black text-amber-500 leading-none">{stats.late}</p>
               </div>
+              <div className="pl-6 hidden lg:block">
+                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Leave</p>
+                <p className="text-2xl font-black text-blue-500 leading-none">{stats.leave}</p>
+              </div>
             </div>
             
             <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-3 shrink-0">
@@ -512,43 +626,65 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
                 <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="px-5 py-4 text-left font-bold text-slate-500 uppercase tracking-wider text-xs">Student Details</th>
-                    <th className="px-5 py-4 text-left font-bold text-slate-500 uppercase tracking-wider text-xs w-[120px]">Reg. No</th>
-                    <th className="px-5 py-4 text-right font-bold text-slate-500 uppercase tracking-wider text-xs min-w-[280px]">Attendance Status</th>
+                    <th className="px-5 py-4 text-left font-bold text-slate-500 uppercase tracking-wider text-xs w-[130px]">Reg / Roll No</th>
+                    <th className="px-5 py-4 text-right font-bold text-slate-500 uppercase tracking-wider text-xs min-w-[320px]">Attendance Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                   {students.map((s, index) => (
-                    <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors group">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm shrink-0">
-                            {s.first_name.charAt(0)}{s.last_name?.charAt(0)}
+                    <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors group border-b border-slate-100 dark:border-slate-800/50 last:border-none">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-sm shadow-sm ring-1 ring-indigo-200 dark:ring-indigo-800 shrink-0">
+                            {s.first_name?.[0]}{s.last_name?.[0]}
                           </div>
-                          <div>
-                            <p className="font-semibold text-slate-900 dark:text-slate-100">{s.first_name} {s.last_name}</p>
-                            <p className="text-xs text-slate-500">{s.class?.name} • {s.section?.name || 'No Section'}</p>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{s.first_name} {s.last_name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                {s.class?.name || 'No Class'}
+                              </span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
+                                {s.section?.name || 'No Section'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">
-                        {s.registration_no || s.id.substring(0,8)}
+                      <td className="px-5 py-4 font-mono text-xs">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 text-[9px] uppercase font-bold tracking-tighter">Reg</span>
+                            <span className="text-slate-600 dark:text-slate-400 font-semibold">{s.registration_no || s.id.substring(0,8)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-primary/70 text-[9px] uppercase font-bold tracking-tighter">Roll</span>
+                            <span className="text-primary dark:text-primary-foreground font-black text-sm">{s.roll_no || 'N/A'}</span>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-5 py-3 text-right">
-                        <div className="flex sm:inline-flex flex-wrap justify-end rounded-xl sm:p-1 gap-1 sm:gap-0 sm:bg-slate-100 sm:dark:bg-slate-900 sm:border border-slate-200 dark:border-slate-800 sm:shadow-inner">
-                          {['present', 'late', 'absent'].map(status => (
+                      <td className="px-5 py-4 text-right">
+                        <div className="flex sm:inline-flex flex-wrap justify-end rounded-2xl sm:p-1 gap-1.5 sm:gap-1 sm:bg-slate-100/80 sm:dark:bg-slate-900/80 sm:border border-slate-200 dark:border-slate-800 sm:backdrop-blur-sm sm:shadow-inner">
+                          {[
+                            { id: 'present', color: 'emerald' },
+                            { id: 'late', color: 'amber' },
+                            { id: 'absent', color: 'red' },
+                            { id: 'leave', color: 'blue' }
+                          ].map(opt => (
                             <button
-                              key={status}
-                              onClick={() => setAttendanceState(prev => ({ ...prev, [s.id]: status }))}
-                              className={`flex-1 sm:flex-none px-3 py-2 sm:px-4 sm:py-1.5 rounded-lg text-xs font-bold capitalize transition-all duration-200
-                                ${attendanceState[s.id] === status 
-                                  ? status === 'present' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                                    : status === 'absent' ? 'bg-red-500 text-white shadow-md shadow-red-500/20'
-                                    : 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
-                                  : 'bg-slate-100 sm:bg-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:bg-slate-800 sm:dark:bg-transparent dark:hover:text-slate-200'
+                              key={opt.id}
+                              onClick={() => setAttendanceState(prev => ({ ...prev, [s.id]: opt.id }))}
+                              className={`flex-1 sm:flex-none px-4 py-2 sm:px-4 sm:py-1.5 rounded-xl text-xs font-black uppercase transition-all duration-300
+                                ${attendanceState[s.id] === opt.id 
+                                  ? opt.id === 'present' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-500/20'
+                                    : opt.id === 'absent' ? 'bg-red-500 text-white shadow-lg shadow-red-500/25 ring-2 ring-red-500/20'
+                                    : opt.id === 'leave' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25 ring-2 ring-blue-600/20'
+                                    : 'bg-amber-500 text-white shadow-lg shadow-amber-500/25 ring-2 ring-amber-500/20'
+                                  : 'bg-slate-100 sm:bg-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:bg-slate-800 sm:dark:bg-transparent dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-700'
                                 }
                               `}
                             >
-                              {status}
+                              {opt.id}
                             </button>
                           ))}
                         </div>
@@ -561,17 +697,20 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
           </div>
 
           <div className="sticky bottom-4 w-full flex justify-end z-10 px-2 sm:px-0">
-            <div className="w-full sm:w-auto bg-white dark:bg-slate-900 p-2 sm:pl-6 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center gap-4 animate-bounce-in">
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 hidden md:block">
-                Ready to submit attendance for <span className="font-bold text-slate-900 dark:text-white">{students.length}</span> students?
-              </p>
+            <div className="w-full sm:w-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-2 sm:pl-6 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-800/50 flex flex-col sm:flex-row items-center gap-4 animate-bounce-in">
+              <div className="hidden md:flex flex-col text-right">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Status</p>
+                <p className="text-sm font-black text-slate-700 dark:text-slate-200">
+                  Ready to save <span className="text-primary">{students.length}</span> records
+                </p>
+              </div>
               <Button 
                 onClick={() => submitMutation.mutate()} 
                 disabled={submitMutation.isPending} 
-                className="w-full sm:w-auto h-12 px-8 rounded-xl shadow-lg shadow-primary/20"
+                className="w-full sm:w-auto h-12 px-10 rounded-xl shadow-xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98] font-black uppercase tracking-tight"
               >
                 <Save className="w-5 h-5 mr-2" />
-                {submitMutation.isPending ? 'Processing...' : 'Save Attendance'}
+                {submitMutation.isPending ? 'Saving...' : 'Confirm & Save'}
               </Button>
             </div>
           </div>
@@ -588,9 +727,9 @@ function StudentSearchTab({ terms, type = 'school' }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
-  
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState('present');
+  const [leaveType, setLeaveType] = useState('sick_leave');
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -601,31 +740,45 @@ function StudentSearchTab({ terms, type = 'school' }) {
 
   const { data: studentsData, isLoading } = useQuery({
     queryKey: ['student-search', debouncedSearch, type],
-    queryFn: () => studentService.getAll({ search: debouncedSearch, limit: 10 }, type),
-    enabled: debouncedSearch.length >= 2,
+    queryFn: async () => {
+      const res = await studentService.getAll({ search: debouncedSearch, limit: 10 }, type);
+      const rows = res?.data?.rows ?? res?.data ?? [];
+      const flat = rows.map(s => flattenStudent(s));
+      return { data: { rows: flat } };
+    },
+    enabled: debouncedSearch.length >= 2
   });
 
   const students = studentsData?.data?.rows ?? studentsData?.data ?? [];
 
   const markMutation = useMutation({
-    mutationFn: (payload) => studentAttendanceService.markAttendance(payload),
+    mutationFn: async (payload) => {
+      console.log('MARK_ATTENDANCE_PAYLOAD:', payload);
+      const res = await studentAttendanceService.markAttendance(payload);
+      return res;
+    },
     onSuccess: () => {
-      toast.success(`Attendance marked as ${status} for ${selectedStudent.first_name}!`);
+      toast.success(`Marked as ${status} for ${selectedStudent.first_name}!`);
       setSelectedStudent(null);
       setSearch('');
     },
     onError: (err) => {
-      toast.error('Failed to mark. ' + (err.response?.data?.message || ''));
+      toast.error('Failed: ' + (err.response?.data?.message || err.message));
     }
   });
 
   const handleSubmit = () => {
-    markMutation.mutate({
+    const payload = {
       student_id: selectedStudent.id,
+      roll_no: selectedStudent.roll_no,
+      class_id: selectedStudent.class_id || selectedStudent.class?.id,
+      section_id: selectedStudent.section_id || selectedStudent.section?.id,
       date,
       status,
+      leave_type: status === 'leave' ? leaveType : null,
       type: 'manual'
-    });
+    };
+    markMutation.mutate(payload);
   };
 
   return (
@@ -633,11 +786,11 @@ function StudentSearchTab({ terms, type = 'school' }) {
       <div className="space-y-2">
         <label className="text-sm font-semibold">Search Student</label>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-primary transition-colors" />
           <Input 
             autoFocus
-            className="pl-10 h-12 text-lg rounded-xl shadow-sm"
-            placeholder="Type name or reg number..."
+            className="pl-10 h-12 text-lg rounded-xl shadow-sm border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-primary/20"
+            placeholder="Search by name or reg number..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -646,24 +799,35 @@ function StudentSearchTab({ terms, type = 'school' }) {
           />
         </div>
         
-        {isLoading && <p className="text-sm text-slate-500 mt-2 px-2 animate-pulse">Searching...</p>}
+        {isLoading && <p className="text-[10px] uppercase font-bold text-slate-400 animate-pulse mt-2 ml-1">Searching database...</p>}
+        
         {debouncedSearch.length >= 2 && !isLoading && students.length === 0 && (
-          <p className="text-sm text-red-500 mt-2 px-2">No students found matching "{debouncedSearch}"</p>
+          <div className="p-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl border border-red-100 dark:border-red-900/50 flex items-center gap-3">
+            <AlertCircle size={16} />
+            <p className="text-sm font-semibold">No results for "{debouncedSearch}"</p>
+          </div>
         )}
         
         {debouncedSearch.length >= 2 && students.length > 0 && !selectedStudent && (
-          <ul className="mt-2 bg-white dark:bg-slate-900 border rounded-xl shadow-lg overflow-hidden border-slate-200 dark:border-slate-800 animate-in fade-in slide-in-from-top-2">
+          <ul className="mt-2 bg-white dark:bg-slate-900 border rounded-xl shadow-2xl overflow-hidden border-slate-200 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800 animate-in slide-in-from-top-4 fade-in duration-300 z-50">
             {students.map(s => (
               <li 
                 key={s.id} 
-                className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between border-b last:border-0"
+                className="px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between group transition-colors"
                 onClick={() => setSelectedStudent(s)}
               >
-                <div>
-                  <p className="font-semibold">{s.first_name} {s.last_name}</p>
-                  <p className="text-xs text-slate-500">{s.registration_no} • {s.class?.name || 'No Class'}</p>
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-xs ring-1 ring-indigo-200/50">
+                    {s.first_name?.[0]}{s.last_name?.[0]}
+                  </div>
+                  <div>
+                    <h4 className="font-black text-slate-800 dark:text-slate-100 text-sm group-hover:text-primary transition-colors">{s.first_name} {s.last_name}</h4>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-0.5">
+                       Roll: <span className="text-primary">{s.roll_no || 'N/A'}</span> • {s.class?.name || 'Class'} {s.section?.name ? `(${s.section.name})` : ''}
+                    </p>
+                  </div>
                 </div>
-                <Button size="sm" variant="secondary" className="rounded-full">Select</Button>
+                <Button size="sm" variant="ghost" className="rounded-lg h-8 px-4 text-[10px] font-black uppercase bg-slate-100 dark:bg-slate-800 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all">Select</Button>
               </li>
             ))}
           </ul>
@@ -671,48 +835,80 @@ function StudentSearchTab({ terms, type = 'school' }) {
       </div>
 
       {selectedStudent && (
-        <div className="bg-slate-50 dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-6 shadow-sm animate-in zoom-in-95 duration-300">
-          <div className="flex items-center gap-4 mb-6 border-b pb-4 border-slate-200 dark:border-slate-800">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xl">
-              {selectedStudent.first_name.charAt(0)}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-300 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />
+          
+          <div className="flex items-center gap-5 mb-8 border-b pb-6 border-slate-100 dark:border-slate-800">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center font-black text-2xl shadow-sm ring-1 ring-emerald-200/50">
+              {selectedStudent.first_name.charAt(0)}{selectedStudent.last_name?.charAt(0)}
             </div>
             <div>
-              <h3 className="text-lg font-bold">{selectedStudent.first_name} {selectedStudent.last_name}</h3>
-              <p className="text-sm text-slate-500">{selectedStudent.registration_no} • {selectedStudent.class?.name || ''}</p>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white leading-none mb-1">{selectedStudent.first_name} {selectedStudent.last_name}</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none">
+                ID: {selectedStudent.registration_no || selectedStudent.id.substring(0,8)} • {selectedStudent.class?.name || 'Class'}
+              </p>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <DatePickerField label="Select Date" value={date} onChange={setDate} />
+          <div className="space-y-8">
+            <DatePickerField label="Effective Date" value={date} onChange={setDate} />
             
-            <div className="space-y-2">
-              <label className="text-sm font-semibold">Attendance Status</label>
-              <div className="grid grid-cols-3 gap-3">
-                {['present', 'late', 'absent'].map(s => (
+            <div className="space-y-4">
+              <label className="text-xs font-black uppercase text-slate-400 tracking-widest flex items-center justify-between">
+                Marking Status
+                {status === 'leave' && <span className="text-[10px] text-blue-500 animate-pulse">Select Type Below</span>}
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { id: 'present', label: 'Present', color: 'bg-emerald-500' },
+                  { id: 'late', label: 'Late', color: 'bg-amber-500' },
+                  { id: 'absent', label: 'Absent', color: 'bg-red-500' },
+                  { id: 'leave', label: 'Leave', color: 'bg-blue-600' }
+                ].map(opt => (
                   <button
-                    key={s}
-                    onClick={() => setStatus(s)}
-                    className={`p-3 rounded-xl border-2 font-bold uppercase tracking-wider text-sm transition-all
-                      ${status === s 
-                        ? s === 'present' ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                          : s === 'absent' ? 'border-red-500 bg-red-50 text-red-700'
-                          : 'border-amber-500 bg-amber-50 text-amber-700'
-                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950'
+                    key={opt.id}
+                    onClick={() => setStatus(opt.id)}
+                    className={`p-4 rounded-2xl border-2 font-black uppercase tracking-wider text-[10px] transition-all
+                      ${status === opt.id 
+                        ? `${opt.color} text-white border-transparent shadow-lg scale-[1.02] ring-4 ring-${opt.color.split('-')[1]}-500/10`
+                        : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200 dark:border-slate-800 dark:bg-slate-950'
                       }
                     `}
                   >
-                    {s}
+                    {opt.label}
                   </button>
                 ))}
               </div>
+
+              {status === 'leave' && (
+                <div className="animate-in slide-in-from-top-4 fade-in duration-500 mt-4 p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                   <SelectField
+                    label="Type of Leave"
+                    options={[
+                      { value: 'sick_leave', label: 'Sick Leave (Medical)' },
+                      { value: 'casual_leave', label: 'Casual Leave' },
+                      { value: 'emergency', label: 'Unforeseen Emergency' },
+                      { value: 'medical', label: 'Authorized Hospitalization' },
+                      { value: 'other', label: 'Standard Leave / Other' }
+                    ]}
+                    value={leaveType}
+                    onChange={setLeaveType}
+                  />
+                </div>
+              )}
             </div>
 
             <Button 
-              className="w-full h-12 text-md" 
+              className="w-full h-14 text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99] group" 
               onClick={handleSubmit} 
               disabled={markMutation.isPending}
             >
-              {markMutation.isPending ? 'Saving...' : `Mark ${status.toUpperCase()} for ${selectedStudent.first_name}`}
+              {markMutation.isPending ? 'Processing Record...' : (
+                <div className="flex items-center gap-2">
+                  <CheckCircle size={18} className="group-hover:rotate-12 transition-transform" />
+                  Mark as {status}
+                </div>
+              )}
             </Button>
           </div>
         </div>
