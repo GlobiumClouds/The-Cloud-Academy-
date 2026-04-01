@@ -19,9 +19,23 @@ export default function ResultCard({ student, exam, result, institute }) {
     printWindow.print();
   };
 
-  if (!student || !exam || !result || !institute) {
-    return <div className="p-4 text-center text-muted-foreground">Loading result card...</div>;
+  // Improved validation - show more helpful debug info
+  if (!student || !exam || !result) {
+    return <div className="p-4 text-center text-muted-foreground">
+      Loading result card... 
+      {!student && <div className="text-xs mt-2">Student: Missing</div>}
+      {!exam && <div className="text-xs mt-2">Exam: Missing</div>}
+      {!result && <div className="text-xs mt-2">Result: Missing</div>}
+    </div>;
   }
+
+  // Institute is optional - use placeholder if not provided
+  const instituteData = institute || {
+    name: 'Institute Name',
+    code: 'INST-CODE',
+    logo_url: null,
+    institute_type: 'institution'
+  };
 
   const subjectMarks = result.subject_marks || [];
   const totalMarksObtained = result.total_marks_obtained || 0;
@@ -52,11 +66,11 @@ export default function ResultCard({ student, exam, result, institute }) {
       >
         {/* Header with Institute Info */}
         <div className="text-center border-b-2 border-gray-300 pb-6 mb-6">
-          {institute.logo_url && (
+          {instituteData.logo_url && (
             <div className="mb-4 flex justify-center">
               <img
-                src={institute.logo_url}
-                alt={institute.name}
+                src={instituteData.logo_url}
+                alt={instituteData.name}
                 height={60}
                 width={60}
                 className="object-contain"
@@ -64,10 +78,10 @@ export default function ResultCard({ student, exam, result, institute }) {
               />
             </div>
           )}
-          <h1 className="text-2xl font-bold text-gray-900">{institute.name}</h1>
-          <p className="text-sm text-gray-600 mt-1">{institute.code}</p>
+          <h1 className="text-2xl font-bold text-gray-900">{instituteData.name}</h1>
+          <p className="text-sm text-gray-600 mt-1">{instituteData.code}</p>
           <p className="text-xs text-gray-500 mt-1">
-            {institute.institute_type ? institute.institute_type.charAt(0).toUpperCase() + institute.institute_type.slice(1) : 'Institute'}
+            {instituteData.institute_type ? instituteData.institute_type.charAt(0).toUpperCase() + instituteData.institute_type.slice(1) : 'Institute'}
           </p>
         </div>
 

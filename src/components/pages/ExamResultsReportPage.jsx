@@ -24,7 +24,8 @@ import { examService } from '@/services/examService';
 
 export default function ExamResultsReportPage({ examId, type }) {
   const router = useRouter();
-  const { user, institute } = useAuthStore();
+  const { user, getInstitute } = useAuthStore();
+  const institute = getInstitute();
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedResult, setSelectedResult] = useState(null);
 
