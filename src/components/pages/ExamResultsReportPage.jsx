@@ -85,9 +85,9 @@ export default function ExamResultsReportPage({ examId, type }) {
       accessorKey: 'percentage',
       header: 'Percentage',
       cell: ({ getValue }) => {
-        const percentage = getValue();
+        const percentage = Number(getValue()) || 0;
         const color = percentage >= 70 ? 'text-green-600' : percentage >= 50 ? 'text-amber-600' : 'text-red-600';
-        return <span className={`font-semibold ${color}`}>{percentage?.toFixed(2)}%</span>;
+        return <span className={`font-semibold ${color}`}>{percentage.toFixed(2)}%</span>;
       }
     },
     {
