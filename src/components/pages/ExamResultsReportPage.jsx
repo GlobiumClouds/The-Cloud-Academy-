@@ -8,10 +8,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Download, ArrowLeft, TrendingUp, Users, Award, PrinterIcon, X } from 'lucide-react';
+import { Download, ArrowLeft, TrendingUp, Users, Award, PrinterIcon } from 'lucide-react';
 
 import PageHeader from '@/components/common/PageHeader';
 import PageLoader from '@/components/common/PageLoader';
+import AppModal from '@/components/common/AppModal';
 import DataTable from '@/components/common/DataTable';
 import StatsCard from '@/components/common/StatsCard';
 import ResultCard from '@/components/cards/ResultCard';
@@ -169,35 +170,27 @@ export default function ExamResultsReportPage({ examId, type }) {
 
   return (
     <>
-      {selectedStudent && selectedResult ? (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-auto p-6 flex items-center justify-center">
-          <div className="bg-white rounded-lg max-h-[90vh] overflow-auto w-full max-w-4xl">
-            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
-              <h2 className="text-lg font-semibold">Result Card</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedStudent(null);
-                  setSelectedResult(null);
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="p-6">
-              <ResultCard
-                student={selectedStudent}
-                exam={exam}
-                result={selectedResult}
-                institute={institute}
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <AppModal
+        open={!!(selectedStudent && selectedResult)}
+        onClose={() => {
+          setSelectedStudent(null);
+          setSelectedResult(null);
+        }}
+        title="Student Result Card"
+        description={selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : ''}
+        size="xl"
+      >
+        {selectedStudent && selectedResult && (
+          <ResultCard
+            student={selectedStudent}
+            exam={exam}
+            result={selectedResult}
+            institute={institute}
+          />
+        )}
+      </AppModal>
 
-      <div className="space-y-6">
+      <div className="space-y-6" role="main">
         <PageHeader
           title={`Results - ${exam.name}`}
           description={`${exam.name} | ${results.length} students | ${exam.total_marks} marks`}

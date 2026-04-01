@@ -1,507 +1,448 @@
 'use client';
 
 /**
- * ResultCard — Professional printable exam result card for individual students
- * Shows student details, institute info, exam details, and subject-wise marks
+ * ResultCard — Professional A4-printable exam result card
+ * Redesigned with clean typography, structured layout, and perfect print output
  */
 
 import { useRef } from 'react';
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+const STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .rc-wrap {
+    font-family: 'DM Sans', sans-serif;
+    background: #fff;
+  }
+
+  .rc-top-bar {
+    height: 6px;
+    background: linear-gradient(90deg, #1a2942 0%, #2d6a9f 50%, #1a7a6e 100%);
+  }
+
+  .rc-inner { padding: 36px 40px 32px; }
+
+  /* ── Header ── */
+  .rc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #e8edf2;
+    margin-bottom: 28px;
+  }
+  .rc-header-left { display: flex; align-items: center; gap: 18px; }
+
+  .rc-logo-circle {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: #1a2942;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 22px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+  .rc-logo-img { width: 64px; height: 64px; border-radius: 50%; object-fit: contain; }
+
+  .rc-inst-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px; font-weight: 700; color: #1a2942; line-height: 1.2;
+  }
+  .rc-inst-sub { font-size: 12px; color: #6b7a8d; margin-top: 3px; letter-spacing: 0.5px; }
+
+  .rc-badge {
+    display: inline-block;
+    padding: 6px 18px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.8px; text-transform: uppercase;
+  }
+  .rc-badge-pass { background: #e6f7ee; color: #1a7a4a; border: 1px solid #a8e6c3; }
+  .rc-badge-fail { background: #fdecea; color: #b32b1a; border: 1px solid #f5b5ae; }
+  .rc-badge-absent { background: #f0f4f8; color: #4a5568; border: 1px solid #cbd5e0; }
+  .rc-gen-date { font-size: 11px; color: #9aa5b4; margin-top: 8px; text-align: right; }
+
+  /* ── Title ── */
+  .rc-title { text-align: center; margin-bottom: 28px; }
+  .rc-title h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px; font-weight: 600;
+    color: #1a2942; letter-spacing: 2px; text-transform: uppercase;
+  }
+  .rc-divider {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 8px; justify-content: center;
+  }
+  .rc-divider-line { height: 1px; width: 60px; background: #dde3ea; }
+  .rc-divider-dot { width: 5px; height: 5px; border-radius: 50%; background: #2d6a9f; }
+
+  /* ── Info Grid ── */
+  .rc-info-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border: 1px solid #e8edf2; border-radius: 10px;
+    overflow: hidden; margin-bottom: 28px;
+  }
+  .rc-info-cell {
+    padding: 14px 18px;
+    border-right: 1px solid #e8edf2;
+    border-bottom: 1px solid #e8edf2;
+  }
+  .rc-info-cell:nth-child(2n) { border-right: none; }
+  .rc-info-cell:nth-last-child(-n+2) { border-bottom: none; }
+  .rc-info-label {
+    font-size: 10px; font-weight: 600; color: #8a97a8;
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px;
+  }
+  .rc-info-value { font-size: 15px; font-weight: 600; color: #1a2942; }
+  .rc-status-pass { color: #1a7a4a; }
+  .rc-status-fail { color: #b32b1a; }
+  .rc-status-absent { color: #4a5568; }
+
+  /* ── Section Label ── */
+  .rc-section-label {
+    font-size: 10px; font-weight: 600; color: #8a97a8;
+    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px;
+  }
+
+  .rc-exam-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px; font-weight: 600; color: #1a2942; margin-bottom: 16px;
+  }
+
+  /* ── Stats Row ── */
+  .rc-stats-row {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    gap: 12px; margin-bottom: 28px;
+  }
+  .rc-stat-card {
+    background: #f5f8fc; border-radius: 10px;
+    padding: 16px; text-align: center;
+    border: 1px solid #e8edf2;
+  }
+  .rc-stat-label {
+    font-size: 10px; font-weight: 600; color: #8a97a8;
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;
+  }
+  .rc-stat-value { font-size: 28px; font-weight: 600; color: #1a2942; line-height: 1; }
+  .rc-stat-value.blue  { color: #2d6a9f; }
+  .rc-stat-value.green { color: #1a7a4a; }
+  .rc-stat-value.amber { color: #b36a00; }
+  .rc-stat-value.red   { color: #b32b1a; }
+
+  /* ── Marks Table ── */
+  .rc-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 13px; }
+  .rc-table thead tr { background: #1a2942; }
+  .rc-table thead th {
+    padding: 11px 14px; text-align: left;
+    font-size: 10px; font-weight: 600;
+    color: #c8d4e3; text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .rc-table thead th:not(:first-child) { text-align: center; }
+  .rc-table tbody tr { border-bottom: 1px solid #edf0f4; }
+  .rc-table tbody tr:last-child { border-bottom: none; }
+  .rc-table tbody tr:nth-child(even) { background: #f8fafd; }
+  .rc-table td { padding: 11px 14px; color: #2c3e50; font-weight: 500; }
+  .rc-table td:not(:first-child) { text-align: center; }
+
+  .rc-pct-pill {
+    display: inline-block; padding: 2px 10px;
+    border-radius: 12px; font-size: 11px; font-weight: 600;
+  }
+  .rc-pct-high { background: #e6f7ee; color: #1a7a4a; }
+  .rc-pct-mid  { background: #fff8e6; color: #b36a00; }
+  .rc-pct-low  { background: #fdecea; color: #b32b1a; }
+
+  /* ── Summary Strip ── */
+  .rc-summary {
+    background: #1a2942;
+    border-radius: 10px;
+    display: grid; grid-template-columns: repeat(3,1fr);
+    overflow: hidden; margin-bottom: 28px;
+  }
+  .rc-sum-cell {
+    padding: 20px; text-align: center;
+    border-right: 1px solid rgba(255,255,255,0.1);
+  }
+  .rc-sum-cell:last-child { border-right: none; }
+  .rc-sum-label {
+    font-size: 10px; font-weight: 500;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+  }
+  .rc-sum-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px; font-weight: 700; color: #fff;
+  }
+
+  /* ── Signatures ── */
+  .rc-signatures {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 40px; margin-top: 10px;
+    padding-top: 24px; border-top: 1px solid #e8edf2;
+  }
+  .rc-sig-block { text-align: center; }
+  .rc-sig-line { border-top: 1px dashed #b0bec5; width: 75%; margin: 48px auto 10px; }
+  .rc-sig-name {
+    font-size: 12px; font-weight: 600;
+    color: #4a5568; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* ── Footer ── */
+  .rc-footer { text-align: center; margin-top: 20px; font-size: 11px; color: #9aa5b4; }
+
+  /* ── Print ── */
+  @media print {
+    @page { size: A4; margin: 15mm; }
+    .rc-no-print { display: none !important; }
+    .rc-wrap { box-shadow: none !important; border-radius: 0 !important; }
+    .rc-top-bar,
+    .rc-summary,
+    .rc-table thead tr,
+    .rc-table tbody tr:nth-child(even),
+    .rc-pct-pill,
+    .rc-badge,
+    .rc-stat-card,
+    .rc-logo-circle {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+`;
+
+function getPctClass(pct) {
+  if (pct >= 70) return 'rc-pct-high';
+  if (pct >= 50) return 'rc-pct-mid';
+  return 'rc-pct-low';
+}
+
+function getStatColor(pct) {
+  if (pct >= 70) return 'green';
+  if (pct >= 50) return 'amber';
+  return 'red';
+}
+
+function getInitials(name) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join('');
+}
+
 export default function ResultCard({ student, exam, result, institute }) {
   const printRef = useRef();
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
-    const htmlContent = `
+    printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="UTF-8">
-          <title>Result Card - ${student.first_name} ${student.last_name}</title>
-          <style>
-            * { margin: 0; padding: 0; }
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              color: #333;
-              line-height: 1.6;
-              background: white;
-            }
-            .container {
-              max-width: 900px;
-              margin: 0 auto;
-              padding: 40px;
-              background: white;
-            }
-            .page {
-              page-break-after: always;
-              padding: 20px;
-              border: 2px solid #2c3e50;
-              border-radius: 8px;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 3px solid #2c3e50;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .logo {
-              max-height: 100px;
-              margin-bottom: 15px;
-            }
-            .institute-name {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2c3e50;
-              margin-bottom: 5px;
-            }
-            .institute-code {
-              font-size: 14px;
-              color: #555;
-              letter-spacing: 1px;
-            }
-            .institute-type {
-              font-size: 12px;
-              color: #888;
-              margin-top: 5px;
-            }
-            .title {
-              text-align: center;
-              font-size: 22px;
-              font-weight: bold;
-              color: #2c3e50;
-              margin: 30px 0;
-            }
-            .student-section {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 30px;
-              margin-bottom: 30px;
-              padding: 20px;
-              background: #f8f9fa;
-              border-left: 4px solid #3498db;
-              border-radius: 4px;
-            }
-            .field {
-              margin-bottom: 15px;
-            }
-            .field-label {
-              font-size: 11px;
-              font-weight: bold;
-              color: #2c3e50;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              margin-bottom: 5px;
-            }
-            .field-value {
-              font-size: 16px;
-              font-weight: 600;
-              color: #1a1a1a;
-            }
-            .exam-section {
-              margin-bottom: 30px;
-              padding: 20px;
-              background: #f8f9fa;
-              border-radius: 4px;
-            }
-            .exam-title {
-              font-size: 18px;
-              font-weight: bold;
-              color: #2c3e50;
-              margin-bottom: 15px;
-            }
-            .exam-header {
-              font-size: 11px;
-              font-weight: bold;
-              color: #2c3e50;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              margin-bottom: 10px;
-            }
-            .stats-grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr 1fr;
-              gap: 20px;
-              margin-top: 15px;
-            }
-            .stat-box {
-              text-align: center;
-              padding: 15px;
-              background: white;
-              border: 2px solid #ecf0f1;
-              border-radius: 4px;
-            }
-            .stat-label {
-              font-size: 11px;
-              color: #555;
-              text-transform: uppercase;
-              font-weight: bold;
-              margin-bottom: 8px;
-            }
-            .stat-value {
-              font-size: 28px;
-              font-weight: bold;
-              color: #3498db;
-            }
-            .subjects-section {
-              margin-bottom: 30px;
-            }
-            .section-title {
-              font-size: 12px;
-              font-weight: bold;
-              color: #2c3e50;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              margin-bottom: 15px;
-            }
-            .table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 20px;
-            }
-            .table thead {
-              background: #2c3e50;
-              color: white;
-            }
-            .table th {
-              padding: 12px;
-              text-align: left;
-              font-size: 12px;
-              font-weight: bold;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-            }
-            .table td {
-              padding: 12px;
-              border-bottom: 1px solid #ecf0f1;
-              font-size: 13px;
-            }
-            .table tbody tr:nth-child(even) {
-              background: #f8f9fa;
-            }
-            .table tbody tr:hover {
-              background: #eef2f7;
-            }
-            .result-summary {
-              display: grid;
-              grid-template-columns: 1fr 1fr 1fr;
-              gap: 20px;
-              margin: 30px 0;
-              padding: 20px;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              border-radius: 4px;
-            }
-            .summary-box {
-              text-align: center;
-              color: white;
-            }
-            .summary-label {
-              font-size: 11px;
-              font-weight: bold;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              opacity: 0.9;
-              margin-bottom: 10px;
-            }
-            .summary-value {
-              font-size: 32px;
-              font-weight: bold;
-            }
-            .footer {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 40px;
-              margin-top: 40px;
-              padding-top: 30px;
-              border-top: 1px solid #ddd;
-            }
-            .signature {
-              text-align: center;
-            }
-            .signature-line {
-              border-top: 1px solid #333;
-              width: 70%;
-              margin: 40px auto 5px;
-            }
-            .signature-text {
-              font-size: 12px;
-              color: #666;
-              font-weight: bold;
-            }
-            .date-text {
-              font-size: 12px;
-              color: #888;
-              margin-top: 20px;
-              text-align: center;
-            }
-            @media print {
-              body { margin: 0; padding: 0; }
-              .container { margin: 0; padding: 0; }
-              .page { page-break-after: always; }
-            }
-          </style>
+          <title>Result Card — ${student?.first_name} ${student?.last_name}</title>
+          <style>${STYLES}</style>
         </head>
-        <body>
-          <div class="container">
-            ${printRef.current?.innerHTML || ''}
-          </div>
+        <body style="background:#fff;padding:0;margin:0;">
+          ${printRef.current?.innerHTML || ''}
         </body>
       </html>
-    `;
-    printWindow.document.write(htmlContent);
+    `);
     printWindow.document.close();
-    setTimeout(() => printWindow.print(), 250);
+    setTimeout(() => printWindow.print(), 400);
   };
 
-  // Improved validation - show more helpful debug info
   if (!student || !exam || !result) {
-    return <div className="p-4 text-center text-muted-foreground">
-      Loading result card... 
-      {!student && <div className="text-xs mt-2">Student: Missing</div>}
-      {!exam && <div className="text-xs mt-2">Exam: Missing</div>}
-      {!result && <div className="text-xs mt-2">Result: Missing</div>}
-    </div>;
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#9aa5b4', fontSize: 14 }}>
+        Loading result card…
+        {!student && <div style={{ fontSize: 12, marginTop: 8 }}>Student data missing</div>}
+        {!exam    && <div style={{ fontSize: 12, marginTop: 4 }}>Exam data missing</div>}
+        {!result  && <div style={{ fontSize: 12, marginTop: 4 }}>Result data missing</div>}
+      </div>
+    );
   }
 
-  // Institute is optional - use placeholder if not provided
-  const instituteData = institute || {
-    name: 'Institute Name',
-    code: 'INST-CODE',
-    logo_url: null,
-    institute_type: 'institution'
-  };
+  const inst = institute || { name: 'Institute Name', code: 'INST-CODE', logo_url: null, institute_type: 'institution' };
 
-  const subjectMarks = result.subject_marks || [];
+  const subjectMarks       = result.subject_marks || [];
   const totalMarksObtained = result.total_marks_obtained || 0;
-  const percentage = result.percentage || 0;
-  const grade = result.grade || 'N/A';
-  const status = result.status || 'absent';
-  
-  // Use actual registration number from student data
-  const registrationNo = student.registration_no || 'N/A';
+  const percentage         = parseFloat(result.percentage || 0);
+  const grade              = result.grade || 'N/A';
+  const status             = result.status || 'absent';
+  const registrationNo     = student.registration_no || 'N/A';
+
+  const badgeClass =
+    status === 'pass'   ? 'rc-badge rc-badge-pass' :
+    status === 'fail'   ? 'rc-badge rc-badge-fail'  :
+                          'rc-badge rc-badge-absent';
+
+  const statusClass =
+    status === 'pass'  ? 'rc-info-value rc-status-pass' :
+    status === 'fail'  ? 'rc-info-value rc-status-fail'  :
+                         'rc-info-value rc-status-absent';
+
+  const instInitials = getInitials(inst.name);
+  const generatedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <div className="space-y-4">
-      {/* Print Button */}
-      <div className="flex justify-end mb-4">
-        <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2">
-          <Printer className="h-4 w-4" />
+    <div>
+      {/* ── Toolbar ── */}
+      <div className="rc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+        <Button onClick={handlePrint} variant="outline" size="sm" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Printer style={{ width: 15, height: 15 }} />
           Print Result Card
         </Button>
       </div>
 
-      {/* Printable Content */}
-      <div ref={printRef} className="bg-white print:bg-white">
-        <div className="page" style={{ pageBreakAfter: 'always' }}>
+      {/* ── Card ── */}
+      <div ref={printRef} className="rc-wrap" style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '0.5px solid #e8edf2' }}>
+        <style>{STYLES}</style>
+
+        <div className="rc-top-bar"></div>
+        <div className="rc-inner">
+
           {/* Header */}
-          <div className="header" style={{ textAlign: 'center', borderBottom: '3px solid #2c3e50', paddingBottom: '20px', marginBottom: '30px' }}>
-            {instituteData.logo_url && (
-              <div style={{ marginBottom: '15px' }}>
-                <img
-                  src={instituteData.logo_url}
-                  alt={instituteData.name}
-                  style={{ maxHeight: '100px', margin: '0 auto' }}
-                />
+          <div className="rc-header">
+            <div className="rc-header-left">
+              {inst.logo_url
+                ? <img src={inst.logo_url} alt={inst.name} className="rc-logo-img" />
+                : <div className="rc-logo-circle">{instInitials}</div>
+              }
+              <div>
+                <div className="rc-inst-name">{inst.name}</div>
+                <div className="rc-inst-sub">
+                  {inst.code}
+                  {inst.institute_type && ` · ${inst.institute_type.charAt(0).toUpperCase() + inst.institute_type.slice(1)}`}
+                </div>
               </div>
-            )}
-            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '5px' }}>
-              {instituteData.name}
             </div>
-            <div style={{ fontSize: '14px', color: '#555', letterSpacing: '1px' }}>
-              {instituteData.code}
-            </div>
-            <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-              {instituteData.institute_type?.charAt(0).toUpperCase() + instituteData.institute_type?.slice(1)}
+            <div>
+              <div className={badgeClass}>{status.toUpperCase()}</div>
+              <div className="rc-gen-date">Generated: {generatedDate}</div>
             </div>
           </div>
 
           {/* Title */}
-          <div style={{ textAlign: 'center', fontSize: '22px', fontWeight: 'bold', color: '#2c3e50', margin: '30px 0' }}>
-            EXAM RESULT CARD
-          </div>
-
-          {/* Student Information */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '30px',
-            marginBottom: '30px',
-            padding: '20px',
-            background: '#f8f9fa',
-            borderLeft: '4px solid #3498db',
-            borderRadius: '4px'
-          }}>
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#2c3e50', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px' }}>
-                Student Name
-              </div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>
-                {student.first_name} {student.last_name}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#2c3e50', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px' }}>
-                Roll Number
-              </div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>
-                {student.roll_number || 'N/A'}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#2c3e50', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px' }}>
-                Registration No
-              </div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>
-                {registrationNo}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#2c3e50', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '5px' }}>
-                Status
-              </div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: status === 'pass' ? '#27ae60' : status === 'fail' ? '#e74c3c' : '#95a5a6', textTransform: 'capitalize' }}>
-                {status}
-              </div>
+          <div className="rc-title">
+            <h2>Official Examination Result Card</h2>
+            <div className="rc-divider">
+              <div className="rc-divider-line"></div>
+              <div className="rc-divider-dot"></div>
+              <div className="rc-divider-line"></div>
             </div>
           </div>
 
-          {/* Exam Information */}
-          <div style={{ marginBottom: '30px', padding: '20px', background: '#f8f9fa', borderRadius: '4px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-              Exam Details
+          {/* Student Info Grid */}
+          <div className="rc-info-grid">
+            <div className="rc-info-cell">
+              <div className="rc-info-label">Student Name</div>
+              <div className="rc-info-value">{student.first_name} {student.last_name}</div>
             </div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '15px' }}>
-              {exam.name}
+            <div className="rc-info-cell">
+              <div className="rc-info-label">Roll Number</div>
+              <div className="rc-info-value">{student.roll_number || 'N/A'}</div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-              <div style={{ textAlign: 'center', padding: '15px', background: 'white', border: '2px solid #ecf0f1', borderRadius: '4px' }}>
-                <div style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '8px' }}>
-                  Total Marks
-                </div>
-                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#3498db' }}>
-                  {exam.total_marks}
-                </div>
-              </div>
-              <div style={{ textAlign: 'center', padding: '15px', background: 'white', border: '2px solid #ecf0f1', borderRadius: '4px' }}>
-                <div style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '8px' }}>
-                  Marks Obtained
-                </div>
-                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#27ae60' }}>
-                  {totalMarksObtained}
-                </div>
-              </div>
-              <div style={{ textAlign: 'center', padding: '15px', background: 'white', border: '2px solid #ecf0f1', borderRadius: '4px' }}>
-                <div style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '8px' }}>
-                  Percentage
-                </div>
-                <div style={{ fontSize: '28px', fontWeight: 'bold', color: percentage >= 70 ? '#27ae60' : percentage >= 50 ? '#f39c12' : '#e74c3c' }}>
-                  {Number(percentage).toFixed(2)}%
-                </div>
-              </div>
+            <div className="rc-info-cell">
+              <div className="rc-info-label">Registration No.</div>
+              <div className="rc-info-value">{registrationNo}</div>
+            </div>
+            <div className="rc-info-cell">
+              <div className="rc-info-label">Overall Status</div>
+              <div className={statusClass}>{status.toUpperCase()}</div>
             </div>
           </div>
 
-          {/* Subject-wise Marks Table */}
-          <div style={{ marginBottom: '30px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '15px' }}>
-              Subject-wise Performance
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
-              <thead>
-                <tr style={{ background: '#2c3e50', color: 'white' }}>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid #2c3e50' }}>Subject</th>
-                  <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid #2c3e50' }}>Total</th>
-                  <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid #2c3e50' }}>Obtained</th>
-                  <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid #2c3e50' }}>%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {exam.subject_schedules && exam.subject_schedules.map((subject, idx) => {
-                  const subjectMark = subjectMarks.find(s => s.subject_id === subject.subject_id);
-                  const obtainedMarks = subjectMark?.marks_obtained || 0;
-                  const subjectPercentage = subject.total_marks > 0 
-                    ? ((obtainedMarks / subject.total_marks) * 100).toFixed(2)
-                    : 0;
+          {/* Exam Details */}
+          <div className="rc-section-label">Examination Details</div>
+          <div className="rc-exam-name">{exam.name}</div>
 
-                  return (
-                    <tr key={subject.subject_id} style={{ background: idx % 2 === 0 ? 'white' : '#f8f9fa', borderBottom: '1px solid #ecf0f1' }}>
-                      <td style={{ padding: '12px', fontSize: '13px', fontWeight: '500', color: '#333' }}>
-                        {subject.subject_name}
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#333' }}>
-                        {subject.total_marks}
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#27ae60' }}>
-                        {obtainedMarks}
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#3498db' }}>
-                        {subjectPercentage}%
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Result Summary */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '20px',
-            margin: '30px 0',
-            padding: '20px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '4px'
-          }}>
-            <div style={{ textAlign: 'center', color: 'white' }}>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.9, marginBottom: '10px' }}>
-                Grade
-              </div>
-              <div style={{ fontSize: '32px', fontWeight: 'bold' }}>
-                {grade}
-              </div>
+          <div className="rc-stats-row">
+            <div className="rc-stat-card">
+              <div className="rc-stat-label">Total Marks</div>
+              <div className="rc-stat-value blue">{exam.total_marks}</div>
             </div>
-            <div style={{ textAlign: 'center', color: 'white' }}>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.9, marginBottom: '10px' }}>
-                Overall Score
-              </div>
-              <div style={{ fontSize: '32px', fontWeight: 'bold' }}>
-                {Number(percentage).toFixed(1)}%
-              </div>
+            <div className="rc-stat-card">
+              <div className="rc-stat-label">Marks Obtained</div>
+              <div className="rc-stat-value green">{totalMarksObtained}</div>
             </div>
-            <div style={{ textAlign: 'center', color: 'white' }}>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.9, marginBottom: '10px' }}>
-                Result
-              </div>
-              <div style={{ fontSize: '32px', fontWeight: 'bold', textTransform: 'capitalize' }}>
-                {status}
-              </div>
+            <div className="rc-stat-card">
+              <div className="rc-stat-label">Percentage</div>
+              <div className={`rc-stat-value ${getStatColor(percentage)}`}>{percentage.toFixed(1)}%</div>
             </div>
           </div>
 
-          {/* Signature Section */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginTop: '40px', paddingTop: '30px', borderTop: '1px solid #ddd' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #333', width: '70%', margin: '40px auto 5px' }}></div>
-              <div style={{ fontSize: '12px', color: '#666', fontWeight: 'bold' }}>
-                Class Teacher
-              </div>
+          {/* Subject Table */}
+          <div className="rc-section-label">Subject-wise Performance</div>
+          <table className="rc-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Total Marks</th>
+                <th>Marks Obtained</th>
+                <th>Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(exam.subject_schedules || []).map((subject, idx) => {
+                const subjectMark  = subjectMarks.find(s => s.subject_id === subject.subject_id);
+                const obtained     = subjectMark?.marks_obtained || 0;
+                const subjectPct   = subject.total_marks > 0
+                  ? parseFloat(((obtained / subject.total_marks) * 100).toFixed(1))
+                  : 0;
+
+                return (
+                  <tr key={subject.subject_id || idx}>
+                    <td>{subject.subject_name}</td>
+                    <td>{subject.total_marks}</td>
+                    <td>{obtained}</td>
+                    <td>
+                      <span className={`rc-pct-pill ${getPctClass(subjectPct)}`}>
+                        {subjectPct.toFixed(1)}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Summary Strip */}
+          <div className="rc-summary">
+            <div className="rc-sum-cell">
+              <div className="rc-sum-label">Grade</div>
+              <div className="rc-sum-value">{grade}</div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #333', width: '70%', margin: '40px auto 5px' }}></div>
-              <div style={{ fontSize: '12px', color: '#666', fontWeight: 'bold' }}>
-                Head of Institute
-              </div>
+            <div className="rc-sum-cell">
+              <div className="rc-sum-label">Overall Score</div>
+              <div className="rc-sum-value">{percentage.toFixed(1)}%</div>
+            </div>
+            <div className="rc-sum-cell">
+              <div className="rc-sum-label">Result</div>
+              <div className="rc-sum-value">{status.toUpperCase()}</div>
+            </div>
+          </div>
+
+          {/* Signatures */}
+          <div className="rc-signatures">
+            <div className="rc-sig-block">
+              <div className="rc-sig-line"></div>
+              <div className="rc-sig-name">Class Teacher</div>
+            </div>
+            <div className="rc-sig-block">
+              <div className="rc-sig-line"></div>
+              <div className="rc-sig-name">Head of Institute</div>
             </div>
           </div>
 
           {/* Footer */}
-          <div style={{ fontSize: '12px', color: '#888', marginTop: '20px', textAlign: 'center', paddingTop: '20px', borderTop: '1px solid #ddd' }}>
-            <p>Generated on {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p style={{ marginTop: '5px', fontSize: '11px', color: '#999' }}>This is an officially issued digital result card</p>
+          <div className="rc-footer">
+            Officially issued result card &nbsp;·&nbsp; {inst.name}
           </div>
+
         </div>
       </div>
     </div>
