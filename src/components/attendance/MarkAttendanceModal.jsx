@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { QrCode, Users, UserSquare, CheckCircle, Search, Save, AlertCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QrCode, Users, UserSquare, CheckCircle, Search, Save, AlertCircle, Calendar, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,6 +22,7 @@ import {
 
 
 export default function MarkAttendanceModal({ open, onClose, defaultMode = 'class', type = 'school' }) {
+  const queryClient = useQueryClient();
   const { terms } = useInstituteConfig();
   const [activeTab, setActiveTab] = useState(defaultMode);
 
@@ -61,7 +62,7 @@ export default function MarkAttendanceModal({ open, onClose, defaultMode = 'clas
 
             <div className="bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-white/10 p-6 shadow-sm">
               <TabsContent value="bulk-scan" className="mt-0 outline-none">
-                <BulkScanTab />
+                <BulkScanTab terms={terms} />
               </TabsContent>
 
               <TabsContent value="class" className="mt-0 outline-none">
@@ -220,10 +221,15 @@ function InstantScanTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 // 1b. Bulk Scan Tab (Queue-based)
 // ─────────────────────────────────────────────────────────────────────────────
-function BulkScanTab() {
+function BulkScanTab({ terms }) {
   const [scannedIds, setScannedIds] = useState([]);
   const scannedIdsRef = useRef([]);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [filters, setFilters] = useState({
+    academic_year_id: '',
+    class_id: '',
+    section_id: '',
+    date: new Date().toISOString().slice(0, 10),
+  });
 
   useEffect(() => {
     scannedIdsRef.current = scannedIds;
@@ -247,9 +253,13 @@ function BulkScanTab() {
   const submitMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        date,
-        records: scannedIds.map(id => ({ student_id: id, status: 'present' })),
-        type: 'bulk_qr'
+        academic_year_id: filters.academic_year_id,
+        class_id: filters.class_id,
+        section_id: filters.section_id,
+        date: filters.date,
+        type: 'regular',
+        skip_existing: true,
+        records: scannedIds.map(id => ({ student_id: id, status: 'present', remarks: '' })),
       };
       
       try {
@@ -257,7 +267,7 @@ function BulkScanTab() {
       } catch (err) {
         console.warn('Bulk API failed, falling back to sequential scans...', err);
         const promises = scannedIds.map(id => 
-          studentAttendanceService.scanQR({ student_id: id, date, type: 'regular' }).catch(e => ({ error: e, id }))
+          studentAttendanceService.scanQR({ student_id: id, date: filters.date, type: 'regular' }).catch(e => ({ error: e, id }))
         );
         const results = await Promise.all(promises);
         return { data: results, fallback: true };
@@ -265,6 +275,8 @@ function BulkScanTab() {
     },
     onSuccess: () => {
       toast.success(`Successfully marked attendance for ${scannedIds.length} students!`);
+      queryClient.invalidateQueries(['attendance']);
+      queryClient.invalidateQueries(['existing-attendance']);
       setScannedIds([]);
     },
     onError: (err) => {
@@ -295,19 +307,18 @@ function BulkScanTab() {
       </div>
       
       <div className="space-y-6 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 relative">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-200 dark:border-slate-800 pb-6 items-end">
-          <div className="w-full min-w-0">
-            <DatePickerField
-              label="Attendance Date"
-              value={date}
-              onChange={(val) => setDate(val)}
-            />
-          </div>
-          <div className="w-full flex justify-end">
+        <div className="grid grid-cols-1 gap-2 border-b border-slate-200 dark:border-slate-800 pb-6">
+          <AttendanceFilter 
+            filters={filters} 
+            setFilters={setFilters} 
+            terms={terms} 
+            showDate={true} 
+          />
+          <div className="w-full flex justify-end mt-4">
             <Button 
               disabled={scannedIds.length === 0 || submitMutation.isPending}
               onClick={() => submitMutation.mutate()}
-              className="w-full sm:w-auto h-[42px] px-8 rounded-xl shadow-lg shadow-primary/20 font-bold"
+              className="w-full sm:w-auto h-12 px-8 rounded-xl shadow-lg shadow-primary/20 font-bold"
             >
               <CheckCircle className="w-4 h-4 mr-2" />
               {submitMutation.isPending ? 'Submitting...' : `Submit Batch (${scannedIds.length})`}
@@ -370,7 +381,12 @@ function BulkScanTab() {
 const flattenStudent = (s) => {
   if (!s) return s;
   const details = s.details?.studentDetails || s.studentDetails || {};
-  const flat = { ...s, ...details, id: s.id }; // Ensure ID is preserved
+  const academic = s.details?.academicInfo || s.academicInfo || s.academic_info || {};
+  const flat = { ...s, ...details, ...academic, id: s.id }; // Ensure ID is preserved
+  
+  // Normalize objects
+  flat.class = flat.class || s.class;
+  flat.section = flat.section || s.section;
   
   // Normalize roll number
   flat.roll_no = flat.roll_no || flat.roll_number || flat.candidate_id || flat.trainee_id || flat.reg_number || '';
@@ -479,13 +495,10 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
     if (students.length > 0) {
       const newState = {};
       
-      // 1. Set default 'present' for everyone
-      students.forEach(s => { newState[s.id] = 'present'; });
-
-      // 2. Override with existing attendance records
+      // 1. Fetch existing attendance records from database
       const existingRecords = existingAttendanceData || [];
       existingRecords.forEach(rec => {
-        if (newState[rec.student_id]) {
+        if (students.find(s => s.id === rec.student_id)) {
           newState[rec.student_id] = rec.status;
         }
       });
@@ -504,12 +517,15 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const records = Object.entries(attendanceState).map(([student_id, status]) => {
-        const student = students.find(s => s.id === student_id);
-        return {
-          student_id,
-          roll_no: student?.roll_no,
-          class_id: student?.class_id || student?.class?.id || filters.class_id,
+      // Only include students that have a status set (status must be truthy)
+      const records = Object.entries(attendanceState)
+        .filter(([_, status]) => !!status) 
+        .map(([student_id, status]) => {
+          const student = students.find(s => s.id === student_id);
+          return {
+            student_id,
+            roll_no: student?.roll_no,
+            class_id: student?.class_id || student?.class?.id || filters.class_id,
           section_id: student?.section_id || student?.section?.id || filters.section_id,
           status,
           remarks: ''
@@ -521,6 +537,8 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
         class_id: filters.class_id,
         section_id: filters.section_id,
         date: filters.date,
+        type: 'regular',
+        skip_existing: true,
         records
       };
 
@@ -534,6 +552,8 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
     },
     onSuccess: () => {
       toast.success('Attendance submitted successfully!');
+      queryClient.invalidateQueries(['attendance']);
+      queryClient.invalidateQueries(['existing-attendance']);
     },
     onError: (err) => {
       toast.error('Failed to submit attendance.');
@@ -724,12 +744,37 @@ function ClassAttendanceTab({ terms, type = 'school' }) {
 // 3. Student Search Tab
 // ─────────────────────────────────────────────────────────────────────────────
 function StudentSearchTab({ terms, type = 'school' }) {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState('present');
   const [leaveType, setLeaveType] = useState('sick_leave');
+
+  // Fetch current status for selected student and date
+  const { data: currentStatusData, isLoading: isLoadingStatus } = useQuery({
+    queryKey: ['student-current-status', selectedStudent?.id, date],
+    queryFn: async () => {
+      const res = await studentAttendanceService.getAttendance({
+        student_id: selectedStudent.id,
+        date: date,
+        limit: 1
+      });
+      return res?.data?.rows?.[0] ?? res?.data?.[0] ?? null;
+    },
+    enabled: !!selectedStudent && !!date
+  });
+
+  // Update status when currentStatusData changes
+  useEffect(() => {
+    if (currentStatusData) {
+      setStatus(currentStatusData.status);
+      if (currentStatusData.leave_type) setLeaveType(currentStatusData.leave_type);
+    } else {
+      setStatus('present'); // Reset if no record found
+    }
+  }, [currentStatusData]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -759,6 +804,9 @@ function StudentSearchTab({ terms, type = 'school' }) {
     },
     onSuccess: () => {
       toast.success(`Marked as ${status} for ${selectedStudent.first_name}!`);
+      queryClient.invalidateQueries(['attendance']);
+      queryClient.invalidateQueries(['existing-attendance']);
+      queryClient.invalidateQueries(['student-current-status']);
       setSelectedStudent(null);
       setSearch('');
     },
@@ -821,9 +869,9 @@ function StudentSearchTab({ terms, type = 'school' }) {
                     {s.first_name?.[0]}{s.last_name?.[0]}
                   </div>
                   <div>
-                    <h4 className="font-black text-slate-800 dark:text-slate-100 text-sm group-hover:text-primary transition-colors">{s.first_name} {s.last_name}</h4>
+                    <h4 className="font-black text-slate-800 dark:text-slate-100 text-sm group-hover:text-primary transition-colors">{s.first_name || s.name} {s.last_name || ''}</h4>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-0.5">
-                       Roll: <span className="text-primary">{s.roll_no || 'N/A'}</span> • {s.class?.name || 'Class'} {s.section?.name ? `(${s.section.name})` : ''}
+                       Roll: <span className="text-primary">{s.roll_no || 'N/A'}</span> • {s.class?.name || s.className || 'No Class'} {s.section?.name || s.sectionName ? `(${s.section?.name || s.sectionName})` : ''}
                     </p>
                   </div>
                 </div>
@@ -838,15 +886,30 @@ function StudentSearchTab({ terms, type = 'school' }) {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-300 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />
           
+          <button 
+            onClick={() => setSelectedStudent(null)}
+            className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all z-10"
+          >
+            <X size={18} />
+          </button>
+          
           <div className="flex items-center gap-5 mb-8 border-b pb-6 border-slate-100 dark:border-slate-800">
             <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center font-black text-2xl shadow-sm ring-1 ring-emerald-200/50">
               {selectedStudent.first_name.charAt(0)}{selectedStudent.last_name?.charAt(0)}
             </div>
             <div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white leading-none mb-1">{selectedStudent.first_name} {selectedStudent.last_name}</h3>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none">
-                ID: {selectedStudent.registration_no || selectedStudent.id.substring(0,8)} • {selectedStudent.class?.name || 'Class'}
-              </p>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white leading-none mb-1 group-active:text-primary transition-colors">{selectedStudent.first_name} {selectedStudent.last_name}</h3>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded uppercase tracking-widest border border-slate-200 dark:border-slate-700">
+                   {selectedStudent.class?.name || selectedStudent.className || 'No Class'}
+                </span>
+                <span className="text-[10px] font-black px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded uppercase tracking-widest border border-indigo-100 dark:border-indigo-900/50">
+                   {selectedStudent.section?.name || selectedStudent.sectionName || 'No Section'}
+                </span>
+                <span className="text-[10px] font-black px-2 py-0.5 bg-primary/10 text-primary rounded uppercase tracking-widest border border-primary/20">
+                   Roll: {selectedStudent.roll_no || 'N/A'}
+                </span>
+              </div>
             </div>
           </div>
 
