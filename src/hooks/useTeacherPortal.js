@@ -1460,19 +1460,58 @@ export const useTeacherExamResults = (examId, filters = {}, page = 1, limit = 20
   let exam = {};
   let pagination = { total: 0, page: currentPage, limit: currentLimit, totalPages: 0 };
 
-  if (data) {
-    if (Array.isArray(data)) {
-      results = data;
-    } else if (data.data && Array.isArray(data.data)) {
+    console.log('Exam Result', data);
+
+  // if (data) {
+  //   if (Array.isArray(data)) {
+  //     results = data;
+  //   } else if (data.data && Array.isArray(data.data)) {
+  //     results = data.data;
+  //     pagination = data.pagination || pagination;
+  //     exam = data.exam || {};
+  //   } else if (data.results && Array.isArray(data.results)) {
+  //     results = data.results;
+  //     pagination = data.pagination || pagination;
+  //     exam = data.exam || {};
+  //   }
+  // }
+
+   if (data) {
+    // Case 1: { success: true, data: { data: [...], exam: {...}, pagination: {...} } }
+    if (data.data && data.data.data && Array.isArray(data.data.data)) {
+      results = data.data.data;
+      pagination = data.data.pagination || pagination;
+      exam = data.data.exam || {};
+    }
+    // Case 2: { data: [...], exam: {...}, pagination: {...} }
+    else if (data.data && Array.isArray(data.data)) {
       results = data.data;
       pagination = data.pagination || pagination;
       exam = data.exam || {};
-    } else if (data.results && Array.isArray(data.results)) {
+    }
+    // Case 3: { results: [...], exam: {...}, pagination: {...} }
+    else if (data.results && Array.isArray(data.results)) {
       results = data.results;
       pagination = data.pagination || pagination;
       exam = data.exam || {};
     }
+    // Case 4: Direct array
+    else if (Array.isArray(data)) {
+      results = data;
+    }
+    // Case 5: Wrapped in data property
+    else if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+      if (data.data.results && Array.isArray(data.data.results)) {
+        results = data.data.results;
+      }
+      exam = data.data.exam || {};
+      pagination = data.data.pagination || pagination;
+    }
   }
+
+  console.log('Extracted Results:', results);
+  console.log('Extracted Exam:', exam);
+  console.log('Extracted Pagination:', pagination);
 
   const addResultsMutation = useMutation({
     mutationFn: (resultsData) => teacherPortalService.addExamResults(examId, resultsData),
@@ -1507,10 +1546,7 @@ export const useTeacherExamResults = (examId, filters = {}, page = 1, limit = 20
       });
     },
     [addResultsMutation]
-  );
-
-  console.log('Exam Result', results);
-  
+  );  
 
   return {
     results,
@@ -1527,8 +1563,6 @@ export const useTeacherExamResults = (examId, filters = {}, page = 1, limit = 20
     isError: addResultsMutation.isError
   };
 };
-
-// src/hooks/useTeacherPortal.js
 
 // Add this new hook after useTeacherExamResults
 export const useTeacherExamEntry = (examId, filters = {}, page = 1, limit = 100) => {
