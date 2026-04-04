@@ -20,6 +20,7 @@ import {
   academicYearService
 } from '@/services';
 
+
 export default function MarkAttendanceModal({ open, onClose, defaultMode = 'class', type = 'school' }) {
   const queryClient = useQueryClient();
   const { terms } = useInstituteConfig();
@@ -83,7 +84,6 @@ export default function MarkAttendanceModal({ open, onClose, defaultMode = 'clas
 // 1. Instant Scan Tab
 // ─────────────────────────────────────────────────────────────────────────────
 function InstantScanTab() {
-  const queryClient = useQueryClient();
   const [scanHistory, setScanHistory] = useState([]);
   const [scanType, setScanType] = useState('regular');
   
@@ -395,7 +395,6 @@ const flattenStudent = (s) => {
 };
 
 function ClassAttendanceTab({ terms, type = 'school' }) {
-  const queryClient = useQueryClient();
   const [filters, setFilters] = useState({
     academic_year_id: '',
     class_id: '',
