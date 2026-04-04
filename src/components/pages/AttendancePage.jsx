@@ -50,6 +50,11 @@ export default function AttendancePage({ type }) {
   const { terms, attendanceConfig } = useInstituteConfig();
 
   const [isMarkOpen, setIsMarkOpen] = useState({ open: false, mode: 'class' });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Filters State
   const [filters, setFilters] = useState({
@@ -57,7 +62,7 @@ export default function AttendancePage({ type }) {
     class_id: '',
     section_id: '',
     status: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: '', // Initialized in useEffect to avoid hydration mismatch
     search: ''
   });
 
@@ -85,7 +90,12 @@ export default function AttendancePage({ type }) {
         setFilters(prev => ({ ...prev, academic_year_id: currentYear.id }));
       }
     }
-  }, [yearsData?.data, filters.academic_year_id]);
+    
+    // Set default today's date if not set
+    if (!filters.date) {
+      setFilters(prev => ({ ...prev, date: new Date().toISOString().slice(0, 10) }));
+    }
+  }, [yearsData?.data, filters.academic_year_id, filters.date]);
 
   // Fetch Classes
   const { data: classesData } = useQuery({
@@ -228,7 +238,7 @@ export default function AttendancePage({ type }) {
               <QrCode className="mr-2 h-4 w-4" />
               Scan QR
             </Button>
-            {canDo('attendance.mark') && (
+            {mounted && canDo('attendance.mark') && (
               <Button onClick={() => setIsMarkOpen({ open: true, mode: 'class' })}>
                 <CheckSquare className="mr-2 h-4 w-4" />
                 Bulk Mark
