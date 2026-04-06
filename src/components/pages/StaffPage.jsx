@@ -26,6 +26,8 @@ import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
 import InputField from '@/components/common/InputField';
+import PhoneInputField from '@/components/common/PhoneInput';
+import CnicInput from '@/components/common/CnicInput';
 import SwitchField from '@/components/common/SwitchField';
 import StatsCard from '@/components/common/StatsCard';
 import { FileUpload } from '@/components/forms/FileUpload';
@@ -811,16 +813,34 @@ export default function StaffManagementPage({ instituteType }) {
                         <Button variant="outline" onClick={() => setModalOpen(false)}>
                             Cancel
                         </Button>
-                        <Button
-                            type="submit"
-                            form="staff-form"
-                            disabled={createMutation.isPending || updateMutation.isPending}
-                        >
-                            {createMutation.isPending || updateMutation.isPending ? (
-                                <Loader2 size={14} className="animate-spin mr-1" />
-                            ) : null}
-                            {editingStaff ? 'Update' : 'Create'}
-                        </Button>
+                        {activeTab !== 'personal' && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={prevTab}
+                            >
+                                Previous
+                            </Button>
+                        )}
+                        {activeTab !== 'documents' ? (
+                            <Button
+                                type="button"
+                                onClick={nextTab}
+                            >
+                                Next
+                            </Button>
+                        ) : (
+                            <Button
+                                type="submit"
+                                form="staff-form"
+                                disabled={createMutation.isPending || updateMutation.isPending}
+                            >
+                                {createMutation.isPending || updateMutation.isPending ? (
+                                    <Loader2 size={14} className="animate-spin mr-1" />
+                                ) : null}
+                                {editingStaff ? 'Update' : 'Add Staff'}
+                            </Button>
+                        )}
                     </div>
                 }
             >
@@ -940,12 +960,11 @@ export default function StaffManagementPage({ instituteType }) {
                                                 placeholder="Select"
                                             />
 
-                                            <InputField
-                                                label="CNIC"
-                                                name="cnic"
-                                                register={register}
+                                            <CnicInput
+                                                label="CNIC / B-Form"
+                                                value={watch('cnic') || ''}
+                                                onChange={val => setValue('cnic', val)}
                                                 error={errors.cnic}
-                                                placeholder="00000-0000000-0"
                                             />
                                         </div>
 
@@ -963,22 +982,18 @@ export default function StaffManagementPage({ instituteType }) {
                                                 placeholder="john@institute.com"
                                             />
 
-                                            <InputField
-                                                label="Phone"
-                                                name="phone"
-                                                register={register}
+                                            <PhoneInputField
+                                                label="Phone Number"
+                                                value={watch('phone') || ''}
+                                                onChange={val => setValue('phone', val)}
                                                 error={errors.phone}
-                                                type="tel"
-                                                placeholder="03001234567"
                                             />
 
-                                            <InputField
+                                            <PhoneInputField
                                                 label="Alternate Phone"
-                                                name="alternate_phone"
-                                                register={register}
+                                                value={watch('alternate_phone') || ''}
+                                                onChange={val => setValue('alternate_phone', val)}
                                                 error={errors.alternate_phone}
-                                                type="tel"
-                                                placeholder="03123456789"
                                             />
 
                                             <InputField
@@ -1030,13 +1045,11 @@ export default function StaffManagementPage({ instituteType }) {
                                                 placeholder="Select"
                                             />
 
-                                            <InputField
-                                                label="Emergency Phone"
-                                                name="emergency_contact_phone"
-                                                register={register}
+                                            <PhoneInputField
+                                                label="Emergency Contact Phone"
+                                                value={watch('emergency_contact_phone') || ''}
+                                                onChange={val => setValue('emergency_contact_phone', val)}
                                                 error={errors.emergency_contact_phone}
-                                                type="tel"
-                                                placeholder="03001234567"
                                             />
                                         </div>
                                     </div>
