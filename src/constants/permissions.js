@@ -1463,6 +1463,23 @@ export const PERM = {
   VENDORS_CATEGORIES:       'vendors.categories',
 
   // ==================== POLICIES & COMPLIANCE PERMISSIONS ====================
+
+  //Policies
+  POLICIES_CREATE:          'policies.create',
+  POLICIES_READ:            'policies.read',
+  POLICIES_UPDATE:          'policies.update',
+  POLICIES_DELETE:          'policies.delete',
+  POLICIES_ACTIVATE:        'policies.activate',
+  POLICIES_DEACTIVATE:      'policies.deactivate',
+  POLICIES_VIEW:            'policies.view',
+  POLICIES_MANAGE:          'policies.manage',
+  POLICIES_BULK_ACTIONS:    'policies.bulk_actions',
+  POLICIES_ATTACHMENTS:     'policies.attachments',
+  POLICIES_NOTES:           'policies.notes',
+  POLICIES_AUDIT_LOG:       'policies.audit_log',
+  POLICIES_EXPORT:          'policies.export',
+  POLICIES_RECURRING:       'policies.recurring',
+
   // Fee Policies
   FEE_POLICIES_CREATE:      'fee_policies.create',
   FEE_POLICIES_READ:        'fee_policies.read',
@@ -2027,6 +2044,11 @@ export const ADMIN_PERMISSION_GROUPS = [
     label: 'Policies',
     icon: '📜',
     perms: [
+      PERM.POLICIES_CREATE, PERM.POLICIES_READ, PERM.POLICIES_UPDATE,
+      PERM.POLICIES_DELETE, PERM.POLICIES_ACTIVATE, PERM.POLICIES_DEACTIVATE, PERM.POLICIES_VIEW,
+      PERM.POLICIES_MANAGE, PERM.POLICIES_BULK_ACTIONS, PERM.POLICIES_ATTACHMENTS,
+      PERM.POLICIES_NOTES, PERM.POLICIES_AUDIT_LOG, PERM.POLICIES_EXPORT,
+      PERM.POLICIES_RECURRING,
       PERM.FEE_POLICIES_CREATE, PERM.FEE_POLICIES_READ, PERM.FEE_POLICIES_UPDATE,
       PERM.FEE_POLICIES_DELETE, PERM.FEE_POLICIES_ACTIVATE, PERM.FEE_POLICIES_APPLY,
       PERM.FEE_POLICIES_DISCOUNT, PERM.FEE_POLICIES_LATE_FEE, PERM.FEE_POLICIES_SCHOLARSHIP,

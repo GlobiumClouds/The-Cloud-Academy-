@@ -174,7 +174,7 @@ export const NAV = {
     { group: 'Admin', label: 'Branches', href: '/school/branches', icon: 'Building2', permission: 'branches.read', requiresBranches: true },
     // { group: 'Admin', label: 'Roles', href: '/school/roles', icon: 'Shield', permission: 'roles.read' },
     // { group: 'Admin', label: 'Users', href: '/school/users', icon: 'UserCog', permission: 'users.read' },
-    { group: 'Admin', label: 'Settings', href: '/school/settings', icon: 'Settings', permission: 'settings.read' },
+    { group: 'Admin', label: 'Settings', href: '/school/settings', icon: 'Settings' },
   ],
 
   coaching: [
