@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Download, CheckCircle } from 'lucide-react';
+import { Plus, Download, CheckCircle, FileText, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { payrollService } from '@/services';
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import PayslipTemplate from '@/components/payroll/PayslipTemplate';
 
 const extractRows  = (d) => d?.data?.rows ?? d?.data ?? [];
 const extractPages = (d) => d?.data?.totalPages ?? 1;
@@ -94,6 +95,7 @@ const payslipColumns = (onMarkPaid, canMark) => [
     cell: ({ row }) => {
       const p = row.original;
       const extraActions = [];
+      extraActions.push({ label: 'View Payslip', onClick: () => setSelectedPayslip(p), icon: FileText });
       if (canMark && p.status === 'generated') {
         extraActions.push({ label: 'Mark as Paid', onClick: () => onMarkPaid(p.id), icon: CheckCircle });
       }
@@ -187,6 +189,7 @@ export default function PayrollPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [page,       setPage]     = useState(1);
   const [pageSize,   setPageSize] = useState(10);
+  const [selectedPayslip, setSelectedPayslip] = useState(null);
 
   /* generate payroll */
   const [genOpen, setGenOpen] = useState(false);
@@ -355,6 +358,25 @@ export default function PayrollPage() {
             </Button>
           </div>
         </div>
+      </AppModal>
+
+      <AppModal
+        open={!!selectedPayslip}
+        onClose={() => setSelectedPayslip(null)}
+        title="Payslip Preview"
+        size="xl"
+        footer={
+          <div className="flex items-center gap-2 payslip-no-print">
+            <Button variant="outline" size="sm" onClick={() => setSelectedPayslip(null)}>
+              Close
+            </Button>
+            <Button size="sm" onClick={() => window.print()}>
+              <Printer className="h-4 w-4" /> Print
+            </Button>
+          </div>
+        }
+      >
+        <PayslipTemplate record={selectedPayslip} />
       </AppModal>
     </div>
   );
