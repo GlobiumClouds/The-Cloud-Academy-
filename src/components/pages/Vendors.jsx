@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Eye, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Eye, EyeOff, Pencil, Plus, Trash2, RefreshCw, Users, Search, X, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 import DataTable from '@/components/common/DataTable';
@@ -12,7 +12,7 @@ import SelectField from '@/components/common/SelectField';
 import CreatableSelectField from '@/components/common/CreatableSelectField';
 import { cn } from '@/lib/utils';
 import { studentService } from '@/services/studentService';
-import { DUMMY_STUDENTS } from '@/data/dummyData';
+import { vendorService } from '@/services/vendorService';
 import useAuthStore from '@/store/authStore';
 
 const STATUS_OPTIONS = [
@@ -21,44 +21,12 @@ const STATUS_OPTIONS = [
 ];
 
 const VENDOR_TYPE_OPTIONS = [
-  { value: 'books', label: 'Books and Stationery Vendors' },
-  { value: 'uniform', label: 'Uniform Vendors' },
-  { value: 'transport', label: 'Transport Vendors' },
-  { value: 'canteen', label: 'Canteen Vendors' },
-  { value: 'it', label: 'IT Vendors' },
-];
-
-const INITIAL_VENDORS = [
-  {
-    id: 'ven-1',
-    name: 'Knowledge Books House',
-    type: 'books',
-    phone: '0300-1112233',
-    email: 'books@knowledge.pk',
-    address: 'Urdu Bazar, Lahore',
-    status: 'active',
-    assignedStudentIds: ['st-1', 'st-2'],
-  },
-  {
-    id: 'ven-2',
-    name: 'Smart Uniforms',
-    type: 'uniform',
-    phone: '0301-4556677',
-    email: 'uniform@smart.pk',
-    address: 'Main Market, Karachi',
-    status: 'active',
-    assignedStudentIds: ['st-3'],
-  },
-  {
-    id: 'ven-3',
-    name: 'School Riders Transport',
-    type: 'transport',
-    phone: '0321-9000011',
-    email: 'ops@riders.pk',
-    address: 'Satellite Town, Rawalpindi',
-    status: 'inactive',
-    assignedStudentIds: [],
-  },
+  { value: 'books', label: 'Books & Stationery' },
+  { value: 'uniform', label: 'Uniforms' },
+  { value: 'transport', label: 'Transport' },
+  { value: 'canteen', label: 'Canteen' },
+  { value: 'it', label: 'IT Services' },
+  { value: 'other', label: 'Other' },
 ];
 
 const EMPTY_FORM = {
@@ -67,6 +35,7 @@ const EMPTY_FORM = {
   phone: '',
   email: '',
   address: '',
+  password: '',
   status: 'active',
 };
 
@@ -78,103 +47,164 @@ function normalizeTypeLabel(value) {
 }
 
 function studentDisplayName(student) {
+  if (!student) return 'Unknown';
   if (student?.name) return student.name;
   const full = `${student?.first_name || ''} ${student?.last_name || ''}`.trim();
   return full || student?.student_name || student?.id || 'Unknown Student';
 }
 
-export default function Vendors({ type = 'school' }) {
+function generateRandomPassword() {
+  const digits = '123456';
+  let password = '';
+  for (let i = 0; i < 6; i++) {
+    password += digits[Math.floor(Math.random() * digits.length)];
+  }
+  return password;
+}
+
+export default function Vendors() {
   const canDo = useAuthStore((s) => s.canDo);
-  const [rows, setRows] = useState(INITIAL_VENDORS);
+  const user = useAuthStore((s) => s.user);
+  const type = user.institute.institute_type;
+
+  const queryClient = useQueryClient();
+
+  // Filter & pagination states
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const [vendorType, setVendorType] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [vendorTypeFilter, setVendorTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Modal states
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
 
+  // Selected items
   const [editingVendor, setEditingVendor] = useState(null);
   const [viewingVendor, setViewingVendor] = useState(null);
   const [deletingVendor, setDeletingVendor] = useState(null);
   const [assigningVendor, setAssigningVendor] = useState(null);
 
+  // Form states
+  const [form, setForm] = useState(EMPTY_FORM);
   const [assignmentSearch, setAssignmentSearch] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [form, setForm] = useState(EMPTY_FORM);
+  // ─── Fetch Vendors ──────────────────────────────────────────────────────
+  const {
+    data: vendorsData,
+    isLoading: vendorsLoading,
+    isFetching: vendorsFetching,
+    refetch: refetchVendors
+  } = useQuery({
+    queryKey: ['vendors', page, pageSize, search, statusFilter, vendorTypeFilter],
+    queryFn: async () => {
+      const params = {
+        page,
+        limit: pageSize,
+        search: search || undefined,
+        status: statusFilter || undefined,
+        type: vendorTypeFilter || undefined,
+      };
+      try {
+        const res = await vendorService.getAll(params);
+        console.log('Vendors fetched:', res);
+        return {
+          rows: res?.data || [],
+          pagination: res?.pagination || { total: 0, page: 1, limit: pageSize, totalPages: 0 }
+        };
+      } catch (error) {
+        console.error('Failed to fetch vendors:', error);
+        return { rows: [], pagination: { total: 0, page: 1, limit: pageSize, totalPages: 0 } };
+      }
+    },
+    placeholderData: { rows: [], pagination: { total: 0, page: 1, limit: pageSize, totalPages: 0 } },
+  });
 
-  const { data: studentsData = [] } = useQuery({
+  const vendors = vendorsData?.rows || [];
+  const total = vendorsData?.pagination?.total || 0;
+  const totalPages = vendorsData?.pagination?.totalPages || 0;
+
+  // ─── Fetch Students for Assignment Modal ────────────────────────────────
+  const {
+    data: studentsData = [],
+    isLoading: studentsLoading,
+  } = useQuery({
     queryKey: ['students-for-vendors', type],
     queryFn: async () => {
       try {
-        const res = await studentService.getAll({ page: 1, limit: 500 }, type);
+        const res = await studentService.getAll({ page: 1, limit: 1000, is_active: true }, type);
+        console.log('Students fetched:', res);
         if (Array.isArray(res?.data?.rows)) return res.data.rows;
         if (Array.isArray(res?.data)) return res.data;
         if (Array.isArray(res?.rows)) return res.rows;
         if (Array.isArray(res)) return res;
-        return DUMMY_STUDENTS || [];
-      } catch {
-        return DUMMY_STUDENTS || [];
+        return [];
+      } catch (error) {
+        console.error('Failed to fetch students:', error);
+        return [];
       }
     },
-    placeholderData: (prev) => prev,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const studentsById = useMemo(() => {
-    return (studentsData || []).reduce((acc, student) => {
-      acc[student.id] = student;
-      return acc;
-    }, {});
-  }, [studentsData]);
+  // ─── Mutations ──────────────────────────────────────────────────────────
+  const createMutation = useMutation({
+    mutationFn: vendorService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast.success('Vendor created successfully');
+      closeFormModal();
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Failed to create vendor');
+    },
+  });
 
-  const filtered = useMemo(() => {
-    return rows.filter((item) => {
-      const q = search.trim().toLowerCase();
-      const searchMatch = !q
-        || item.name.toLowerCase().includes(q)
-        || item.phone.toLowerCase().includes(q)
-        || item.email.toLowerCase().includes(q);
-      const statusMatch = !status || item.status === status;
-      const typeMatch = !vendorType || item.type === vendorType;
-      return searchMatch && statusMatch && typeMatch;
-    });
-  }, [rows, search, status, vendorType]);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => vendorService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast.success('Vendor updated successfully');
+      closeFormModal();
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Failed to update vendor');
+    },
+  });
 
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const deleteMutation = useMutation({
+    mutationFn: vendorService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast.success('Vendor deleted successfully');
+      setDeleteModalOpen(false);
+      setDeletingVendor(null);
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Failed to delete vendor');
+    },
+  });
 
-  const pageRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+  const assignStudentsMutation = useMutation({
+    mutationFn: ({ id, studentIds }) => vendorService.assignStudents(id, studentIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast.success('Students assigned successfully');
+      setAssignModalOpen(false);
+      setAssigningVendor(null);
+      setSelectedStudentIds([]);
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Failed to assign students');
+    },
+  });
 
-  const assignmentCandidates = useMemo(() => {
-    const q = assignmentSearch.trim().toLowerCase();
-    return (studentsData || []).filter((student) => {
-      if (!q) return true;
-      const name = studentDisplayName(student).toLowerCase();
-      const reg = String(student.registration_no || student.roll_no || '').toLowerCase();
-      return name.includes(q) || reg.includes(q);
-    });
-  }, [studentsData, assignmentSearch]);
-
-  const vendorTypeOptions = useMemo(() => {
-    const fromRows = rows
-      .map((item) => item.type)
-      .filter(Boolean)
-      .map((value) => ({ value, label: normalizeTypeLabel(value) }));
-
-    const map = new Map();
-    [...VENDOR_TYPE_OPTIONS, ...fromRows].forEach((opt) => {
-      if (!map.has(opt.value)) map.set(opt.value, opt);
-    });
-    return Array.from(map.values());
-  }, [rows]);
-
+  // ─── Handlers ───────────────────────────────────────────────────────────
   const resetForm = () => setForm(EMPTY_FORM);
 
   const openAdd = () => {
@@ -188,11 +218,13 @@ export default function Vendors({ type = 'school' }) {
     setForm({
       name: vendor.name,
       type: vendor.type,
-      phone: vendor.phone,
-      email: vendor.email,
-      address: vendor.address,
+      phone: vendor.phone || '',
+      email: vendor.email || '',
+      address: vendor.address || '',
+      password: '',
       status: vendor.status,
     });
+    setShowPassword(false);
     setFormModalOpen(true);
   };
 
@@ -203,7 +235,7 @@ export default function Vendors({ type = 'school' }) {
 
   const openAssignModal = (vendor) => {
     setAssigningVendor(vendor);
-    setSelectedStudentIds(vendor.assignedStudentIds || []);
+    setSelectedStudentIds(vendor.assigned_student_ids || []);
     setAssignmentSearch('');
     setAssignModalOpen(true);
   };
@@ -211,10 +243,11 @@ export default function Vendors({ type = 'school' }) {
   const closeFormModal = () => {
     setFormModalOpen(false);
     setEditingVendor(null);
+    setShowPassword(false);
     resetForm();
   };
 
-  const saveVendor = (e) => {
+  const onSave = (e) => {
     e.preventDefault();
 
     if (!form.name || !form.type || !form.phone || !form.status) {
@@ -222,72 +255,43 @@ export default function Vendors({ type = 'school' }) {
       return;
     }
 
+    if (!editingVendor && !form.password) {
+      toast.error('Password is required for new vendors');
+      return;
+    }
+
     const payload = {
       name: form.name.trim(),
       type: form.type,
       phone: form.phone.trim(),
-      email: form.email.trim(),
-      address: form.address.trim(),
+      email: form.email?.trim() || '',
+      address: form.address?.trim() || '',
       status: form.status,
     };
 
-    if (editingVendor) {
-      setRows((prev) => prev.map((item) => (item.id === editingVendor.id ? { ...item, ...payload } : item)));
-      toast.success('Vendor updated');
-    } else {
-      const id = `ven-${Date.now()}`;
-      setRows((prev) => [{ id, ...payload, assignedStudentIds: [] }, ...prev]);
-      toast.success('Vendor added');
+    if (form.password) {
+      payload.password = form.password;
     }
 
-    closeFormModal();
+    if (editingVendor) {
+      updateMutation.mutate({ id: editingVendor.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
-  const deleteVendor = () => {
-    if (!deletingVendor) return;
-    setRows((prev) => prev.filter((item) => item.id !== deletingVendor.id));
-    setDeleteModalOpen(false);
-    setDeletingVendor(null);
-    toast.success('Vendor deleted');
+  const onDelete = () => {
+    if (deletingVendor) {
+      deleteMutation.mutate(deletingVendor.id);
+    }
   };
 
   const saveAssignment = () => {
     if (!assigningVendor) return;
-
-    setRows((prev) => prev.map((item) => (
-      item.id === assigningVendor.id
-        ? { ...item, assignedStudentIds: selectedStudentIds }
-        : item
-    )));
-
-    if (viewingVendor?.id === assigningVendor.id) {
-      setViewingVendor((prev) => (prev ? { ...prev, assignedStudentIds: selectedStudentIds } : prev));
-    }
-
-    setAssignModalOpen(false);
-    setAssigningVendor(null);
-    toast.success('Student assignments saved');
-  };
-
-  const removeAssignmentFromVendor = (vendorId, studentId) => {
-    setRows((prev) => prev.map((item) => {
-      if (item.id !== vendorId) return item;
-      return {
-        ...item,
-        assignedStudentIds: (item.assignedStudentIds || []).filter((id) => id !== studentId),
-      };
-    }));
-
-    setViewingVendor((prev) => {
-      if (!prev || prev.id !== vendorId) return prev;
-      return {
-        ...prev,
-        assignedStudentIds: (prev.assignedStudentIds || []).filter((id) => id !== studentId),
-      };
+    assignStudentsMutation.mutate({
+      id: assigningVendor.id,
+      studentIds: selectedStudentIds
     });
-
-    setSelectedStudentIds((prev) => prev.filter((id) => id !== studentId));
-    toast.success('Assignment removed');
   };
 
   const toggleStudent = (studentId) => {
@@ -298,38 +302,42 @@ export default function Vendors({ type = 'school' }) {
     ));
   };
 
+  // ─── Memos ──────────────────────────────────────────────────────────────
+  const filteredStudents = useMemo(() => {
+    const q = assignmentSearch.trim().toLowerCase();
+    return studentsData.filter((student) => {
+      if (!q) return true;
+      const name = studentDisplayName(student).toLowerCase();
+      const regNo = String(student.registration_no || student.roll_no || '').toLowerCase();
+      const classSec = `${student.class_name || ''} ${student.section_name || ''}`.toLowerCase();
+      return name.includes(q) || regNo.includes(q) || classSec.includes(q);
+    });
+  }, [studentsData, assignmentSearch]);
+
+  const assignedStudentsList = useMemo(() => {
+    if (!viewingVendor?.assigned_student_ids?.length) return [];
+    return viewingVendor.assigned_student_ids
+      .map(id => studentsData.find(s => s.id === id))
+      .filter(Boolean);
+  }, [viewingVendor, studentsData]);
+
   const columns = useMemo(() => [
-    { accessorKey: 'name', header: 'Vendor Name', cell: ({ getValue }) => <span className="font-medium">{getValue()}</span> },
+    {
+      accessorKey: 'name',
+      header: 'Vendor Name',
+      cell: ({ getValue }) => <span className="font-medium">{getValue()}</span>
+    },
     {
       accessorKey: 'type',
-      header: 'Vendor Type',
+      header: 'Type',
       cell: ({ getValue }) => {
         const value = getValue();
-        return vendorTypeOptions.find((opt) => opt.value === value)?.label || normalizeTypeLabel(value);
-      },
+        const opt = VENDOR_TYPE_OPTIONS.find(o => o.value === value);
+        return opt?.label || normalizeTypeLabel(value);
+      }
     },
-    { accessorKey: 'phone', header: 'Phone' },
+    { accessorKey: 'phone', header: 'Phone', cell: ({ getValue }) => getValue() || '—' },
     { accessorKey: 'email', header: 'Email', cell: ({ getValue }) => getValue() || '—' },
-    {
-      id: 'assigned_students',
-      header: 'Assigned Students',
-      accessorFn: (row) => row.assignedStudentIds?.length || 0,
-      cell: ({ row }) => {
-        const count = row.original.assignedStudentIds?.length || 0;
-        return (
-          canDo('fees.update') ? (
-            <button
-              className="text-primary text-sm font-medium hover:underline"
-              onClick={() => openAssignModal(row.original)}
-            >
-              {count} student{count === 1 ? '' : 's'}
-            </button>
-          ) : (
-            <span className="text-sm">{count} student{count === 1 ? '' : 's'}</span>
-          )
-        );
-      },
-    },
     {
       accessorKey: 'status',
       header: 'Status',
@@ -337,71 +345,92 @@ export default function Vendors({ type = 'school' }) {
         const value = getValue();
         return (
           <span className={cn(
-            'rounded-full px-2 py-0.5 text-xs font-medium capitalize',
-            value === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700',
+            'rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
+            value === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
           )}>
             {value}
           </span>
         );
-      },
+      }
     },
     {
       id: 'actions',
       header: 'Actions',
       enableHiding: false,
-      cell: ({ row }) => (
-        <div className="flex items-center justify-end gap-1">
-          {canDo('fees.read') && (
-            <button onClick={() => openView(row.original)} className="rounded p-1.5 hover:bg-accent" title="View">
-              <Eye size={14} />
-            </button>
-          )}
-          {canDo('fees.update') && (
-            <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit">
-              <Pencil size={14} />
-            </button>
-          )}
-          {canDo('fees.update') && (
-            <button onClick={() => openAssignModal(row.original)} className="rounded p-1.5 hover:bg-accent" title="Assign Students">
-              <UserPlus size={14} />
-            </button>
-          )}
-          {canDo('fees.delete') && (
-            <button
-              onClick={() => {
-                setDeletingVendor(row.original);
-                setDeleteModalOpen(true);
-              }}
-              className="rounded p-1.5 text-destructive hover:bg-destructive/10"
-              title="Delete"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
-      ),
-    },
-  ], [canDo, vendorTypeOptions]);
+      cell: ({ row }) => {
+        const isTransport = row.original.type === 'transport';
+        const assignCount = row.original.assigned_student_ids?.length || 0;
 
-  if (!canDo('fees.read')) {
+        return (
+          <div className="flex items-center justify-end gap-1">
+            {canDo('vendors.read') && (
+              <button onClick={() => openView(row.original)} className="rounded p-1.5 hover:bg-accent" title="View">
+                <Eye size={14} />
+              </button>
+            )}
+            {canDo('vendors.update') && (
+              <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit">
+                <Pencil size={14} />
+              </button>
+            )}
+            {/* Show "Add Students" button only for Transport vendors */}
+            {canDo('vendors.update') && isTransport && (
+              <button
+                onClick={() => openAssignModal(row.original)}
+                className="rounded p-1.5 hover:bg-accent text-blue-600 hover:text-blue-700 relative"
+                title={`${assignCount} students assigned`}
+              >
+                <Users size={14} />
+                {assignCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold">
+                    {assignCount}
+                  </span>
+                )}
+              </button>
+            )}
+            {canDo('vendors.delete') && (
+              <button
+                onClick={() => {
+                  setDeletingVendor(row.original);
+                  setDeleteModalOpen(true);
+                }}
+                className="rounded p-1.5 text-destructive hover:bg-destructive/10"
+                title="Delete"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        );
+      }
+    },
+  ], [canDo]);
+
+  if (!canDo('vendors.read')) {
     return <div className="py-20 text-center text-muted-foreground">You don't have permission to view vendors.</div>;
   }
 
-  const currentAssignedStudents = useMemo(() => {
-    if (!viewingVendor?.assignedStudentIds?.length) return [];
-    return viewingVendor.assignedStudentIds
-      .map((id) => studentsById[id])
-      .filter(Boolean);
-  }, [viewingVendor, studentsById]);
-
   return (
     <div className="space-y-5">
-      <PageHeader title="Vendors" description={`${total} records`} />
+      <PageHeader
+        title="Vendor Management"
+        description={`Total ${total} vendors`}
+        actions={
+          <button
+            onClick={() => refetchVendors()}
+            disabled={vendorsFetching}
+            className="rounded-md border px-3 py-2 text-sm hover:bg-accent flex items-center gap-1"
+          >
+            <RefreshCw size={14} className={vendorsFetching ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        }
+      />
 
       <DataTable
         columns={columns}
-        data={pageRows}
-        loading={false}
+        data={vendors}
+        loading={vendorsLoading}
         emptyMessage="No vendors found"
         search={search}
         onSearch={(v) => {
@@ -413,25 +442,25 @@ export default function Vendors({ type = 'school' }) {
           {
             name: 'type',
             label: 'Type',
-            value: vendorType,
+            value: vendorTypeFilter,
             onChange: (v) => {
-              setVendorType(v);
+              setVendorTypeFilter(v);
               setPage(1);
             },
-            options: vendorTypeOptions,
+            options: VENDOR_TYPE_OPTIONS,
           },
           {
             name: 'status',
             label: 'Status',
-            value: status,
+            value: statusFilter,
             onChange: (v) => {
-              setStatus(v);
+              setStatusFilter(v);
               setPage(1);
             },
             options: STATUS_OPTIONS,
           },
         ]}
-        action={canDo('fees.create') ? (
+        action={canDo('vendors.create') ? (
           <button
             onClick={openAdd}
             className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
@@ -453,6 +482,7 @@ export default function Vendors({ type = 'school' }) {
         }}
       />
 
+      {/* Add/Edit Vendor Modal */}
       <AppModal
         open={formModalOpen}
         onClose={closeFormModal}
@@ -460,50 +490,120 @@ export default function Vendors({ type = 'school' }) {
         size="lg"
         footer={
           <>
-            <button type="button" onClick={closeFormModal} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">
+            <button
+              type="button"
+              onClick={closeFormModal}
+              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
               Cancel
             </button>
-            <button type="submit" form="vendor-form" className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
-              {editingVendor ? 'Update' : 'Save'}
+            <button
+              type="submit"
+              form="vendor-form"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {(createMutation.isPending || updateMutation.isPending) ? 'Saving...' : (editingVendor ? 'Update' : 'Save')}
             </button>
           </>
         }
       >
-        <form id="vendor-form" onSubmit={saveVendor} className="space-y-4">
+        <form id="vendor-form" onSubmit={onSave} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Vendor Name </label>
-              <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className="input-base" />
+              <label className="text-sm font-medium">Vendor Name *</label>
+              <input
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                className="input-base"
+                placeholder="e.g., School Transport Ltd"
+                required
+              />
             </div>
-            <CreatableSelectField
-              label="Vendor Type "
-              value={form.type}
-              onChange={(value) => setForm((p) => ({ ...p, type: value }))}
-              options={vendorTypeOptions}
-              placeholder="Select or create vendor type"
-              required
-            />
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Vendor Type *</label>
+              <CreatableSelectField
+                value={form.type}
+                onChange={(value) => setForm((p) => ({ ...p, type: value }))}
+                options={VENDOR_TYPE_OPTIONS}
+                placeholder="Select type"
+                required
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Phone Number </label>
-              <input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} className="input-base" />
+              <label className="text-sm font-medium">Phone *</label>
+              <input
+                value={form.phone}
+                onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                className="input-base"
+                placeholder="0300-1234567"
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} className="input-base" />
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                className="input-base"
+                placeholder="vendor@example.com"
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Address</label>
-            <textarea value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} className="input-base min-h-24" />
+            <textarea
+              value={form.address}
+              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+              className="input-base min-h-20"
+              placeholder="Full address..."
+              rows={2}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Password {!editingVendor && '*'}</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                  className="input-base pr-10"
+                  placeholder={editingVendor ? '(Leave blank to keep current)' : 'e.g., 123456'}
+                  required={!editingVendor}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, password: generateRandomPassword() }))}
+                className="rounded-md border px-3 py-2 text-sm hover:bg-accent flex items-center gap-1 whitespace-nowrap"
+                title="Generate 6-digit password"
+              >
+                <Zap size={14} />
+                Generate
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">6 random digits will be generated</p>
           </div>
 
           <SelectField
-            label="Status "
-            name="vendor_status"
+            label="Status *"
+            name="status"
             value={form.status}
             onChange={(value) => setForm((p) => ({ ...p, status: value }))}
             options={STATUS_OPTIONS}
@@ -512,63 +612,207 @@ export default function Vendors({ type = 'school' }) {
         </form>
       </AppModal>
 
+      {/* View Vendor Modal */}
       <AppModal
         open={viewModalOpen}
         onClose={() => {
           setViewModalOpen(false);
           setViewingVendor(null);
         }}
-        title="View Vendor"
+        title="Vendor Details"
         size="lg"
-        footer={<button onClick={() => setViewModalOpen(false)} className="rounded-md border px-4 py-2 text-sm hover:bg-accent">Close</button>}
+        footer={<button className="rounded-md border px-4 py-2 text-sm hover:bg-accent" onClick={() => setViewModalOpen(false)}>Close</button>}
       >
         {viewingVendor && (
-          <div className="space-y-4 text-sm">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div><p className="text-muted-foreground">Vendor Name</p><p className="font-medium">{viewingVendor.name}</p></div>
-              <div><p className="text-muted-foreground">Vendor Type</p><p className="font-medium">{vendorTypeOptions.find((opt) => opt.value === viewingVendor.type)?.label || normalizeTypeLabel(viewingVendor.type)}</p></div>
-              <div><p className="text-muted-foreground">Phone</p><p className="font-medium">{viewingVendor.phone || '—'}</p></div>
-              <div><p className="text-muted-foreground">Email</p><p className="font-medium">{viewingVendor.email || '—'}</p></div>
-              <div><p className="text-muted-foreground">Status</p><p className="font-medium capitalize">{viewingVendor.status}</p></div>
-              <div className="sm:col-span-2"><p className="text-muted-foreground">Address</p><p className="font-medium">{viewingVendor.address || '—'}</p></div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-muted-foreground">Vendor Name</p>
+                <p className="font-medium">{viewingVendor.name}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Type</p>
+                <p className="font-medium">
+                  {VENDOR_TYPE_OPTIONS.find(o => o.value === viewingVendor.type)?.label || normalizeTypeLabel(viewingVendor.type)}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Phone</p>
+                <p className="font-medium">{viewingVendor.phone || '—'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Email</p>
+                <p className="font-medium">{viewingVendor.email || '—'}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-muted-foreground">Address</p>
+                <p className="font-medium">{viewingVendor.address || '—'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Status</p>
+                <span className={cn(
+                  'inline-block rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
+                  viewingVendor.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                )}>
+                  {viewingVendor.status}
+                </span>
+              </div>
             </div>
 
-            <div className="rounded-lg border p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="font-semibold">Assigned Students</p>
-                <button
-                  onClick={() => openAssignModal(viewingVendor)}
-                  className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
-                >
-                  Edit Assignment
-                </button>
-              </div>
-
-              {currentAssignedStudents.length === 0 ? (
-                <p className="text-muted-foreground">No students assigned.</p>
-              ) : (
-                <div className="space-y-2">
-                  {currentAssignedStudents.map((student) => (
-                    <div key={student.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                      <div>
-                        <p className="font-medium">{studentDisplayName(student)}</p>
-                        <p className="text-xs text-muted-foreground">{student.registration_no || student.roll_no || '—'}</p>
-                      </div>
-                      <button
-                        onClick={() => removeAssignmentFromVendor(viewingVendor.id, student.id)}
-                        className="rounded-md border border-destructive/40 px-2.5 py-1 text-xs text-destructive hover:bg-destructive/10"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+            {/* Show Assigned Students for Transport Vendors */}
+            {viewingVendor.type === 'transport' && (
+              <div className="border-t pt-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="font-semibold">Assigned Students</h3>
+                  {canDo('vendors.update') && (
+                    <button
+                      onClick={() => openAssignModal(viewingVendor)}
+                      className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent flex items-center gap-1"
+                    >
+                      <Users size={12} /> Edit
+                    </button>
+                  )}
                 </div>
+
+                <div className="max-h-48 space-y-2 overflow-auto">
+                  {assignedStudentsList.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No students assigned</p>
+                  ) : (
+                    assignedStudentsList.map((student) => (
+                      <div key={student.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                        <div>
+                          <p className="font-medium">{studentDisplayName(student)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {student.registration_no || student.roll_no || '—'} • {student.class_name || 'N/A'} {student.section_name || ''}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </AppModal>
+
+      {/* Assign Students Modal (Transport Vendors Only) */}
+      <AppModal
+        open={assignModalOpen}
+        onClose={() => {
+          setAssignModalOpen(false);
+          setAssigningVendor(null);
+          setSelectedStudentIds([]);
+          setAssignmentSearch('');
+        }}
+        title={`Assign Students to ${assigningVendor?.name}`}
+        size="lg"
+        footer={
+          <>
+            <button
+              onClick={() => {
+                setAssignModalOpen(false);
+                setAssigningVendor(null);
+                setSelectedStudentIds([]);
+                setAssignmentSearch('');
+              }}
+              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              disabled={assignStudentsMutation.isPending}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={saveAssignment}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              disabled={assignStudentsMutation.isPending}
+            >
+              {assignStudentsMutation.isPending ? 'Saving...' : 'Save Assignment'}
+            </button>
+          </>
+        }
+      >
+        {assigningVendor && (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-accent/30 p-3">
+              <p className="text-sm">
+                <strong>Vendor:</strong> {assigningVendor.name}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Search Students</label>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-3 text-muted-foreground" />
+                <input
+                  autoFocus
+                  value={assignmentSearch}
+                  onChange={(e) => setAssignmentSearch(e.target.value)}
+                  placeholder="Type name, roll no, or class section..."
+                  className="input-base pl-9"
+                />
+                {assignmentSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setAssignmentSearch('')}
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="max-h-96 space-y-1 overflow-auto rounded-lg border p-2">
+              {studentsLoading ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Loading students...</p>
+              ) : filteredStudents.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">No students found</p>
+              ) : (
+                filteredStudents.map((student) => {
+                  const isSelected = selectedStudentIds.includes(student.id);
+                  return (
+                    <label
+                      key={student.id}
+                      className={cn(
+                        'flex cursor-pointer items-start gap-3 rounded-md border p-2.5 transition-colors',
+                        isSelected ? 'bg-primary/10 border-primary' : 'hover:bg-accent/50'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={isSelected}
+                        onChange={() => toggleStudent(student.id)}
+                      />
+                      <div className="flex-1 text-sm">
+                        <p className="font-medium">{studentDisplayName(student)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {student.registration_no || student.roll_no || 'No Reg#'} • {student.class_name || 'N/A'} {student.section_name || ''}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg bg-muted p-3 text-sm">
+              <span>Selected: <strong>{selectedStudentIds.length}</strong> student{selectedStudentIds.length !== 1 ? 's' : ''}</span>
+              {selectedStudentIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedStudentIds([])}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Clear All
+                </button>
               )}
             </div>
           </div>
         )}
       </AppModal>
 
+      {/* Delete Vendor Modal */}
       <AppModal
         open={deleteModalOpen}
         onClose={() => {
@@ -585,101 +829,23 @@ export default function Vendors({ type = 'school' }) {
                 setDeletingVendor(null);
               }}
               className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              disabled={deleteMutation.isPending}
             >
               Cancel
             </button>
-            <button onClick={deleteVendor} className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-              Confirm Delete
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-muted-foreground">Are you sure you want to delete this item?</p>
-      </AppModal>
-
-      <AppModal
-        open={assignModalOpen}
-        onClose={() => {
-          setAssignModalOpen(false);
-          setAssigningVendor(null);
-          setSelectedStudentIds([]);
-          setAssignmentSearch('');
-        }}
-        title="Assign Students"
-        size="lg"
-        footer={
-          <>
             <button
-              onClick={() => {
-                setAssignModalOpen(false);
-                setAssigningVendor(null);
-                setSelectedStudentIds([]);
-                setAssignmentSearch('');
-              }}
-              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              onClick={onDelete}
+              className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              disabled={deleteMutation.isPending}
             >
-              Cancel
-            </button>
-            <button onClick={saveAssignment} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
-              Save Assignment
+              {deleteMutation.isPending ? 'Deleting...' : 'Confirm Delete'}
             </button>
           </>
         }
       >
-        {assigningVendor && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
-              <div>
-                <p className="text-muted-foreground">Vendor</p>
-                <p className="font-medium">{assigningVendor.name}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Vendor Type</p>
-                <p className="font-medium">{vendorTypeOptions.find((opt) => opt.value === assigningVendor.type)?.label || normalizeTypeLabel(assigningVendor.type)}</p>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Search Students</label>
-              <input
-                value={assignmentSearch}
-                onChange={(e) => setAssignmentSearch(e.target.value)}
-                placeholder="Type student name or roll no..."
-                className="input-base"
-              />
-            </div>
-
-            <div className="max-h-72 space-y-2 overflow-auto rounded-lg border p-2">
-              {assignmentCandidates.length === 0 ? (
-                <p className="px-2 py-3 text-sm text-muted-foreground">No students found.</p>
-              ) : (
-                assignmentCandidates.map((student) => {
-                  const isChecked = selectedStudentIds.includes(student.id);
-                  return (
-                    <label key={student.id} className="flex cursor-pointer items-start gap-3 rounded-md border p-2 hover:bg-accent/40">
-                      <input
-                        type="checkbox"
-                        className="mt-1"
-                        checked={isChecked}
-                        onChange={() => toggleStudent(student.id)}
-                      />
-                      <div className="text-sm">
-                        <p className="font-medium">{studentDisplayName(student)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {student.registration_no || student.roll_no || '—'}
-                        </p>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-
-            <p className="text-xs font-medium text-muted-foreground">
-              Selected students: {selectedStudentIds.length}
-            </p>
-          </div>
-        )}
+        <p className="text-sm text-muted-foreground">
+          Are you sure you want to delete <strong>{deletingVendor?.name}</strong>? This action cannot be undone.
+        </p>
       </AppModal>
     </div>
   );

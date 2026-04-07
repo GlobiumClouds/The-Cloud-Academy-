@@ -99,6 +99,11 @@ export const PERMISSIONS = {
   NOTICE_READ: 'notice.read',
   NOTICE_UPDATE: 'notice.update',
   NOTICE_DELETE: 'notice.delete',
+  EVENT_CREATE: 'event.create',
+  EVENT_READ: 'event.read',
+  EVENT_UPDATE: 'event.update',
+  EVENT_DELETE: 'event.delete',
+  EVENT_SEND_SMS: 'event.send_sms',
   NOTIFICATION_SEND: 'notification.send',
 
   // Reports
@@ -169,6 +174,7 @@ export const SCHOOL_NAV = [
 
   // ── Communication ─────────────────────────────────────────────────────
   { label: 'Notice Board', href: '/notices', icon: 'Bell', permission: PERMISSIONS.NOTICE_READ, group: 'Communication' },
+  { label: 'Events', href: '/events', icon: 'Calendar', permission: PERMISSIONS.EVENT_READ, group: 'Communication' },
 
   // ── Reports ───────────────────────────────────────────────────────────
   { label: 'Reports', href: '/reports', icon: 'BarChart2', permission: PERMISSIONS.REPORT_STUDENT, group: 'Reports' },
