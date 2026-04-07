@@ -43,7 +43,7 @@ const MONTH_LABELS = Object.fromEntries(
 );
 
 /* ─── Payslip columns ─────────────────────────────────────────── */
-const payslipColumns = (onMarkPaid, canMark) => [
+const payslipColumns = (onMarkPaid, onViewPayslip, canMark) => [
   {
     id: 'employee',
     header: 'Employee',
@@ -95,7 +95,7 @@ const payslipColumns = (onMarkPaid, canMark) => [
     cell: ({ row }) => {
       const p = row.original;
       const extraActions = [];
-      extraActions.push({ label: 'View Payslip', onClick: () => setSelectedPayslip(p), icon: FileText });
+      extraActions.push({ label: 'View Payslip', onClick: () => onViewPayslip(p), icon: FileText });
       if (canMark && p.status === 'generated') {
         extraActions.push({ label: 'Mark as Paid', onClick: () => onMarkPaid(p.id), icon: CheckCircle });
       }
@@ -178,8 +178,19 @@ const gradeColumns = () => [
 export default function PayrollPage() {
   const qc = useQueryClient();
 
-  const canGenerate = useAuthStore((s) => s.canDo(PERMISSIONS.PAYROLL_GENERATE));
-  const canMark     = useAuthStore((s) => s.canDo(PERMISSIONS.PAYROLL_MARK_PAID));
+  const canGenerate = useAuthStore((s) =>
+    s.canDoAny([
+      PERMISSIONS.PAYROLL_GENERATE,
+      'payroll.process',
+      PERMISSIONS.PAYROLL_CREATE,
+    ])
+  );
+  const canMark     = useAuthStore((s) =>
+    s.canDoAny([
+      PERMISSIONS.PAYROLL_UPDATE,
+      'payroll.process',
+    ])
+  );
   const canApprove  = useAuthStore((s) => s.canDo(PERMISSIONS.LEAVE_APPROVE));
   const canCreate   = useAuthStore((s) => s.canDo(PERMISSIONS.PAYROLL_READ));
 
@@ -250,7 +261,11 @@ export default function PayrollPage() {
     onError:   (e) => toast.error(e?.response?.data?.message ?? 'Failed'),
   });
 
-  const psColumns    = payslipColumns((id) => markPaidMutation.mutate(id), canMark);
+  const psColumns    = payslipColumns(
+    (id) => markPaidMutation.mutate(id),
+    (row) => setSelectedPayslip(row),
+    canMark,
+  );
   const lvColumns    = leaveColumns((id) => approveLeaveMutation.mutate(id), (id) => rejectLeaveMutation.mutate(id), canApprove);
   const grColumns    = gradeColumns();
 
