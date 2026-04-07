@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import {
     Plus, Pencil, Trash2, Users, UserCog, Mail, Phone,
     Loader2, RefreshCw, Upload, X, Calendar, Briefcase,
-    GraduationCap, Banknote, MapPin, FileText, Shield
+    GraduationCap, Banknote, MapPin, FileText, Shield, IdCard
 } from 'lucide-react';
 import useAuthStore from '@/store/authStore';
 import { staffService } from '@/services/staffService';
@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DatePickerField, TextareaField } from '../common';
 import { GENDER_OPTIONS, RELATIONSHIP_OPTIONS, BLOOD_GROUP_OPTIONS, RELIGION_OPTIONS, EMPLOYMENT_TYPE_OPTIONS, DOCUMENT_TYPES, STAFF_TYPES, STATUS_OPTS } from '@/constants';
+import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
 
 const MAX_FILE_MB = 10;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
@@ -182,6 +183,12 @@ export default function StaffManagementPage({ instituteType }) {
     const canCreate = canDo('staff.create') || canDo('users.create') || user?.user_type === 'MASTER_ADMIN';
     const canUpdate = canDo('staff.update') || canDo('users.update') || user?.user_type === 'MASTER_ADMIN';
     const canDelete = canDo('staff.delete') || canDo('users.delete') || user?.user_type === 'MASTER_ADMIN';
+
+    const resolveCardRole = (staffMember) => {
+        const typeValue = String(staffMember?.staff_type || '').toLowerCase();
+        if (typeValue.includes('admin')) return 'admin';
+        return 'staff';
+    };
 
     // Fetch staff members
     const { data, isLoading, refetch, isFetching } = useQuery({
@@ -719,11 +726,24 @@ export default function StaffManagementPage({ instituteType }) {
                                 <Trash2 size={13} />
                             </button>
                         )}
+                        {(canDo('staff.read') || canDo('users.read')) && (
+                            <button
+                                onClick={() => generateAndDownloadIdCard({
+                                    role: resolveCardRole(s),
+                                    person: s,
+                                    institute: user?.institute || user?.school || {}
+                                })}
+                                className="rounded p-1.5 hover:bg-accent"
+                                title="Generate ID Card"
+                            >
+                                <IdCard size={13} />
+                            </button>
+                        )}
                     </div>
                 );
             },
         },
-    ], [canUpdate, canDelete]);
+    ], [canUpdate, canDelete, canDo, user]);
 
     // Stats
     const activeCount = staffMembers.filter(s => s.is_active).length;
