@@ -1241,10 +1241,10 @@ export const useTeacherAttendance = () => {
     }
   }, []);
 
-  const getClassAttendance = useCallback(async (classId, date) => {
+  const getClassAttendance = useCallback(async (classId, date, sectionId) => {
     try {
       setLoading(true);
-      const response = await teacherPortalService.getClassAttendance(classId, date);
+      const response = await teacherPortalService.getClassAttendance(classId, date, sectionId);
       return response;
     } catch (error) {
       toast.error('Failed to load attendance');
