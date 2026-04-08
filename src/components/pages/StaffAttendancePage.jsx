@@ -435,6 +435,7 @@ export default function StaffAttendancePage({ type }) {
               value={manualForm.date}
               onChange={(value) => setManualForm((p) => ({ ...p, date: value }))}
               disabled={!!editingAttendanceId}
+              disableFutureDates
               required
             />
 

@@ -226,6 +226,7 @@ const user = useAuthStore((state) => state.user);
                 label="Date"
                 value={filters.date}
                 onChange={(value) => handleFilterChange('date', value)}
+                disableFutureDates
               />
 
               <SelectField
