@@ -968,8 +968,8 @@ export const useTeacherStudents = () => {
   const [attendanceSummary, setAttendanceSummary] = useState(null);
 
   const fetchStudents = useCallback(async (customFilters = {}, page = 1, limit = 10) => {
-    // Merge filters
-    const mergedFilters = { ...filters, ...customFilters };
+    // Use the provided filter set directly
+    const mergedFilters = { ...customFilters };
     
     // Validate - class_id is required
     if (!mergedFilters.class_id) {
@@ -1037,14 +1037,17 @@ export const useTeacherStudents = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   // Update filters and refetch
   const updateFilters = useCallback((newFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
-    // Reset to page 1 when filters change
-    fetchStudents({ ...filters, ...newFilters }, 1, pagination.limit);
-  }, [filters, pagination.limit, fetchStudents]);
+    setFilters((prev) => {
+      const nextFilters = { ...prev, ...newFilters };
+      // Reset to page 1 when filters change
+      fetchStudents(nextFilters, 1, pagination.limit);
+      return nextFilters;
+    });
+  }, [fetchStudents, pagination.limit]);
 
   // Change page
   const changePage = useCallback((newPage) => {
