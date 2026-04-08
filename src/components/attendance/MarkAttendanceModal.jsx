@@ -472,9 +472,9 @@ function BulkScanTab({ terms, instituteId, type }) {
   const submitMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        academic_year_id: filters.academic_year_id,
-        class_id: filters.class_id,
-        section_id: filters.section_id,
+        ...(filters.academic_year_id ? { academic_year_id: filters.academic_year_id } : {}),
+        ...(filters.class_id ? { class_id: filters.class_id } : {}),
+        ...(filters.section_id ? { section_id: filters.section_id } : {}),
         date: filters.date,
         type: scanType,
         skip_existing: true,
@@ -785,9 +785,9 @@ function ClassAttendanceTab({ terms, type, instituteId }) {
         }));
 
       const payload = {
-        academic_year_id: filters.academic_year_id,
-        class_id: filters.class_id,
-        section_id: filters.section_id,
+        ...(filters.academic_year_id ? { academic_year_id: filters.academic_year_id } : {}),
+        ...(filters.class_id ? { class_id: filters.class_id } : {}),
+        ...(filters.section_id ? { section_id: filters.section_id } : {}),
         date: filters.date,
         type: scanType,
         skip_existing: true,

@@ -28,8 +28,10 @@ export default function TeacherSelfAttendancePage() {
   const [isCheckIn, setIsCheckIn] = useState(false);
   const [checkInData, setCheckInData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -67,7 +69,9 @@ export default function TeacherSelfAttendancePage() {
               <p className="text-white/70 text-xs mb-0.5 tracking-wider uppercase font-bold">My Attendance</p>
               <h1 className="text-2xl font-extrabold tracking-tight">Daily Presence & Duty</h1>
               <div className="flex flex-wrap gap-2 mt-2">
-                <Badge className="bg-white/20 text-white border-0 text-xs font-bold">{format(time, "EEEE, dd MMMM")}</Badge>
+                <Badge className="bg-white/20 text-white border-0 text-xs font-bold">
+                  {isMounted ? format(time, "EEEE, dd MMMM") : "Loading date..."}
+                </Badge>
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/30 rounded-full text-[10px] font-bold">
                    <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" /> Live Tracking Active
                 </div>
@@ -78,7 +82,7 @@ export default function TeacherSelfAttendancePage() {
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex flex-col items-center min-w-[180px]">
             <p className="text-[10px] text-white/60 font-black uppercase tracking-widest mb-1">Current Server Time</p>
             <p className="text-3xl font-black text-white font-mono tracking-tighter">
-              {format(time, "hh:mm:ss a")}
+              {isMounted ? format(time, "hh:mm:ss a") : "--:--:--"}
             </p>
           </div>
         </div>

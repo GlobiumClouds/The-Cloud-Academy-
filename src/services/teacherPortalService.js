@@ -103,28 +103,20 @@ export const teacherPortalService = {
    * @param {string} date - Date (YYYY-MM-DD)
    */
   getClassAttendance: (classId, date, sectionId = null) =>
-    withFallback(
-      () =>
-        api
-          .get(`/portal/teacher/attendance/class/${classId}`, {
-            params: { date, section_id: sectionId },
-          })
-          .then((r) => r.data),
-      () => ({ data: DUMMY_ATTENDANCE }),
-    ),
+    api
+      .get(`/portal/teacher/attendance/class/${classId}`, {
+        params: { date, section_id: sectionId },
+      })
+      .then((r) => r.data),
 
   /**
    * Get attendance for a specific student
    * @param {string} studentId - Student ID
    */
   getStudentAttendance: (studentId) =>
-    withFallback(
-      () =>
-        api
-          .get(`/portal/teacher/attendance/student/${studentId}`)
-          .then((r) => r.data),
-      () => ({ data: DUMMY_STUDENT_DETAILS.attendance }),
-    ),
+    api
+      .get(`/portal/teacher/attendance/student/${studentId}`)
+      .then((r) => r.data),
 
   // Attendance
   // getAttendance: (filters = {}) =>
