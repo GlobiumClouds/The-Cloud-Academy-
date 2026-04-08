@@ -24,7 +24,7 @@ import { studentAttendanceService } from '@/services/studentAttendanceService';
 import { classService } from '@/services/classService';
 import { studentService } from '@/services/studentService';
 import { academicYearService } from '@/services/academicYearService';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
