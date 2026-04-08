@@ -757,16 +757,17 @@ function ClassAttendanceTab({ terms, type, instituteId }) {
 
   const students = studentsData || [];
 
+  // Hydrate attendance state when students or existing records change
   useEffect(() => {
-    if (students.length > 0 && existingAttendanceData) {
-      const newState = {};
-      existingAttendanceData.forEach(rec => {
-        if (students.find(s => s.id === rec.student_id)) {
-          newState[rec.student_id] = rec.status;
-        }
-      });
-      setAttendanceState(newState);
-    }
+    if (!existingAttendanceData || !studentsData?.length) return;
+    const newState = {};
+    existingAttendanceData.forEach(rec => {
+      // String comparison to avoid number/string ID mismatch
+      if (studentsData.find(s => String(s.id) === String(rec.student_id))) {
+        newState[rec.student_id] = rec.status;
+      }
+    });
+    setAttendanceState(newState);
   }, [studentsData, existingAttendanceData]);
 
   const markAll = (status) => {

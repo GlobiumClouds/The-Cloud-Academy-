@@ -335,8 +335,12 @@ export default function StaffAttendancePage({ type }) {
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3">
         <label className="text-sm font-medium">Date:</label>
-        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        <DatePickerField
+          value={dateFilter}
+          onChange={(v) => setDateFilter(v || '')}
+          disableFutureDates
+          className="w-48"
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
