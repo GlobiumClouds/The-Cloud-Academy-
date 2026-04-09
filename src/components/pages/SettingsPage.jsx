@@ -1,170 +1,1175 @@
+// // src/app/(dashboard)/settings/page.jsx
 // 'use client';
-// /**
-//  * SettingsPage — Institute configuration & preferences
-//  */
-// import { useState } from 'react';
-// import { useForm } from 'react-hook-form';
-// import { toast } from 'sonner';
-// import { useMutation } from '@tanstack/react-query';
-// import { Settings, Building2, GraduationCap, DollarSign, Bell, Save } from 'lucide-react';
-// import useInstituteConfig from '@/hooks/useInstituteConfig';
-// import useAuthStore from '@/store/authStore';
 
+// import { useState, useEffect } from 'react';
+// import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// import { 
+//   Building2, 
+//   Mail, 
+//   Phone, 
+//   MapPin, 
+//   Globe, 
+//   Calendar, 
+//   Upload, 
+//   Trash2, 
+//   Save,
+//   Settings as SettingsIcon,
+//   Shield,
+//   FileText,
+//   Users,
+//   CreditCard,
+//   Bell,
+//   Palette,
+//   Lock,
+//   Database,
+//   RefreshCw,
+//   CheckCircle,
+//   XCircle,
+//   Camera,
+//   Loader2,
+//   Download,
+//   Facebook,
+//   Instagram,
+//   Twitter,
+//   Linkedin,
+//   Youtube,
+//   Clock,
+//   DollarSign,
+//   Globe as GlobeIcon,
+//   Smartphone,
+//   Eye,
+//   EyeOff,
+//   Moon,
+//   Sun
+// } from 'lucide-react';
+// import { toast } from 'sonner';
+// import Image from 'next/image';
+
+// import useAuthStore from '@/store/authStore';
+// import { settingService } from '@/services/settingService';
+// import PolicyManagement from '@/components/settings/PolicyManagement';
+// import { cn } from '@/lib/utils';
+
+// // Tab configurations
 // const TABS = [
-//   { key: 'general',  label: 'General',      icon: Building2 },
-//   { key: 'academic', label: 'Academic',      icon: GraduationCap },
-//   { key: 'finance',  label: 'Finance',       icon: DollarSign },
-//   { key: 'notifications', label: 'Notifications', icon: Bell },
+//   { id: 'general', label: 'General Settings', icon: Building2 },
+//   { id: 'policies', label: 'Policies', icon: Shield },
+//   { id: 'timings', label: 'Timings & Schedule', icon: Clock },
+//   { id: 'backup', label: 'Backup & Data', icon: Database },
 // ];
 
-// function GeneralTab({ register, errors }) {
-//   return (
-//     <div className="space-y-4">
-//       <h3 className="font-semibold">Institute Information</h3>
-//       <div className="grid grid-cols-2 gap-4">
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Institute Name</label><input {...register('name')} className="input-base" /></div>
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Short Name / Code</label><input {...register('short_name')} className="input-base" /></div>
-//       </div>
-//       <div className="grid grid-cols-2 gap-4">
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Principal / Head</label><input {...register('principal')} className="input-base" /></div>
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Phone</label><input {...register('phone')} className="input-base" /></div>
-//       </div>
-//       <div className="space-y-1.5"><label className="text-sm font-medium">Email</label><input type="email" {...register('email')} className="input-base" /></div>
-//       <div className="space-y-1.5"><label className="text-sm font-medium">Address</label><textarea {...register('address')} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" /></div>
-//       <div className="space-y-1.5"><label className="text-sm font-medium">Website</label><input {...register('website')} className="input-base" placeholder="https://example.com" /></div>
-//     </div>
-//   );
-// }
-
-// function AcademicTab({ register }) {
-//   return (
-//     <div className="space-y-4">
-//       <h3 className="font-semibold">Academic Configuration</h3>
-//       <div className="grid grid-cols-2 gap-4">
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Current Academic Year</label><input {...register('current_year')} className="input-base" placeholder="2025-26" /></div>
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Working Days per Week</label><input type="number" {...register('working_days')} className="input-base" defaultValue={5} /></div>
-//       </div>
-//       <div className="grid grid-cols-2 gap-4">
-//         <div className="space-y-1.5"><label className="text-sm font-medium">School Start Time</label><input type="time" {...register('start_time')} className="input-base" /></div>
-//         <div className="space-y-1.5"><label className="text-sm font-medium">School End Time</label><input type="time" {...register('end_time')} className="input-base" /></div>
-//       </div>
-//       <div className="space-y-1.5"><label className="text-sm font-medium">Attendance Threshold (%)</label><input type="number" {...register('attendance_threshold')} className="input-base" placeholder="75" /></div>
-//       <label className="flex items-center gap-2 cursor-pointer select-none">
-//         <input type="checkbox" {...register('auto_promote')} className="rounded" />
-//         <span className="text-sm">Auto-promote students at year end</span>
-//       </label>
-//     </div>
-//   );
-// }
-
-// function FinanceTab({ register }) {
-//   return (
-//     <div className="space-y-4">
-//       <h3 className="font-semibold">Finance Configuration</h3>
-//       <div className="grid grid-cols-2 gap-4">
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Currency</label><input {...register('currency')} className="input-base" defaultValue="PKR" /></div>
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Fee Due Date (day of month)</label><input type="number" {...register('fee_due_day')} className="input-base" placeholder="10" /></div>
-//       </div>
-//       <div className="grid grid-cols-2 gap-4">
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Late Fee (%)</label><input type="number" {...register('late_fee_pct')} className="input-base" placeholder="5" /></div>
-//         <div className="space-y-1.5"><label className="text-sm font-medium">Discount Policy</label><input {...register('discount_policy')} className="input-base" /></div>
-//       </div>
-//       <label className="flex items-center gap-2 cursor-pointer select-none">
-//         <input type="checkbox" {...register('auto_invoice')} className="rounded" />
-//         <span className="text-sm">Auto-generate monthly invoices</span>
-//       </label>
-//       <label className="flex items-center gap-2 cursor-pointer select-none">
-//         <input type="checkbox" {...register('sms_fee_reminder')} className="rounded" />
-//         <span className="text-sm">Send SMS fee reminders</span>
-//       </label>
-//     </div>
-//   );
-// }
-
-// function NotificationsTab({ register }) {
-//   return (
-//     <div className="space-y-4">
-//       <h3 className="font-semibold">Notification Preferences</h3>
-//       <div className="space-y-3">
-//         {[
-//           { name: 'notify_attendance', label: 'Attendance alerts to parents' },
-//           { name: 'notify_fee_due',    label: 'Fee due date reminders' },
-//           { name: 'notify_results',    label: 'Exam result notifications' },
-//           { name: 'notify_notices',    label: 'New notice announcements' },
-//           { name: 'notify_events',     label: 'Event and holiday reminders' },
-//           { name: 'sms_enabled',       label: 'Enable SMS notifications' },
-//           { name: 'email_enabled',     label: 'Enable email notifications' },
-//           { name: 'push_enabled',      label: 'Enable push notifications (mobile)' },
-//         ].map(({ name, label }) => (
-//           <label key={name} className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 cursor-pointer">
-//             <span className="text-sm font-medium">{label}</span>
-//             <input type="checkbox" {...register(name)} className="rounded" />
-//           </label>
-//         ))}
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default function SettingsPage({ type }) {
-//   const canDo = useAuthStore((s) => s.canDo);
-//   const { terms } = useInstituteConfig();
+// export default function SettingsPage() {
+//   const { user, institute, setInstitute } = useAuthStore();
+//   const queryClient = useQueryClient();
 //   const [activeTab, setActiveTab] = useState('general');
+//   const [uploadingLogo, setUploadingLogo] = useState(false);
+//   const [uploadingFavicon, setUploadingFavicon] = useState(false);
+//   const [resettingSection, setResettingSection] = useState(null);
 
-//   const { register, handleSubmit, formState: { errors } } = useForm({
-//     defaultValues: {
-//       name: '', short_name: '', principal: '', phone: '', email: '', address: '', website: '',
-//       current_year: '2025-26', working_days: 5, start_time: '08:00', end_time: '14:00', attendance_threshold: 75,
-//       currency: 'PKR', fee_due_day: 10, late_fee_pct: 5,
-//       notify_attendance: true, notify_fee_due: true, notify_results: true, sms_enabled: false, email_enabled: true,
-//     },
+//   // ──────────────────────────────────────────────────────────────
+//   // General Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [generalForm, setGeneralForm] = useState({
+//     display_name: '',
+//     tagline: '',
+//     description: '',
+//     email: '',
+//     phone: '',
+//     alternate_phone: '',
+//     whatsapp_number: '',
+//     website: '',
+//     registration_no: '',
+//     established_year: '',
+//     address_line1: '',
+//     address_line2: '',
+//     city: '',
+//     state: '',
+//     country: 'Pakistan',
+//     postal_code: '',
+//     latitude: '',
+//     longitude: '',
+//     facebook_url: '',
+//     instagram_url: '',
+//     twitter_url: '',
+//     linkedin_url: '',
+//     youtube_url: ''
 //   });
 
-//   const save = useMutation({
-//     mutationFn: async (vals) => {
-//       try { const { schoolService } = await import('@/services'); return await schoolService.updateSettings(vals); }
-//       catch { return { data: vals }; }
-//     },
-//     onSuccess: () => toast.success('Settings saved!'),
-//     onError: () => toast.error('Failed to save settings'),
+//   // ──────────────────────────────────────────────────────────────
+//   // Academic Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [academicForm, setAcademicForm] = useState({
+//     session_start_month: 'April',
+//     session_end_month: 'March',
+//     academic_year_start: null,
+//     academic_year_end: null,
+//     grading_system: 'percentage',
+//     gpa_scale: 4.0,
+//     passing_percentage: 33,
+//     default_language: 'en',
+//     timezone: 'Asia/Karachi',
+//     week_start_day: 'Monday',
+//     class_duration_minutes: 45,
+//     break_duration_minutes: 10,
+//     exam_type_default: 'quarterly'
 //   });
 
-//   if (!canDo('settings.view')) return <div className="py-20 text-center text-muted-foreground">Access denied</div>;
+//   // ──────────────────────────────────────────────────────────────
+//   // Timings Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [timingsForm, setTimingsForm] = useState({
+//     working_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+//     start_time: '08:00',
+//     end_time: '14:00',
+//     friday_start_time: '08:00',
+//     friday_end_time: '12:30',
+//     breaks: [
+//       { name: 'Morning Break', start: '10:00', end: '10:15', enabled: true },
+//       { name: 'Lunch Break', start: '12:00', end: '12:45', enabled: true },
+//       { name: 'Afternoon Break', start: null, end: null, enabled: false }
+//     ],
+//     attendance_start_time: '07:30',
+//     attendance_end_time: '09:00',
+//     late_attendance_grace_minutes: 10,
+//     weekly_off_days: ['saturday', 'sunday']
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Finance Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [financeForm, setFinanceForm] = useState({
+//     currency: 'PKR',
+//     currency_symbol: '₨',
+//     tax_rate: 0,
+//     late_fee_percentage: 5,
+//     late_fee_days_after_due: 15,
+//     discount_auto_apply: true,
+//     receipt_prefix: 'INV',
+//     payment_terms_days: 30,
+//     enable_online_payment: false,
+//     online_payment_gateway: null,
+//     bank_account_details: {
+//       bank_name: '',
+//       account_title: '',
+//       account_number: '',
+//       iban: ''
+//     }
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Communication Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [communicationForm, setCommunicationForm] = useState({
+//     welcome_email_enabled: true,
+//     welcome_sms_enabled: false,
+//     attendance_alerts_enabled: true,
+//     fee_reminders_enabled: true,
+//     exam_notifications_enabled: true,
+//     result_published_alerts: true,
+//     event_notifications: true,
+//     parent_portal_access: true,
+//     student_portal_access: true,
+//     teacher_portal_access: true,
+//     sms_gateway: null,
+//     email_signature: '',
+//     notification_frequency: 'daily'
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Appearance Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [appearanceForm, setAppearanceForm] = useState({
+//     primary_color: '#10b981',
+//     secondary_color: '#3b82f6',
+//     accent_color: '#f59e0b',
+//     font_family: 'Inter',
+//     logo_url: '',
+//     logo_public_id: '',
+//     favicon_url: '',
+//     favicon_public_id: '',
+//     login_bg_url: '',
+//     portal_title: '',
+//     custom_css: '',
+//     custom_js: ''
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Security Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [securityForm, setSecurityForm] = useState({
+//     two_factor_auth: false,
+//     password_expiry_days: 90,
+//     session_timeout_minutes: 30,
+//     max_login_attempts: 5,
+//     ip_whitelist: [],
+//     allowed_domains: [],
+//     force_strong_password: true,
+//     mfa_required_for_admins: false
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Modules Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [modulesForm, setModulesForm] = useState({
+//     attendance: { enabled: true, required: true },
+//     exams: { enabled: true, required: false },
+//     assignments: { enabled: true, required: false },
+//     fees: { enabled: true, required: false },
+//     library: { enabled: false, required: false },
+//     transport: { enabled: false, required: false },
+//     hostel: { enabled: false, required: false },
+//     canteen: { enabled: false, required: false },
+//     events: { enabled: true, required: false },
+//     notices: { enabled: true, required: false }
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Footer Form State
+//   // ──────────────────────────────────────────────────────────────
+//   const [footerForm, setFooterForm] = useState({
+//     invoice_footer_text: 'Thank you for your payment',
+//     certificate_footer_text: '',
+//     report_card_header: '',
+//     report_card_footer: '',
+//     terms_and_conditions: ''
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Fetch Settings Data
+//   // ──────────────────────────────────────────────────────────────
+//   const { data: settingsData, isLoading, refetch } = useQuery({
+//     queryKey: ['settings', institute?.id],
+//     queryFn: () => settingService.getSettings(),
+//     enabled: !!institute?.id,
+//     onSuccess: (response) => {
+//       const data = response.data;
+//       if (data) {
+//         // Populate General Form
+//         setGeneralForm({
+//           display_name: data.display_name || data.institute?.name || '',
+//           tagline: data.tagline || '',
+//           description: data.description || '',
+//           email: data.contact_email || data.institute?.email || '',
+//           phone: data.contact_phone || data.institute?.phone || '',
+//           alternate_phone: data.alternate_phone || '',
+//           whatsapp_number: data.whatsapp_number || '',
+//           website: data.website || '',
+//           registration_no: data.registration_no || '',
+//           established_year: data.established_year || '',
+//           address_line1: data.address_line1 || '',
+//           address_line2: data.address_line2 || '',
+//           city: data.city || data.institute?.city || '',
+//           state: data.state || '',
+//           country: data.country || 'Pakistan',
+//           postal_code: data.postal_code || '',
+//           latitude: data.latitude || '',
+//           longitude: data.longitude || '',
+//           facebook_url: data.facebook_url || '',
+//           instagram_url: data.instagram_url || '',
+//           twitter_url: data.twitter_url || '',
+//           linkedin_url: data.linkedin_url || '',
+//           youtube_url: data.youtube_url || ''
+//         });
+
+//         // Populate Academic Form
+//         if (data.academic) {
+//           setAcademicForm(prev => ({ ...prev, ...data.academic }));
+//         }
+
+//         // Populate Timings Form
+//         if (data.timings) {
+//           setTimingsForm(prev => ({ ...prev, ...data.timings }));
+//         }
+
+//         // Populate Finance Form
+//         if (data.finance) {
+//           setFinanceForm(prev => ({ ...prev, ...data.finance }));
+//         }
+
+//         // Populate Communication Form
+//         if (data.communication) {
+//           setCommunicationForm(prev => ({ ...prev, ...data.communication }));
+//         }
+
+//         // Populate Appearance Form
+//         if (data.appearance) {
+//           setAppearanceForm(prev => ({ 
+//             ...prev, 
+//             ...data.appearance,
+//             logo_url: data.appearance.logo_url || data.institute?.logo_url || '',
+//             favicon_url: data.appearance.favicon_url || ''
+//           }));
+//         }
+
+//         // Populate Security Form
+//         if (data.security) {
+//           setSecurityForm(prev => ({ ...prev, ...data.security }));
+//         }
+
+//         // Populate Modules Form
+//         if (data.modules) {
+//           setModulesForm(prev => ({ ...prev, ...data.modules }));
+//         }
+
+//         // Populate Footer Form
+//         if (data.footer) {
+//           setFooterForm(prev => ({ ...prev, ...data.footer }));
+//         }
+//       }
+//     }
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Mutations
+//   // ──────────────────────────────────────────────────────────────
+  
+//   // General Settings Mutation
+//   const updateGeneralMutation = useMutation({
+//     mutationFn: (data) => settingService.updateGeneralSettings(data),
+//     onSuccess: (response) => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('General settings updated successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update general settings');
+//     }
+//   });
+
+//   // Academic Settings Mutation
+//   const updateAcademicMutation = useMutation({
+//     mutationFn: (data) => settingService.updateAcademicSettings(data),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('Academic settings updated successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update academic settings');
+//     }
+//   });
+
+//   // Timings Settings Mutation
+//   const updateTimingsMutation = useMutation({
+//     mutationFn: (data) => settingService.updateTimingsSettings(data),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('Timings updated successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update timings');
+//     }
+//   });
+
+//   // Finance Settings Mutation
+//   const updateFinanceMutation = useMutation({
+//     mutationFn: (data) => settingService.updateFinanceSettings(data),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('Finance settings updated successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update finance settings');
+//     }
+//   });
+
+//   // Communication Settings Mutation
+//   const updateCommunicationMutation = useMutation({
+//     mutationFn: (data) => settingService.updateCommunicationSettings(data),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('Communication settings updated successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update communication settings');
+//     }
+//   });
+
+//   // Appearance Settings Mutation
+//   const updateAppearanceMutation = useMutation({
+//     mutationFn: ({ data, logoFile, faviconFile }) => 
+//       settingService.updateAppearanceSettings(data, logoFile, faviconFile),
+//     onSuccess: (response) => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       if (response.data?.appearance?.logo_url) {
+//         setInstitute({ ...institute, logo_url: response.data.appearance.logo_url });
+//       }
+//       toast.success('Appearance settings updated successfully');
+//       setUploadingLogo(false);
+//       setUploadingFavicon(false);
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update appearance settings');
+//       setUploadingLogo(false);
+//       setUploadingFavicon(false);
+//     }
+//   });
+
+//   // Security Settings Mutation
+//   const updateSecurityMutation = useMutation({
+//     mutationFn: (data) => settingService.updateSecuritySettings(data),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('Security settings updated successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update security settings');
+//     }
+//   });
+
+//   // Modules Settings Mutation
+//   const updateModulesMutation = useMutation({
+//     mutationFn: (data) => settingService.updateModuleSettings(data),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('Module settings updated successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update module settings');
+//     }
+//   });
+
+//   // Footer Settings Mutation
+//   const updateFooterMutation = useMutation({
+//     mutationFn: (data) => settingService.updateFooterSettings(data),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('Footer settings updated successfully');
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to update footer settings');
+//     }
+//   });
+
+//   // Reset Section Mutation
+//   const resetSectionMutation = useMutation({
+//     mutationFn: (section) => settingService.resetSettingsSection(section),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries(['settings', institute?.id]);
+//       toast.success('Section reset to default successfully');
+//       setResettingSection(null);
+//     },
+//     onError: (error) => {
+//       toast.error(error?.response?.data?.message || 'Failed to reset section');
+//       setResettingSection(null);
+//     }
+//   });
+
+//   // ──────────────────────────────────────────────────────────────
+//   // Handlers
+//   // ──────────────────────────────────────────────────────────────
+
+//   const handleGeneralSubmit = (e) => {
+//     e.preventDefault();
+//     updateGeneralMutation.mutate(generalForm);
+//   };
+
+//   const handleAcademicSubmit = (e) => {
+//     e.preventDefault();
+//     updateAcademicMutation.mutate(academicForm);
+//   };
+
+//   const handleTimingsSubmit = (e) => {
+//     e.preventDefault();
+//     updateTimingsMutation.mutate(timingsForm);
+//   };
+
+//   const handleFinanceSubmit = (e) => {
+//     e.preventDefault();
+//     updateFinanceMutation.mutate(financeForm);
+//   };
+
+//   const handleCommunicationSubmit = (e) => {
+//     e.preventDefault();
+//     updateCommunicationMutation.mutate(communicationForm);
+//   };
+
+//   const handleAppearanceSubmit = (e) => {
+//     e.preventDefault();
+//     updateAppearanceMutation.mutate({
+//       data: {
+//         primary_color: appearanceForm.primary_color,
+//         secondary_color: appearanceForm.secondary_color,
+//         accent_color: appearanceForm.accent_color,
+//         font_family: appearanceForm.font_family,
+//         portal_title: appearanceForm.portal_title,
+//         login_bg_url: appearanceForm.login_bg_url,
+//         custom_css: appearanceForm.custom_css,
+//         custom_js: appearanceForm.custom_js
+//       }
+//     });
+//   };
+
+//   const handleSecuritySubmit = (e) => {
+//     e.preventDefault();
+//     updateSecurityMutation.mutate(securityForm);
+//   };
+
+//   const handleModulesSubmit = (e) => {
+//     e.preventDefault();
+//     updateModulesMutation.mutate(modulesForm);
+//   };
+
+//   const handleFooterSubmit = (e) => {
+//     e.preventDefault();
+//     updateFooterMutation.mutate(footerForm);
+//   };
+
+//   const handleLogoUpload = (e) => {
+//     const file = e.target.files?.[0];
+//     if (!file) return;
+
+//     if (!file.type.startsWith('image/')) {
+//       toast.error('Please upload an image file');
+//       return;
+//     }
+
+//     if (file.size > 2 * 1024 * 1024) {
+//       toast.error('Logo size should be less than 2MB');
+//       return;
+//     }
+
+//     setUploadingLogo(true);
+//     updateAppearanceMutation.mutate({
+//       data: appearanceForm,
+//       logoFile: file,
+//       faviconFile: null
+//     });
+//   };
+
+//   const handleFaviconUpload = (e) => {
+//     const file = e.target.files?.[0];
+//     if (!file) return;
+
+//     if (!file.type.startsWith('image/')) {
+//       toast.error('Please upload an image file');
+//       return;
+//     }
+
+//     if (file.size > 500 * 1024) {
+//       toast.error('Favicon size should be less than 500KB');
+//       return;
+//     }
+
+//     setUploadingFavicon(true);
+//     updateAppearanceMutation.mutate({
+//       data: appearanceForm,
+//       logoFile: null,
+//       faviconFile: file
+//     });
+//   };
+
+//   const handleResetSection = (section) => {
+//     if (confirm(`Are you sure you want to reset ${section} settings to default?`)) {
+//       setResettingSection(section);
+//       resetSectionMutation.mutate(section);
+//     }
+//   };
+
+//   // Helper for day selection
+//   const toggleWorkingDay = (day) => {
+//     setTimingsForm(prev => ({
+//       ...prev,
+//       working_days: prev.working_days.includes(day)
+//         ? prev.working_days.filter(d => d !== day)
+//         : [...prev.working_days, day]
+//     }));
+//   };
+
+//   const toggleWeeklyOff = (day) => {
+//     setTimingsForm(prev => ({
+//       ...prev,
+//       weekly_off_days: prev.weekly_off_days.includes(day)
+//         ? prev.weekly_off_days.filter(d => d !== day)
+//         : [...prev.weekly_off_days, day]
+//     }));
+//   };
+
+//   const updateBreak = (index, field, value) => {
+//     const newBreaks = [...timingsForm.breaks];
+//     newBreaks[index] = { ...newBreaks[index], [field]: value };
+//     setTimingsForm(prev => ({ ...prev, breaks: newBreaks }));
+//   };
+
+//   if (isLoading) {
+//     return (
+//       <div className="flex items-center justify-center min-h-[400px]">
+//         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+//       </div>
+//     );
+//   }
 
 //   return (
-//     <div className="space-y-5">
-//       <div className="flex flex-wrap items-center justify-between gap-3">
-//         <div><h1 className="text-xl font-bold">Settings</h1><p className="text-sm text-muted-foreground">Configure your institute preferences</p></div>
-//       </div>
-
-//       <div className="flex flex-col gap-5 lg:flex-row">
-//         {/* Sidebar tabs */}
-//         <nav className="flex flex-row flex-wrap gap-1 lg:flex-col lg:w-48 lg:flex-none">
-//           {TABS.map(({ key, label, icon: Icon }) => (
-//             <button key={key} onClick={() => setActiveTab(key)}
-//               className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activeTab === key ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}>
-//               <Icon size={15} /> {label}
+//     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+//       <div className="container mx-auto px-4 py-8 max-w-7xl">
+//         {/* Header */}
+//         <div className="mb-8 flex justify-between items-center">
+//           <div>
+//             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+//             <p className="text-gray-500 dark:text-gray-400 mt-1">
+//               Manage your institute settings and configurations
+//             </p>
+//           </div>
+//           {activeTab !== 'policies' && (
+//             <button
+//               onClick={() => handleResetSection(activeTab)}
+//               disabled={resettingSection === activeTab}
+//               className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition disabled:opacity-50"
+//             >
+//               {resettingSection === activeTab ? (
+//                 <Loader2 size={16} className="animate-spin" />
+//               ) : (
+//                 <RefreshCw size={16} />
+//               )}
+//               Reset to Default
 //             </button>
-//           ))}
-//         </nav>
+//           )}
+//         </div>
 
-//         {/* Tab content */}
-//         <div className="flex-1">
-//           <form onSubmit={handleSubmit((v) => save.mutate(v))} className="space-y-6">
-//             <div className="rounded-xl border bg-card p-5">
-//               {activeTab === 'general'       && <GeneralTab       register={register} errors={errors} />}
-//               {activeTab === 'academic'      && <AcademicTab      register={register} />}
-//               {activeTab === 'finance'       && <FinanceTab       register={register} />}
-//               {activeTab === 'notifications' && <NotificationsTab register={register} />}
+//         <div className="flex flex-col lg:flex-row gap-8">
+//           {/* Sidebar */}
+//           <div className="lg:w-64 flex-shrink-0">
+//             <div className="sticky top-8 space-y-1">
+//               {TABS.map((tab) => {
+//                 const Icon = tab.icon;
+//                 return (
+//                   <button
+//                     key={tab.id}
+//                     onClick={() => setActiveTab(tab.id)}
+//                     className={cn(
+//                       "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200",
+//                       activeTab === tab.id
+//                         ? "bg-primary text-primary-foreground shadow-md"
+//                         : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+//                     )}
+//                   >
+//                     <Icon size={18} />
+//                     <span className="font-medium">{tab.label}</span>
+//                   </button>
+//                 );
+//               })}
 //             </div>
-//             {canDo('settings.update') && (
-//               <div className="flex justify-end">
-//                 <button type="submit" disabled={save.isPending} className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">
-//                   {save.isPending ? 'Saving…' : <><Save size={14} /> Save Changes</>}
-//                 </button>
+//           </div>
+
+//           {/* Main Content */}
+//           <div className="flex-1">
+            
+//             {/* ==================== GENERAL SETTINGS ==================== */}
+//             {activeTab === 'general' && (
+//               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+//                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20">
+//                   <h2 className="text-xl font-semibold flex items-center gap-2">
+//                     <Building2 size={20} className="text-primary" />
+//                     General Settings
+//                   </h2>
+//                   <p className="text-sm text-gray-500 mt-1">Basic information about your institute</p>
+//                 </div>
+
+//                 <form onSubmit={handleGeneralSubmit} className="p-6 space-y-6">
+//                   {/* Basic Info */}
+//                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//                     <div>
+//                       <label className="block text-sm font-medium mb-1">Institute Name *</label>
+//                       <input
+//                         type="text"
+//                         value={generalForm.display_name}
+//                         onChange={(e) => setGeneralForm({ ...generalForm, display_name: e.target.value })}
+//                         className="input-base w-full"
+//                         required
+//                       />
+//                     </div>
+//                     <div>
+//                       <label className="block text-sm font-medium mb-1">Tagline / Motto</label>
+//                       <input
+//                         type="text"
+//                         value={generalForm.tagline}
+//                         onChange={(e) => setGeneralForm({ ...generalForm, tagline: e.target.value })}
+//                         className="input-base w-full"
+//                         placeholder="Empowering minds, shaping futures"
+//                       />
+//                     </div>
+//                     <div className="md:col-span-2">
+//                       <label className="block text-sm font-medium mb-1">Description</label>
+//                       <textarea
+//                         value={generalForm.description}
+//                         onChange={(e) => setGeneralForm({ ...generalForm, description: e.target.value })}
+//                         className="input-base w-full"
+//                         rows={3}
+//                         placeholder="About your institute..."
+//                       />
+//                     </div>
+//                     <div>
+//                       <label className="block text-sm font-medium mb-1">Registration Number</label>
+//                       <input
+//                         type="text"
+//                         value={generalForm.registration_no}
+//                         onChange={(e) => setGeneralForm({ ...generalForm, registration_no: e.target.value })}
+//                         className="input-base w-full"
+//                       />
+//                     </div>
+//                     <div>
+//                       <label className="block text-sm font-medium mb-1">Established Year</label>
+//                       <input
+//                         type="number"
+//                         value={generalForm.established_year}
+//                         onChange={(e) => setGeneralForm({ ...generalForm, established_year: e.target.value })}
+//                         className="input-base w-full"
+//                         min="1900"
+//                         max={new Date().getFullYear()}
+//                       />
+//                     </div>
+//                   </div>
+
+//                   {/* Contact Information */}
+//                   <div className="border-t pt-6">
+//                     <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+//                       <Phone size={18} />
+//                       Contact Information
+//                     </h3>
+//                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Email</label>
+//                         <input
+//                           type="email"
+//                           value={generalForm.email}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, email: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Phone</label>
+//                         <input
+//                           type="tel"
+//                           value={generalForm.phone}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, phone: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Alternate Phone</label>
+//                         <input
+//                           type="tel"
+//                           value={generalForm.alternate_phone}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, alternate_phone: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">WhatsApp Number</label>
+//                         <input
+//                           type="tel"
+//                           value={generalForm.whatsapp_number}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, whatsapp_number: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Website</label>
+//                         <input
+//                           type="url"
+//                           value={generalForm.website}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, website: e.target.value })}
+//                           className="input-base w-full"
+//                           placeholder="https://..."
+//                         />
+//                       </div>
+//                     </div>
+//                   </div>
+
+//                   {/* Address */}
+//                   <div className="border-t pt-6">
+//                     <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+//                       <MapPin size={18} />
+//                       Address
+//                     </h3>
+//                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//                       <div className="md:col-span-2">
+//                         <label className="block text-sm font-medium mb-1">Address Line 1</label>
+//                         <input
+//                           type="text"
+//                           value={generalForm.address_line1}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, address_line1: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div className="md:col-span-2">
+//                         <label className="block text-sm font-medium mb-1">Address Line 2</label>
+//                         <input
+//                           type="text"
+//                           value={generalForm.address_line2}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, address_line2: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">City</label>
+//                         <input
+//                           type="text"
+//                           value={generalForm.city}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, city: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">State/Province</label>
+//                         <input
+//                           type="text"
+//                           value={generalForm.state}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, state: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Country</label>
+//                         <input
+//                           type="text"
+//                           value={generalForm.country}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, country: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Postal Code</label>
+//                         <input
+//                           type="text"
+//                           value={generalForm.postal_code}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, postal_code: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                     </div>
+//                   </div>
+
+//                   {/* Social Media */}
+//                   <div className="border-t pt-6">
+//                     <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+//                       <Globe size={18} />
+//                       Social Media
+//                     </h3>
+//                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+//                           <Facebook size={16} /> Facebook
+//                         </label>
+//                         <input
+//                           type="url"
+//                           value={generalForm.facebook_url}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, facebook_url: e.target.value })}
+//                           className="input-base w-full"
+//                           placeholder="https://facebook.com/..."
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+//                           <Instagram size={16} /> Instagram
+//                         </label>
+//                         <input
+//                           type="url"
+//                           value={generalForm.instagram_url}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, instagram_url: e.target.value })}
+//                           className="input-base w-full"
+//                           placeholder="https://instagram.com/..."
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+//                           <Twitter size={16} /> Twitter/X
+//                         </label>
+//                         <input
+//                           type="url"
+//                           value={generalForm.twitter_url}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, twitter_url: e.target.value })}
+//                           className="input-base w-full"
+//                           placeholder="https://twitter.com/..."
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+//                           <Linkedin size={16} /> LinkedIn
+//                         </label>
+//                         <input
+//                           type="url"
+//                           value={generalForm.linkedin_url}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, linkedin_url: e.target.value })}
+//                           className="input-base w-full"
+//                           placeholder="https://linkedin.com/..."
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+//                           <Youtube size={16} /> YouTube
+//                         </label>
+//                         <input
+//                           type="url"
+//                           value={generalForm.youtube_url}
+//                           onChange={(e) => setGeneralForm({ ...generalForm, youtube_url: e.target.value })}
+//                           className="input-base w-full"
+//                           placeholder="https://youtube.com/..."
+//                         />
+//                       </div>
+//                     </div>
+//                   </div>
+
+//                   <div className="flex justify-end pt-4">
+//                     <button
+//                       type="submit"
+//                       disabled={updateGeneralMutation.isPending}
+//                       className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
+//                     >
+//                       {updateGeneralMutation.isPending ? (
+//                         <Loader2 size={16} className="animate-spin" />
+//                       ) : (
+//                         <Save size={16} />
+//                       )}
+//                       Save Changes
+//                     </button>
+//                   </div>
+//                 </form>
 //               </div>
 //             )}
-//           </form>
+
+//             {/* ==================== POLICIES TAB ==================== */}
+//             {activeTab === 'policies' && (
+//               <PolicyManagement />
+//             )}
+
+//             {/* ==================== TIMINGS & SCHEDULE ==================== */}
+//             {activeTab === 'timings' && (
+//               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+//                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-cyan-50 to-sky-50 dark:from-cyan-950/20 dark:to-sky-950/20">
+//                   <h2 className="text-xl font-semibold flex items-center gap-2">
+//                     <Clock size={20} className="text-primary" />
+//                     Timings & Schedule
+//                   </h2>
+//                   <p className="text-sm text-gray-500 mt-1">Configure working hours, breaks, and holidays</p>
+//                 </div>
+
+//                 <form onSubmit={handleTimingsSubmit} className="p-6 space-y-6">
+//                   {/* Working Days */}
+//                   <div>
+//                     <label className="block text-sm font-medium mb-3">Working Days</label>
+//                     <div className="flex flex-wrap gap-3">
+//                       {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+//                         <label key={day} className="flex items-center gap-2">
+//                           <input
+//                             type="checkbox"
+//                             checked={timingsForm.working_days.includes(day)}
+//                             onChange={() => toggleWorkingDay(day)}
+//                             className="rounded"
+//                           />
+//                           <span className="capitalize">{day}</span>
+//                         </label>
+//                       ))}
+//                     </div>
+//                   </div>
+
+//                   {/* Working Hours */}
+//                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//                     <div>
+//                       <label className="block text-sm font-medium mb-1">Regular Start Time</label>
+//                       <input
+//                         type="time"
+//                         value={timingsForm.start_time}
+//                         onChange={(e) => setTimingsForm({ ...timingsForm, start_time: e.target.value })}
+//                         className="input-base w-full"
+//                       />
+//                     </div>
+//                     <div>
+//                       <label className="block text-sm font-medium mb-1">Regular End Time</label>
+//                       <input
+//                         type="time"
+//                         value={timingsForm.end_time}
+//                         onChange={(e) => setTimingsForm({ ...timingsForm, end_time: e.target.value })}
+//                         className="input-base w-full"
+//                       />
+//                     </div>
+//                     <div>
+//                       <label className="block text-sm font-medium mb-1">Friday Start Time</label>
+//                       <input
+//                         type="time"
+//                         value={timingsForm.friday_start_time}
+//                         onChange={(e) => setTimingsForm({ ...timingsForm, friday_start_time: e.target.value })}
+//                         className="input-base w-full"
+//                       />
+//                     </div>
+//                     <div>
+//                       <label className="block text-sm font-medium mb-1">Friday End Time</label>
+//                       <input
+//                         type="time"
+//                         value={timingsForm.friday_end_time}
+//                         onChange={(e) => setTimingsForm({ ...timingsForm, friday_end_time: e.target.value })}
+//                         className="input-base w-full"
+//                       />
+//                     </div>
+//                   </div>
+
+//                   {/* Breaks */}
+//                   <div>
+//                     <label className="block text-sm font-medium mb-3">Break Timings</label>
+//                     <div className="space-y-3">
+//                       {timingsForm.breaks.map((breakItem, index) => (
+//                         <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+//                           <label className="flex items-center gap-2 min-w-[100px]">
+//                             <input
+//                               type="checkbox"
+//                               checked={breakItem.enabled}
+//                               onChange={(e) => updateBreak(index, 'enabled', e.target.checked)}
+//                               className="rounded"
+//                             />
+//                             <span className="font-medium">{breakItem.name}</span>
+//                           </label>
+//                           {breakItem.enabled && (
+//                             <>
+//                               <input
+//                                 type="time"
+//                                 value={breakItem.start || ''}
+//                                 onChange={(e) => updateBreak(index, 'start', e.target.value)}
+//                                 className="input-base w-32"
+//                                 placeholder="Start"
+//                               />
+//                               <span>to</span>
+//                               <input
+//                                 type="time"
+//                                 value={breakItem.end || ''}
+//                                 onChange={(e) => updateBreak(index, 'end', e.target.value)}
+//                                 className="input-base w-32"
+//                                 placeholder="End"
+//                               />
+//                             </>
+//                           )}
+//                         </div>
+//                       ))}
+//                     </div>
+//                   </div>
+
+//                   {/* Attendance Window */}
+//                   <div className="border-t pt-6">
+//                     <h3 className="text-lg font-medium mb-4">Attendance Settings</h3>
+//                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Attendance Start Time</label>
+//                         <input
+//                           type="time"
+//                           value={timingsForm.attendance_start_time}
+//                           onChange={(e) => setTimingsForm({ ...timingsForm, attendance_start_time: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Attendance End Time</label>
+//                         <input
+//                           type="time"
+//                           value={timingsForm.attendance_end_time}
+//                           onChange={(e) => setTimingsForm({ ...timingsForm, attendance_end_time: e.target.value })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                       <div>
+//                         <label className="block text-sm font-medium mb-1">Late Grace Period (Minutes)</label>
+//                         <input
+//                           type="number"
+//                           value={timingsForm.late_attendance_grace_minutes}
+//                           onChange={(e) => setTimingsForm({ ...timingsForm, late_attendance_grace_minutes: parseInt(e.target.value) })}
+//                           className="input-base w-full"
+//                         />
+//                       </div>
+//                     </div>
+//                   </div>
+
+//                   {/* Weekly Off Days */}
+//                   <div>
+//                     <label className="block text-sm font-medium mb-3">Weekly Off Days</label>
+//                     <div className="flex flex-wrap gap-3">
+//                       {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+//                         <label key={day} className="flex items-center gap-2">
+//                           <input
+//                             type="checkbox"
+//                             checked={timingsForm.weekly_off_days.includes(day)}
+//                             onChange={() => toggleWeeklyOff(day)}
+//                             className="rounded"
+//                           />
+//                           <span className="capitalize">{day}</span>
+//                         </label>
+//                       ))}
+//                     </div>
+//                   </div>
+
+//                   <div className="flex justify-end pt-4">
+//                     <button
+//                       type="submit"
+//                       disabled={updateTimingsMutation.isPending}
+//                       className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
+//                     >
+//                       {updateTimingsMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+//                       Save Changes
+//                     </button>
+//                   </div>
+//                 </form>
+//               </div>
+//             )}
+
+//             {/* ==================== BACKUP & DATA TAB ==================== */}
+//             {activeTab === 'backup' && (
+//               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+//                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-950/20 dark:to-slate-950/20">
+//                   <h2 className="text-xl font-semibold flex items-center gap-2">
+//                     <Database size={20} className="text-primary" />
+//                     Backup & Data Management
+//                   </h2>
+//                   <p className="text-sm text-gray-500 mt-1">Manage your data backups and exports</p>
+//                 </div>
+
+//                 <div className="p-6 space-y-6">
+//                   <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+//                     <p className="text-sm text-amber-800 dark:text-amber-400">
+//                       <strong>Note:</strong> Backups are automatically created daily. You can also manually create a backup below.
+//                     </p>
+//                   </div>
+
+//                   <div className="flex gap-4">
+//                     <button
+//                       type="button"
+//                       className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition"
+//                     >
+//                       <RefreshCw size={16} />
+//                       Create Backup Now
+//                     </button>
+//                     <button
+//                       type="button"
+//                       className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+//                     >
+//                       <Download size={16} />
+//                       Export All Data
+//                     </button>
+//                   </div>
+
+//                   <div className="mt-6">
+//                     <h3 className="font-medium mb-3">Recent Backups</h3>
+//                     <div className="space-y-2">
+//                       <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+//                         <div className="flex items-center gap-3">
+//                           <CheckCircle size={16} className="text-green-500" />
+//                           <div>
+//                             <p className="text-sm font-medium">Backup_2026-04-07_02-00-01.sql</p>
+//                             <p className="text-xs text-gray-500">Size: 45.2 MB • Type: Full Backup</p>
+//                           </div>
+//                         </div>
+//                         <button className="text-primary hover:underline text-sm">Download</button>
+//                       </div>
+//                       <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+//                         <div className="flex items-center gap-3">
+//                           <CheckCircle size={16} className="text-green-500" />
+//                           <div>
+//                             <p className="text-sm font-medium">Backup_2026-04-06_02-00-01.sql</p>
+//                             <p className="text-xs text-gray-500">Size: 44.8 MB • Type: Full Backup</p>
+//                           </div>
+//                         </div>
+//                         <button className="text-primary hover:underline text-sm">Download</button>
+//                       </div>
+//                     </div>
+//                   </div>
+//                 </div>
+//               </div>
+//             )}
+//           </div>
 //         </div>
 //       </div>
 //     </div>
@@ -173,294 +1178,320 @@
 
 
 
+// src/app/(dashboard)/settings/page.jsx (UPDATED - With Realtime Updates)
 
-
-
-
-
-// src/app/(dashboard)/settings/page.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  Building2, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Globe, 
-  Calendar, 
-  Upload, 
-  Trash2, 
-  Save,
-  Settings as SettingsIcon,
-  Shield,
-  FileText,
-  Users,
-  CreditCard,
-  Bell,
-  Palette,
-  Lock,
-  Database,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  Camera,
-  Loader2,
-  Download
+  Building2, Mail, Phone, MapPin, Globe, Calendar, Upload, Trash2, Save,
+  Settings as SettingsIcon, Shield, CreditCard, Bell, Palette, Lock, Database,
+  RefreshCw, CheckCircle, Loader2, Download, Facebook, Instagram, Twitter,
+  Linkedin, Youtube, Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 
 import useAuthStore from '@/store/authStore';
-import { instituteService } from '@/services/instituteService';
+import { settingService } from '@/services/settingService';
 import PolicyManagement from '@/components/settings/PolicyManagement';
 import { cn } from '@/lib/utils';
 
-// Tab configurations
 const TABS = [
   { id: 'general', label: 'General Settings', icon: Building2 },
   { id: 'policies', label: 'Policies', icon: Shield },
-  { id: 'academic', label: 'Academic Settings', icon: Calendar },
-  { id: 'finance', label: 'Finance Settings', icon: CreditCard },
-  { id: 'communication', label: 'Communication', icon: Bell },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'security', label: 'Security', icon: Lock },
+  { id: 'timings', label: 'Timings & Schedule', icon: Clock },
+  { id: 'modules', label: 'Modules', icon: SettingsIcon },
   { id: 'backup', label: 'Backup & Data', icon: Database },
 ];
 
 export default function SettingsPage() {
-  const { user, institute, setInstitute } = useAuthStore();
+  const { 
+    user, 
+    setInstituteLogo, 
+    setInstituteSettings, 
+    updateSettingSection,
+    setModuleEnabled 
+  } = useAuthStore();
+  
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('general');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [resettingSection, setResettingSection] = useState(null);
 
-  // Form states
+  // ──────────────────────────────────────────────────────────────
+  // Get current settings from store (realtime)
+  // ──────────────────────────────────────────────────────────────
+  const currentSettings = user?.institute?.settings || {};
+  const currentLogo = user?.institute?.logo_url || '';
+  const currentModules = currentSettings.modules || {};
+
+  // Form states with store values
   const [generalForm, setGeneralForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    website: '',
-    registration_no: '',
-    established_year: '',
-    description: ''
+    display_name: user?.institute?.name || '',
+    tagline: currentSettings.tagline || '',
+    description: currentSettings.description || '',
+    email: user?.institute?.email || '',
+    phone: user?.institute?.phone || '',
+    address_line1: currentSettings.address_line1 || '',
+    city: currentSettings.city || user?.institute?.city || '',
+    country: currentSettings.country || 'Pakistan',
+    facebook_url: currentSettings.facebook_url || '',
+    instagram_url: currentSettings.instagram_url || '',
+    twitter_url: currentSettings.twitter_url || '',
+    linkedin_url: currentSettings.linkedin_url || '',
+    youtube_url: currentSettings.youtube_url || ''
   });
 
-  const [academicForm, setAcademicForm] = useState({
-    session_start_month: 'April',
-    session_end_month: 'March',
-    grading_system: 'percentage',
-    default_language: 'en',
-    timezone: 'Asia/Karachi'
+  const [timingsForm, setTimingsForm] = useState(currentSettings.timings || {
+    working_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+    start_time: '08:00',
+    end_time: '14:00',
+    friday_start_time: '08:00',
+    friday_end_time: '12:30',
+    breaks: [
+      { name: 'Morning Break', start: '10:00', end: '10:15', enabled: true },
+      { name: 'Lunch Break', start: '12:00', end: '12:45', enabled: true },
+      { name: 'Afternoon Break', start: null, end: null, enabled: false }
+    ],
+    attendance_start_time: '07:30',
+    attendance_end_time: '09:00',
+    late_attendance_grace_minutes: 10,
+    weekly_off_days: ['saturday', 'sunday']
   });
 
-  const [financeForm, setFinanceForm] = useState({
-    currency: 'PKR',
-    tax_rate: 0,
-    late_fee_percentage: 5,
-    discount_auto_apply: true,
-    receipt_prefix: 'INV',
-    payment_terms_days: 30
+  const [modulesForm, setModulesForm] = useState(currentModules);
+
+  // Update forms when store changes
+  useEffect(() => {
+    setGeneralForm(prev => ({
+      ...prev,
+      display_name: user?.institute?.name || '',
+      tagline: currentSettings.tagline || '',
+      description: currentSettings.description || '',
+      email: user?.institute?.email || '',
+      phone: user?.institute?.phone || '',
+      address_line1: currentSettings.address_line1 || '',
+      city: currentSettings.city || user?.institute?.city || '',
+      country: currentSettings.country || 'Pakistan',
+      facebook_url: currentSettings.facebook_url || '',
+      instagram_url: currentSettings.instagram_url || '',
+      twitter_url: currentSettings.twitter_url || '',
+      linkedin_url: currentSettings.linkedin_url || '',
+      youtube_url: currentSettings.youtube_url || ''
+    }));
+  }, [user?.institute, currentSettings]);
+
+  useEffect(() => {
+    if (currentSettings.timings) {
+      setTimingsForm(currentSettings.timings);
+    }
+  }, [currentSettings.timings]);
+
+  useEffect(() => {
+    setModulesForm(currentModules);
+  }, [currentModules]);
+
+  // ──────────────────────────────────────────────────────────────
+  // Mutations with Store Updates
+  // ──────────────────────────────────────────────────────────────
+  
+  const updateGeneralMutation = useMutation({
+    mutationFn: (data) => settingService.updateGeneralSettings(data),
+    onSuccess: (response) => {
+      const updatedSettings = response.data;
+      // 🔥 Update store with new settings
+      setInstituteSettings({
+        tagline: updatedSettings.tagline,
+        description: updatedSettings.description,
+        address_line1: updatedSettings.address_line1,
+        city: updatedSettings.city,
+        country: updatedSettings.country,
+        facebook_url: updatedSettings.facebook_url,
+        instagram_url: updatedSettings.instagram_url,
+        twitter_url: updatedSettings.twitter_url,
+        linkedin_url: updatedSettings.linkedin_url,
+        youtube_url: updatedSettings.youtube_url
+      });
+      toast.success('General settings updated successfully');
+      queryClient.invalidateQueries(['settings']);
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Failed to update general settings');
+    }
   });
 
-  const [communicationForm, setCommunicationForm] = useState({
-    welcome_email: true,
-    attendance_alerts: true,
-    fee_reminders: true,
-    exam_notifications: true,
-    parent_portal_access: true,
-    sms_enabled: false,
-    email_signature: ''
+  const updateTimingsMutation = useMutation({
+    mutationFn: (data) => settingService.updateTimingsSettings(data),
+    onSuccess: (response) => {
+      // 🔥 Update timings section in store
+      updateSettingSection('timings', response.data.timings);
+      toast.success('Timings updated successfully');
+      queryClient.invalidateQueries(['settings']);
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Failed to update timings');
+    }
   });
 
-  const [appearanceForm, setAppearanceForm] = useState({
-    primary_color: '#10b981',
-    secondary_color: '#3b82f6',
-    logo_url: '',
-    favicon_url: '',
-    portal_title: '',
-    login_bg_url: ''
+  const updateModulesMutation = useMutation({
+    mutationFn: (data) => settingService.updateModuleSettings(data),
+    onSuccess: (response) => {
+      // 🔥 Update modules in store
+      const updatedModules = response.data.modules;
+      Object.keys(updatedModules).forEach(moduleName => {
+        setModuleEnabled(moduleName, updatedModules[moduleName].enabled);
+      });
+      toast.success('Module settings updated successfully');
+      queryClient.invalidateQueries(['settings']);
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || 'Failed to update module settings');
+    }
   });
 
-  const [securityForm, setSecurityForm] = useState({
-    two_factor_auth: false,
-    password_expiry_days: 90,
-    session_timeout_minutes: 30,
-    ip_whitelist: '',
-    max_login_attempts: 5
-  });
-
-  // Fetch institute data
-  const { data: instituteData, isLoading, refetch } = useQuery({
-    queryKey: ['institute', institute?.id],
-    queryFn: () => instituteService.getById(institute?.id),
-    enabled: !!institute?.id,
-    onSuccess: (data) => {
-      // Populate forms with fetched data
-      if (data?.data) {
-        const inst = data.data;
-        setGeneralForm({
-          name: inst.name || '',
-          email: inst.email || '',
-          phone: inst.phone || '',
-          address: inst.address || '',
-          website: inst.website || '',
-          registration_no: inst.registration_no || '',
-          established_year: inst.established_year || '',
-          description: inst.description || ''
-        });
-        setAppearanceForm(prev => ({
-          ...prev,
-          logo_url: inst.logo_url || '',
-          favicon_url: inst.favicon_url || ''
-        }));
-        
-        // Load settings if available
-        if (inst.settings) {
-          setAcademicForm(prev => ({ ...prev, ...inst.settings.academic }));
-          setFinanceForm(prev => ({ ...prev, ...inst.settings.finance }));
-          setCommunicationForm(prev => ({ ...prev, ...inst.settings.communication }));
-          setAppearanceForm(prev => ({ ...prev, ...inst.settings.appearance }));
-          setSecurityForm(prev => ({ ...prev, ...inst.settings.security }));
-        }
+  const updateAppearanceMutation = useMutation({
+    mutationFn: ({ data, logoFile }) => settingService.updateAppearanceSettings(data, logoFile),
+    onSuccess: (response) => {
+      // 🔥 Update logo in store if changed
+      if (response.data.appearance?.logo_url) {
+        setInstituteLogo(response.data.appearance.logo_url);
       }
-    }
-  });
-
-  // Mutations
-  const updateInstituteMutation = useMutation({
-    mutationFn: ({ id, data }) => instituteService.update(id, data),
-    onSuccess: (response) => {
-      setInstitute(response.data);
-      queryClient.invalidateQueries(['institute', institute?.id]);
-      toast.success('Institute settings updated successfully');
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to update settings');
-    }
-  });
-
-  const uploadLogoMutation = useMutation({
-    mutationFn: ({ id, file }) => instituteService.uploadLogo(id, file),
-    onSuccess: (response) => {
-      setAppearanceForm(prev => ({ ...prev, logo_url: response.data.logo_url }));
-      setInstitute({ ...institute, logo_url: response.data.logo_url });
-      queryClient.invalidateQueries(['institute', institute?.id]);
-      toast.success('Logo uploaded successfully');
+      // Update appearance settings
+      updateSettingSection('appearance', response.data.appearance);
+      toast.success('Appearance settings updated successfully');
       setUploadingLogo(false);
+      queryClient.invalidateQueries(['settings']);
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to upload logo');
+      toast.error(error?.response?.data?.message || 'Failed to update appearance');
       setUploadingLogo(false);
     }
   });
 
-  const removeLogoMutation = useMutation({
-    mutationFn: (id) => instituteService.removeLogo(id),
-    onSuccess: () => {
-      setAppearanceForm(prev => ({ ...prev, logo_url: '' }));
-      setInstitute({ ...institute, logo_url: '' });
-      queryClient.invalidateQueries(['institute', institute?.id]);
-      toast.success('Logo removed successfully');
+  const resetSectionMutation = useMutation({
+    mutationFn: (section) => settingService.resetSettingsSection(section),
+    onSuccess: (response) => {
+      // 🔥 Update the reset section in store
+      if (response.data[activeTab]) {
+        updateSettingSection(activeTab, response.data[activeTab]);
+      }
+      toast.success(`${activeTab} settings reset to default`);
+      setResettingSection(null);
+      queryClient.invalidateQueries(['settings']);
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to remove logo');
+      toast.error(error?.response?.data?.message || 'Failed to reset section');
+      setResettingSection(null);
     }
   });
 
+  // ──────────────────────────────────────────────────────────────
   // Handlers
+  // ──────────────────────────────────────────────────────────────
+
   const handleGeneralSubmit = (e) => {
     e.preventDefault();
-    updateInstituteMutation.mutate({
-      id: institute?.id,
-      data: generalForm
-    });
+    updateGeneralMutation.mutate(generalForm);
   };
 
-  const handleAcademicSubmit = (e) => {
+  const handleTimingsSubmit = (e) => {
     e.preventDefault();
-    updateInstituteMutation.mutate({
-      id: institute?.id,
-      data: { settings: { academic: academicForm } }
-    });
+    updateTimingsMutation.mutate(timingsForm);
   };
 
-  const handleFinanceSubmit = (e) => {
+  const handleModulesSubmit = (e) => {
     e.preventDefault();
-    updateInstituteMutation.mutate({
-      id: institute?.id,
-      data: { settings: { finance: financeForm } }
-    });
-  };
-
-  const handleCommunicationSubmit = (e) => {
-    e.preventDefault();
-    updateInstituteMutation.mutate({
-      id: institute?.id,
-      data: { settings: { communication: communicationForm } }
-    });
-  };
-
-  const handleAppearanceSubmit = (e) => {
-    e.preventDefault();
-    updateInstituteMutation.mutate({
-      id: institute?.id,
-      data: { settings: { appearance: appearanceForm } }
-    });
-  };
-
-  const handleSecuritySubmit = (e) => {
-    e.preventDefault();
-    updateInstituteMutation.mutate({
-      id: institute?.id,
-      data: { settings: { security: securityForm } }
-    });
+    updateModulesMutation.mutate(modulesForm);
   };
 
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file');
       return;
     }
-
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast.error('Logo size should be less than 2MB');
       return;
     }
-
     setUploadingLogo(true);
-    uploadLogoMutation.mutate({ id: institute?.id, file });
+    updateAppearanceMutation.mutate({
+      data: {},
+      logoFile: file
+    });
   };
 
-  const handleRemoveLogo = () => {
-    if (confirm('Are you sure you want to remove the logo?')) {
-      removeLogoMutation.mutate(institute?.id);
+  const handleResetSection = (section) => {
+    if (confirm(`Are you sure you want to reset ${section} settings to default?`)) {
+      setResettingSection(section);
+      resetSectionMutation.mutate(section);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const toggleWorkingDay = (day) => {
+    setTimingsForm(prev => ({
+      ...prev,
+      working_days: prev.working_days.includes(day)
+        ? prev.working_days.filter(d => d !== day)
+        : [...prev.working_days, day]
+    }));
+  };
+
+  const toggleWeeklyOff = (day) => {
+    setTimingsForm(prev => ({
+      ...prev,
+      weekly_off_days: prev.weekly_off_days.includes(day)
+        ? prev.weekly_off_days.filter(d => d !== day)
+        : [...prev.weekly_off_days, day]
+    }));
+  };
+
+  const updateBreak = (index, field, value) => {
+    const newBreaks = [...timingsForm.breaks];
+    newBreaks[index] = { ...newBreaks[index], [field]: value };
+    setTimingsForm(prev => ({ ...prev, breaks: newBreaks }));
+  };
+
+  const toggleModule = (moduleName) => {
+    const currentModule = modulesForm[moduleName];
+    if (currentModule?.required) {
+      toast.info(`${moduleName} module is required and cannot be disabled`);
+      return;
+    }
+    setModulesForm(prev => ({
+      ...prev,
+      [moduleName]: { ...prev[moduleName], enabled: !prev[moduleName]?.enabled }
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Manage your institute settings and configurations
-          </p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">
+              Manage your institute settings and configurations
+            </p>
+          </div>
+          {activeTab !== 'policies' && (
+            <button
+              onClick={() => handleResetSection(activeTab)}
+              disabled={resettingSection === activeTab}
+              className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition disabled:opacity-50"
+            >
+              {resettingSection === activeTab ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <RefreshCw size={16} />
+              )}
+              Reset to Default
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
@@ -490,7 +1521,8 @@ export default function SettingsPage() {
 
           {/* Main Content */}
           <div className="flex-1">
-            {/* General Settings Tab */}
+            
+            {/* ==================== GENERAL SETTINGS ==================== */}
             {activeTab === 'general' && (
               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20">
@@ -502,25 +1534,18 @@ export default function SettingsPage() {
                 </div>
 
                 <form onSubmit={handleGeneralSubmit} className="p-6 space-y-6">
-                  {/* Logo Upload */}
+                  {/* Logo Upload - Shows current logo from store */}
                   <div className="flex items-center gap-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                     <div className="relative">
-                      {appearanceForm.logo_url ? (
+                      {currentLogo ? (
                         <div className="relative group">
                           <Image
-                            src={appearanceForm.logo_url}
+                            src={currentLogo}
                             alt="Institute Logo"
                             width={80}
                             height={80}
                             className="rounded-lg object-cover border"
                           />
-                          <button
-                            type="button"
-                            onClick={handleRemoveLogo}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 size={12} />
-                          </button>
                         </div>
                       ) : (
                         <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
@@ -549,19 +1574,30 @@ export default function SettingsPage() {
                       <label className="block text-sm font-medium mb-1">Institute Name *</label>
                       <input
                         type="text"
-                        value={generalForm.name}
-                        onChange={(e) => setGeneralForm({ ...generalForm, name: e.target.value })}
+                        value={generalForm.display_name}
+                        onChange={(e) => setGeneralForm({ ...generalForm, display_name: e.target.value })}
                         className="input-base w-full"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Registration Number</label>
+                      <label className="block text-sm font-medium mb-1">Tagline / Motto</label>
                       <input
                         type="text"
-                        value={generalForm.registration_no}
-                        onChange={(e) => setGeneralForm({ ...generalForm, registration_no: e.target.value })}
+                        value={generalForm.tagline}
+                        onChange={(e) => setGeneralForm({ ...generalForm, tagline: e.target.value })}
                         className="input-base w-full"
+                        placeholder="Empowering minds, shaping futures"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">Description</label>
+                      <textarea
+                        value={generalForm.description}
+                        onChange={(e) => setGeneralForm({ ...generalForm, description: e.target.value })}
+                        className="input-base w-full"
+                        rows={3}
+                        placeholder="About your institute..."
                       />
                     </div>
                     <div>
@@ -583,54 +1619,111 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Website</label>
+                      <label className="block text-sm font-medium mb-1">Address</label>
                       <input
-                        type="url"
-                        value={generalForm.website}
-                        onChange={(e) => setGeneralForm({ ...generalForm, website: e.target.value })}
+                        type="text"
+                        value={generalForm.address_line1}
+                        onChange={(e) => setGeneralForm({ ...generalForm, address_line1: e.target.value })}
                         className="input-base w-full"
-                        placeholder="https://..."
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Established Year</label>
+                      <label className="block text-sm font-medium mb-1">City</label>
                       <input
-                        type="number"
-                        value={generalForm.established_year}
-                        onChange={(e) => setGeneralForm({ ...generalForm, established_year: e.target.value })}
+                        type="text"
+                        value={generalForm.city}
+                        onChange={(e) => setGeneralForm({ ...generalForm, city: e.target.value })}
                         className="input-base w-full"
-                        min="1900"
-                        max={new Date().getFullYear()}
                       />
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1">Address</label>
-                      <textarea
-                        value={generalForm.address}
-                        onChange={(e) => setGeneralForm({ ...generalForm, address: e.target.value })}
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Country</label>
+                      <input
+                        type="text"
+                        value={generalForm.country}
+                        onChange={(e) => setGeneralForm({ ...generalForm, country: e.target.value })}
                         className="input-base w-full"
-                        rows={2}
                       />
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1">Description</label>
-                      <textarea
-                        value={generalForm.description}
-                        onChange={(e) => setGeneralForm({ ...generalForm, description: e.target.value })}
-                        className="input-base w-full"
-                        rows={3}
-                        placeholder="About your institute..."
-                      />
+                  </div>
+
+                  {/* Social Media */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                      <Globe size={18} />
+                      Social Media
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+                          <Facebook size={16} /> Facebook
+                        </label>
+                        <input
+                          type="url"
+                          value={generalForm.facebook_url}
+                          onChange={(e) => setGeneralForm({ ...generalForm, facebook_url: e.target.value })}
+                          className="input-base w-full"
+                          placeholder="https://facebook.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+                          <Instagram size={16} /> Instagram
+                        </label>
+                        <input
+                          type="url"
+                          value={generalForm.instagram_url}
+                          onChange={(e) => setGeneralForm({ ...generalForm, instagram_url: e.target.value })}
+                          className="input-base w-full"
+                          placeholder="https://instagram.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+                          <Twitter size={16} /> Twitter/X
+                        </label>
+                        <input
+                          type="url"
+                          value={generalForm.twitter_url}
+                          onChange={(e) => setGeneralForm({ ...generalForm, twitter_url: e.target.value })}
+                          className="input-base w-full"
+                          placeholder="https://twitter.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+                          <Linkedin size={16} /> LinkedIn
+                        </label>
+                        <input
+                          type="url"
+                          value={generalForm.linkedin_url}
+                          onChange={(e) => setGeneralForm({ ...generalForm, linkedin_url: e.target.value })}
+                          className="input-base w-full"
+                          placeholder="https://linkedin.com/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+                          <Youtube size={16} /> YouTube
+                        </label>
+                        <input
+                          type="url"
+                          value={generalForm.youtube_url}
+                          onChange={(e) => setGeneralForm({ ...generalForm, youtube_url: e.target.value })}
+                          className="input-base w-full"
+                          placeholder="https://youtube.com/..."
+                        />
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex justify-end pt-4">
                     <button
                       type="submit"
-                      disabled={updateInstituteMutation.isPending}
+                      disabled={updateGeneralMutation.isPending}
                       className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
                     >
-                      {updateInstituteMutation.isPending ? (
+                      {updateGeneralMutation.isPending ? (
                         <Loader2 size={16} className="animate-spin" />
                       ) : (
                         <Save size={16} />
@@ -642,400 +1735,177 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Policies Tab */}
-            {activeTab === 'policies' && (
-              <PolicyManagement />
-            )}
+            {/* ==================== POLICIES TAB ==================== */}
+            {activeTab === 'policies' && <PolicyManagement />}
 
-            {/* Academic Settings Tab */}
-            {activeTab === 'academic' && (
+            {/* ==================== TIMINGS & SCHEDULE ==================== */}
+            {activeTab === 'timings' && (
               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-cyan-50 to-sky-50 dark:from-cyan-950/20 dark:to-sky-950/20">
                   <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Calendar size={20} className="text-primary" />
-                    Academic Settings
+                    <Clock size={20} className="text-primary" />
+                    Timings & Schedule
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">Configure academic year and grading preferences</p>
+                  <p className="text-sm text-gray-500 mt-1">Configure working hours, breaks, and holidays</p>
                 </div>
 
-                <form onSubmit={handleAcademicSubmit} className="p-6 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Session Start Month</label>
-                      <select
-                        value={academicForm.session_start_month}
-                        onChange={(e) => setAcademicForm({ ...academicForm, session_start_month: e.target.value })}
-                        className="input-base w-full"
-                      >
-                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
-                          <option key={month} value={month}>{month}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Session End Month</label>
-                      <select
-                        value={academicForm.session_end_month}
-                        onChange={(e) => setAcademicForm({ ...academicForm, session_end_month: e.target.value })}
-                        className="input-base w-full"
-                      >
-                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
-                          <option key={month} value={month}>{month}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Grading System</label>
-                      <select
-                        value={academicForm.grading_system}
-                        onChange={(e) => setAcademicForm({ ...academicForm, grading_system: e.target.value })}
-                        className="input-base w-full"
-                      >
-                        <option value="percentage">Percentage (%)</option>
-                        <option value="gpa">GPA (4.0 Scale)</option>
-                        <option value="letter">Letter Grade (A-F)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Default Language</label>
-                      <select
-                        value={academicForm.default_language}
-                        onChange={(e) => setAcademicForm({ ...academicForm, default_language: e.target.value })}
-                        className="input-base w-full"
-                      >
-                        <option value="en">English</option>
-                        <option value="ur">Urdu</option>
-                        <option value="ar">Arabic</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Time Zone</label>
-                      <select
-                        value={academicForm.timezone}
-                        onChange={(e) => setAcademicForm({ ...academicForm, timezone: e.target.value })}
-                        className="input-base w-full"
-                      >
-                        <option value="Asia/Karachi">Asia/Karachi (PKT)</option>
-                        <option value="Asia/Dubai">Asia/Dubai (GST)</option>
-                        <option value="Asia/Riyadh">Asia/Riyadh (AST)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4">
-                    <button
-                      type="submit"
-                      disabled={updateInstituteMutation.isPending}
-                      className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
-                    >
-                      {updateInstituteMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Finance Settings Tab */}
-            {activeTab === 'finance' && (
-              <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <CreditCard size={20} className="text-primary" />
-                    Finance Settings
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">Configure fee collection and financial preferences</p>
-                </div>
-
-                <form onSubmit={handleFinanceSubmit} className="p-6 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Currency</label>
-                      <select
-                        value={financeForm.currency}
-                        onChange={(e) => setFinanceForm({ ...financeForm, currency: e.target.value })}
-                        className="input-base w-full"
-                      >
-                        <option value="PKR">PKR - Pakistani Rupee</option>
-                        <option value="USD">USD - US Dollar</option>
-                        <option value="GBP">GBP - British Pound</option>
-                        <option value="AED">AED - Dirham</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Tax Rate (%)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={financeForm.tax_rate}
-                        onChange={(e) => setFinanceForm({ ...financeForm, tax_rate: parseFloat(e.target.value) })}
-                        className="input-base w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Late Fee Percentage (%)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={financeForm.late_fee_percentage}
-                        onChange={(e) => setFinanceForm({ ...financeForm, late_fee_percentage: parseFloat(e.target.value) })}
-                        className="input-base w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Payment Terms (Days)</label>
-                      <input
-                        type="number"
-                        value={financeForm.payment_terms_days}
-                        onChange={(e) => setFinanceForm({ ...financeForm, payment_terms_days: parseInt(e.target.value) })}
-                        className="input-base w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Receipt Prefix</label>
-                      <input
-                        type="text"
-                        value={financeForm.receipt_prefix}
-                        onChange={(e) => setFinanceForm({ ...financeForm, receipt_prefix: e.target.value })}
-                        className="input-base w-full"
-                        placeholder="INV"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={financeForm.discount_auto_apply}
-                        onChange={(e) => setFinanceForm({ ...financeForm, discount_auto_apply: e.target.checked })}
-                        className="rounded"
-                      />
-                      Auto-apply discounts based on policy
-                    </label>
-                  </div>
-
-                  <div className="flex justify-end pt-4">
-                    <button
-                      type="submit"
-                      disabled={updateInstituteMutation.isPending}
-                      className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
-                    >
-                      {updateInstituteMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Communication Settings Tab */}
-            {activeTab === 'communication' && (
-              <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Bell size={20} className="text-primary" />
-                    Communication Settings
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">Configure notifications and alerts</p>
-                </div>
-
-                <form onSubmit={handleCommunicationSubmit} className="p-6 space-y-6">
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={communicationForm.welcome_email}
-                        onChange={(e) => setCommunicationForm({ ...communicationForm, welcome_email: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span>Send welcome email to new students</span>
-                    </label>
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={communicationForm.attendance_alerts}
-                        onChange={(e) => setCommunicationForm({ ...communicationForm, attendance_alerts: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span>Send attendance alerts to parents</span>
-                    </label>
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={communicationForm.fee_reminders}
-                        onChange={(e) => setCommunicationForm({ ...communicationForm, fee_reminders: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span>Send fee due reminders</span>
-                    </label>
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={communicationForm.exam_notifications}
-                        onChange={(e) => setCommunicationForm({ ...communicationForm, exam_notifications: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span>Send exam schedule notifications</span>
-                    </label>
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={communicationForm.parent_portal_access}
-                        onChange={(e) => setCommunicationForm({ ...communicationForm, parent_portal_access: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span>Enable parent portal access</span>
-                    </label>
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={communicationForm.sms_enabled}
-                        onChange={(e) => setCommunicationForm({ ...communicationForm, sms_enabled: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span>Enable SMS notifications (additional charges apply)</span>
-                    </label>
-                  </div>
-
+                <form onSubmit={handleTimingsSubmit} className="p-6 space-y-6">
+                  {/* Working Days */}
                   <div>
-                    <label className="block text-sm font-medium mb-1">Email Signature</label>
-                    <textarea
-                      value={communicationForm.email_signature}
-                      onChange={(e) => setCommunicationForm({ ...communicationForm, email_signature: e.target.value })}
-                      className="input-base w-full"
-                      rows={3}
-                      placeholder="Best regards,&#10;Your Institute Name"
-                    />
+                    <label className="block text-sm font-medium mb-3">Working Days</label>
+                    <div className="flex flex-wrap gap-3">
+                      {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                        <label key={day} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={timingsForm.working_days?.includes(day) || false}
+                            onChange={() => toggleWorkingDay(day)}
+                            className="rounded"
+                          />
+                          <span className="capitalize">{day}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="flex justify-end pt-4">
-                    <button
-                      type="submit"
-                      disabled={updateInstituteMutation.isPending}
-                      className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
-                    >
-                      {updateInstituteMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Appearance Settings Tab */}
-            {activeTab === 'appearance' && (
-              <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Palette size={20} className="text-primary" />
-                    Appearance Settings
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">Customize the look and feel of your portal</p>
-                </div>
-
-                <form onSubmit={handleAppearanceSubmit} className="p-6 space-y-6">
+                  {/* Working Hours */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Primary Color</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="color"
-                          value={appearanceForm.primary_color}
-                          onChange={(e) => setAppearanceForm({ ...appearanceForm, primary_color: e.target.value })}
-                          className="w-12 h-10 rounded border cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          value={appearanceForm.primary_color}
-                          onChange={(e) => setAppearanceForm({ ...appearanceForm, primary_color: e.target.value })}
-                          className="input-base flex-1"
-                          placeholder="#10b981"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Secondary Color</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="color"
-                          value={appearanceForm.secondary_color}
-                          onChange={(e) => setAppearanceForm({ ...appearanceForm, secondary_color: e.target.value })}
-                          className="w-12 h-10 rounded border cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          value={appearanceForm.secondary_color}
-                          onChange={(e) => setAppearanceForm({ ...appearanceForm, secondary_color: e.target.value })}
-                          className="input-base flex-1"
-                          placeholder="#3b82f6"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Portal Title</label>
+                      <label className="block text-sm font-medium mb-1">Regular Start Time</label>
                       <input
-                        type="text"
-                        value={appearanceForm.portal_title}
-                        onChange={(e) => setAppearanceForm({ ...appearanceForm, portal_title: e.target.value })}
+                        type="time"
+                        value={timingsForm.start_time || '08:00'}
+                        onChange={(e) => setTimingsForm({ ...timingsForm, start_time: e.target.value })}
                         className="input-base w-full"
-                        placeholder="The Clouds Academy"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Favicon URL</label>
+                      <label className="block text-sm font-medium mb-1">Regular End Time</label>
                       <input
-                        type="url"
-                        value={appearanceForm.favicon_url}
-                        onChange={(e) => setAppearanceForm({ ...appearanceForm, favicon_url: e.target.value })}
+                        type="time"
+                        value={timingsForm.end_time || '14:00'}
+                        onChange={(e) => setTimingsForm({ ...timingsForm, end_time: e.target.value })}
                         className="input-base w-full"
-                        placeholder="https://..."
                       />
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1">Login Page Background URL</label>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Friday Start Time</label>
                       <input
-                        type="url"
-                        value={appearanceForm.login_bg_url}
-                        onChange={(e) => setAppearanceForm({ ...appearanceForm, login_bg_url: e.target.value })}
+                        type="time"
+                        value={timingsForm.friday_start_time || '08:00'}
+                        onChange={(e) => setTimingsForm({ ...timingsForm, friday_start_time: e.target.value })}
                         className="input-base w-full"
-                        placeholder="https://..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Friday End Time</label>
+                      <input
+                        type="time"
+                        value={timingsForm.friday_end_time || '12:30'}
+                        onChange={(e) => setTimingsForm({ ...timingsForm, friday_end_time: e.target.value })}
+                        className="input-base w-full"
                       />
                     </div>
                   </div>
 
-                  {/* Preview Section */}
-                  <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <p className="text-sm font-medium mb-3">Preview</p>
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-16 h-16 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-                        style={{ backgroundColor: appearanceForm.primary_color }}
-                      >
-                        Primary
+                  {/* Breaks */}
+                  <div>
+                    <label className="block text-sm font-medium mb-3">Break Timings</label>
+                    <div className="space-y-3">
+                      {timingsForm.breaks?.map((breakItem, index) => (
+                        <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <label className="flex items-center gap-2 min-w-[100px]">
+                            <input
+                              type="checkbox"
+                              checked={breakItem.enabled || false}
+                              onChange={(e) => updateBreak(index, 'enabled', e.target.checked)}
+                              className="rounded"
+                            />
+                            <span className="font-medium">{breakItem.name}</span>
+                          </label>
+                          {breakItem.enabled && (
+                            <>
+                              <input
+                                type="time"
+                                value={breakItem.start || ''}
+                                onChange={(e) => updateBreak(index, 'start', e.target.value)}
+                                className="input-base w-32"
+                                placeholder="Start"
+                              />
+                              <span>to</span>
+                              <input
+                                type="time"
+                                value={breakItem.end || ''}
+                                onChange={(e) => updateBreak(index, 'end', e.target.value)}
+                                className="input-base w-32"
+                                placeholder="End"
+                              />
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Attendance Window */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium mb-4">Attendance Settings</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Attendance Start Time</label>
+                        <input
+                          type="time"
+                          value={timingsForm.attendance_start_time || '07:30'}
+                          onChange={(e) => setTimingsForm({ ...timingsForm, attendance_start_time: e.target.value })}
+                          className="input-base w-full"
+                        />
                       </div>
-                      <div
-                        className="w-16 h-16 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-                        style={{ backgroundColor: appearanceForm.secondary_color }}
-                      >
-                        Secondary
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Attendance End Time</label>
+                        <input
+                          type="time"
+                          value={timingsForm.attendance_end_time || '09:00'}
+                          onChange={(e) => setTimingsForm({ ...timingsForm, attendance_end_time: e.target.value })}
+                          className="input-base w-full"
+                        />
                       </div>
-                      <button
-                        className="px-4 py-2 rounded-md text-white text-sm"
-                        style={{ backgroundColor: appearanceForm.primary_color }}
-                      >
-                        Button Preview
-                      </button>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Late Grace Period (Minutes)</label>
+                        <input
+                          type="number"
+                          value={timingsForm.late_attendance_grace_minutes || 10}
+                          onChange={(e) => setTimingsForm({ ...timingsForm, late_attendance_grace_minutes: parseInt(e.target.value) })}
+                          className="input-base w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weekly Off Days */}
+                  <div>
+                    <label className="block text-sm font-medium mb-3">Weekly Off Days</label>
+                    <div className="flex flex-wrap gap-3">
+                      {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                        <label key={day} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={timingsForm.weekly_off_days?.includes(day) || false}
+                            onChange={() => toggleWeeklyOff(day)}
+                            className="rounded"
+                          />
+                          <span className="capitalize">{day}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
 
                   <div className="flex justify-end pt-4">
                     <button
                       type="submit"
-                      disabled={updateInstituteMutation.isPending}
+                      disabled={updateTimingsMutation.isPending}
                       className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
                     >
-                      {updateInstituteMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      {updateTimingsMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                       Save Changes
                     </button>
                   </div>
@@ -1043,83 +1913,48 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Security Settings Tab */}
-            {activeTab === 'security' && (
+            {/* ==================== MODULES SETTINGS ==================== */}
+            {activeTab === 'modules' && (
               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20">
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/20 dark:to-violet-950/20">
                   <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Lock size={20} className="text-primary" />
-                    Security Settings
+                    <SettingsIcon size={20} className="text-primary" />
+                    Module Settings
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">Configure security and access controls</p>
+                  <p className="text-sm text-gray-500 mt-1">Enable or disable system modules</p>
                 </div>
 
-                <form onSubmit={handleSecuritySubmit} className="p-6 space-y-6">
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={securityForm.two_factor_auth}
-                        onChange={(e) => setSecurityForm({ ...securityForm, two_factor_auth: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span>Enable Two-Factor Authentication (2FA)</span>
-                    </label>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Password Expiry (Days)</label>
-                      <input
-                        type="number"
-                        value={securityForm.password_expiry_days}
-                        onChange={(e) => setSecurityForm({ ...securityForm, password_expiry_days: parseInt(e.target.value) })}
-                        className="input-base w-full"
-                        min="0"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Set to 0 for no expiry</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Session Timeout (Minutes)</label>
-                      <input
-                        type="number"
-                        value={securityForm.session_timeout_minutes}
-                        onChange={(e) => setSecurityForm({ ...securityForm, session_timeout_minutes: parseInt(e.target.value) })}
-                        className="input-base w-full"
-                        min="5"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Max Login Attempts</label>
-                      <input
-                        type="number"
-                        value={securityForm.max_login_attempts}
-                        onChange={(e) => setSecurityForm({ ...securityForm, max_login_attempts: parseInt(e.target.value) })}
-                        className="input-base w-full"
-                        min="3"
-                        max="10"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1">IP Whitelist (Comma-separated)</label>
-                      <textarea
-                        value={securityForm.ip_whitelist}
-                        onChange={(e) => setSecurityForm({ ...securityForm, ip_whitelist: e.target.value })}
-                        className="input-base w-full"
-                        rows={3}
-                        placeholder="192.168.1.1, 10.0.0.1"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Leave empty to allow all IPs</p>
-                    </div>
+                <form onSubmit={handleModulesSubmit} className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(modulesForm).map(([key, module]) => (
+                      <div key={key} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div>
+                          <p className="font-medium capitalize">{key}</p>
+                          {module?.required && (
+                            <span className="text-xs text-gray-500">Required (cannot be disabled)</span>
+                          )}
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={module?.enabled || false}
+                            disabled={module?.required}
+                            onChange={() => toggleModule(key)}
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                      </div>
+                    ))}
                   </div>
 
                   <div className="flex justify-end pt-4">
                     <button
                       type="submit"
-                      disabled={updateInstituteMutation.isPending}
+                      disabled={updateModulesMutation.isPending}
                       className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
                     >
-                      {updateInstituteMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      {updateModulesMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                       Save Changes
                     </button>
                   </div>
@@ -1127,7 +1962,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Backup & Data Tab */}
+            {/* ==================== BACKUP & DATA TAB ==================== */}
             {activeTab === 'backup' && (
               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-950/20 dark:to-slate-950/20">
@@ -1160,32 +1995,6 @@ export default function SettingsPage() {
                       <Download size={16} />
                       Export All Data
                     </button>
-                  </div>
-
-                  <div className="mt-6">
-                    <h3 className="font-medium mb-3">Recent Backups</h3>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle size={16} className="text-green-500" />
-                          <div>
-                            <p className="text-sm font-medium">Backup_2026-04-07_02-00-01.sql</p>
-                            <p className="text-xs text-gray-500">Size: 45.2 MB • Type: Full Backup</p>
-                          </div>
-                        </div>
-                        <button className="text-primary hover:underline text-sm">Download</button>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle size={16} className="text-green-500" />
-                          <div>
-                            <p className="text-sm font-medium">Backup_2026-04-06_02-00-01.sql</p>
-                            <p className="text-xs text-gray-500">Size: 44.8 MB • Type: Full Backup</p>
-                          </div>
-                        </div>
-                        <button className="text-primary hover:underline text-sm">Download</button>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
