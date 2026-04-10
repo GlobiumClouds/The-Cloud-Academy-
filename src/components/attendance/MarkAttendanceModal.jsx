@@ -89,8 +89,42 @@ function InstantScanTab({ instituteId, type }) {
   const [scanType, setScanType] = useState('regular');
   const [scanDate, setScanDate] = useState(new Date().toISOString().slice(0, 10));
   const [showDetails, setShowDetails] = useState(null);
+  const [scanInput, setScanInput] = useState('');
+  const scanInputRef = useRef(null);
   
   const todayDate = new Date().toISOString().slice(0, 10);
+  
+  // Setup keyboard input listener for HID keyboard scanners
+  useEffect(() => {
+    const handleKeyboardScan = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const value = scanInputRef.current?.value?.trim();
+        
+        if (value) {
+          console.log('⌨️ Keyboard input received:', value);
+          
+          // Try to parse as JSON (for HID keyboard scanners)
+          try {
+            const parsed = JSON.parse(value);
+            handleScan(parsed?.id || parsed);
+          } catch {
+            // Fallback: treat as plain ID
+            handleScan(value);
+          }
+        }
+        
+        setScanInput('');
+        if (scanInputRef.current) scanInputRef.current.value = '';
+      }
+    };
+    
+    const scannerInput = scanInputRef.current;
+    if (scannerInput) {
+      scannerInput.addEventListener('keydown', handleKeyboardScan);
+      return () => scannerInput.removeEventListener('keydown', handleKeyboardScan);
+    }
+  }, []);
 
   const fetchStudentDetails = async (studentId) => {
     try {
@@ -246,6 +280,18 @@ function InstantScanTab({ instituteId, type }) {
           </div>
 
           <div className="rounded-xl overflow-hidden shadow-inner bg-black/5 p-1.5 border border-slate-200 dark:border-slate-700">
+            {/* Hidden input for HID keyboard scanner */}
+            <input
+              ref={scanInputRef}
+              autoFocus
+              type="text"
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+              placeholder="Scanner ready"
+              style={{ opacity: 0, position: 'absolute', pointerEvents: 'none', width: 0, height: 0 }}
+              aria-label="Hidden scanner input for HID keyboard devices"
+            />
+            
             <QRScanner 
               onScan={handleScan} 
               bulkMode={true}

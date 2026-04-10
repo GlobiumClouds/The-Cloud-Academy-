@@ -11,8 +11,10 @@ import { studentAttendanceService, studentService } from '@/services';
 export default function QRScanner({ onScan, bulkMode = false, onScanComplete, instituteId, type = 'school' }) {
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
+  const scanInputRef = useRef(null);
   const cooldownRef = useRef(false);
   const isProcessingRef = useRef(false);
+  const scanBufferRef = useRef('');
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -168,6 +170,7 @@ export default function QRScanner({ onScan, bulkMode = false, onScanComplete, in
             student: studentInfo 
           });
           successSound(studentInfo?.name || 'Student');
+          speak('Attendance Marked', 'success');
           if (onScanComplete) onScanComplete(true, studentId, studentInfo);
         } else {
           setResult({ 
@@ -176,6 +179,7 @@ export default function QRScanner({ onScan, bulkMode = false, onScanComplete, in
             student: studentInfo 
           });
           errorSound('Already in queue');
+          speak('Attendance Already Marked', 'warning');
           if (onScanComplete) onScanComplete(false, studentId, studentInfo);
         }
         return;
@@ -203,8 +207,10 @@ export default function QRScanner({ onScan, bulkMode = false, onScanComplete, in
 
       if (status === 'late') {
         lateSound(studentInfo?.name || 'Student');
+        speak('Attendance Marked Late', 'success');
       } else {
         successSound(studentInfo?.name || 'Student');
+        speak('Attendance Marked', 'success');
       }
 
       if (onScanComplete) onScanComplete(true, studentId, studentInfo);
@@ -223,6 +229,15 @@ export default function QRScanner({ onScan, bulkMode = false, onScanComplete, in
       setError(errorMessage);
       toast.error(errorMessage);
       errorSound(errorMessage);
+      
+      // Text-to-speech for different error types
+      if (errorMessage.toLowerCase().includes('not found')) {
+        speak('Student Not Found', 'error');
+      } else if (errorMessage.toLowerCase().includes('already')) {
+        speak('Attendance Already Marked', 'warning');
+      } else {
+        speak('Scan Failed', 'error');
+      }
       
       if (onScanComplete) onScanComplete(false, null, null, errorMessage);
     } finally {
@@ -245,10 +260,75 @@ export default function QRScanner({ onScan, bulkMode = false, onScanComplete, in
   };
 
   // =========================
+  // ⌨️ KEYBOARD SCANNER INPUT
+  // =========================
+  
+  const handleKeyboardInput = (e) => {
+    const char = e.key;
+    
+    // Enter key = scan complete
+    if (char === 'Enter') {
+      e.preventDefault();
+      const currentValue = scanBufferRef.current.trim();
+      
+      if (currentValue) {
+        console.log('📱 Keyboard scan detected:', currentValue);
+        
+        // Try to parse as JSON (for HID keyboard scanners)
+        try {
+          const parsed = JSON.parse(currentValue);
+          console.log('✅ JSON parsed:', parsed);
+          handleScan(parsed);
+        } catch {
+          // Fallback: treat as plain ID
+          console.log('⚠️ Treating as plain ID:', currentValue);
+          handleScan(currentValue);
+        }
+      }
+      
+      // Clear buffer and input for next scan
+      scanBufferRef.current = '';
+      if (scanInputRef.current) scanInputRef.current.value = '';
+      return;
+    }
+    
+    // Accumulate characters in buffer (except special keys)
+    if (char.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      scanBufferRef.current += char;
+      if (scanInputRef.current) {
+        scanInputRef.current.value = scanBufferRef.current;
+      }
+    }
+    
+    // Backspace support
+    if (char === 'Backspace') {
+      e.preventDefault();
+      scanBufferRef.current = scanBufferRef.current.slice(0, -1);
+      if (scanInputRef.current) {
+        scanInputRef.current.value = scanBufferRef.current;
+      }
+    }
+  };
+
+  // =========================
   // 🚀 START SCANNER
   // =========================
 
+  // Focus input and initialize scanner
   useEffect(() => {
+    // Focus scanner input immediately
+    if (scanInputRef.current) {
+      scanInputRef.current.focus();
+    }
+    
+    // Re-focus after a short delay to ensure it's active
+    const focusTimer = setTimeout(() => {
+      if (scanInputRef.current) {
+        scanInputRef.current.focus();
+      }
+    }, 300);
+
     if (!videoRef.current) return;
 
     let scanner = null;
@@ -279,6 +359,7 @@ export default function QRScanner({ onScan, bulkMode = false, onScanComplete, in
     }
 
     return () => {
+      clearTimeout(focusTimer);
       if (scanner) {
         scanner.stop();
         scanner.destroy();
@@ -293,6 +374,21 @@ export default function QRScanner({ onScan, bulkMode = false, onScanComplete, in
 
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto">
+
+      {/* Visible input for HID keyboard scanner support */}
+      <div className="w-full">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">📱 Scanner Input</label>
+        <input
+          ref={scanInputRef}
+          autoFocus
+          type="text"
+          className="w-full px-4 py-3 rounded-lg border-2 border-emerald-400 focus:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all"
+          placeholder="📱 Scanner ready - QR code or keyboard input"
+          onKeyDown={handleKeyboardInput}
+          onBlur={() => setTimeout(() => scanInputRef.current?.focus(), 100)}
+        />
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">✅ HID Keyboard Scanner will input here automatically</p>
+      </div>
 
       <div className="relative w-full aspect-square rounded-3xl overflow-hidden bg-black border border-white/10">
 
