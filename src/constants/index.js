@@ -158,6 +158,7 @@ export const SCHOOL_NAV = [
   // ── Staff ─────────────────────────────────────────────────────────────
   { label: 'Teachers', href: '/teachers', icon: 'GraduationCap', permission: PERMISSIONS.TEACHER_READ, group: 'Staff' },
   { label: 'Staff Attendance', href: '/staff-attendance', icon: 'CalendarCheck', permission: PERMISSIONS.ATTENDANCE_READ, group: 'Staff' },
+  { label: 'Leave Requests', href: '/leave-requests', icon: 'Calendar', permission: PERMISSIONS.LEAVE_READ, group: 'Staff' },
   { label: 'Payroll', href: '/payroll', icon: 'DollarSign', permission: PERMISSIONS.PAYROLL_READ, group: 'Staff' },
 
   // ── Academics ─────────────────────────────────────────────────────────
