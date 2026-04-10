@@ -101,7 +101,7 @@ const generateMockData = () => {
   const classes = ["Grade 10-A", "Grade 9-B", "Grade 11-Science", "Grade 8-C", "Grade 12-Arts"];
   const statuses = ["Paid", "Overdue", "Partial"];
 
-  return Array.from({ length: 120 }, (_, i) => ({
+  return Array.from({ length: 150 }, (_, i) => ({
     id: i + 1,
     name: names[i % names.length],
     regNo: `REG-2023-${(i + 1).toString().padStart(3, "0")}`,
@@ -115,6 +115,11 @@ const generateMockData = () => {
 const MOCK_TABLE_DATA = generateMockData();
 
 export default function FeeCollectionDummyApp() {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -132,6 +137,8 @@ export default function FeeCollectionDummyApp() {
     const start = (currentPage - 1) * pageSize;
     return filteredData.slice(start, start + pageSize);
   }, [filteredData, currentPage, pageSize]);
+
+  if (!mounted) return null;
 
   const columns = [
     {

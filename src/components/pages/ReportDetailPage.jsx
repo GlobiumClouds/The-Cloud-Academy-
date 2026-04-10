@@ -25,6 +25,7 @@ import SelectField from '@/components/common/SelectField';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import FeeCollectionDummyApp from './FeeCollectionDummyApp';
+import PayrollDummyApp from './PayrollDummyApp';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REPORT TYPE CONFIGS
@@ -88,6 +89,12 @@ const REPORT_CONFIGS = {
       { key: 'status', label: 'Status' },
     ],
     permission: 'reports.exam',
+  },
+  payroll: {
+    title: 'Payroll Report',
+    filters: [],
+    columns: [],
+    permission: 'reports.payroll',
   },
 };
 
@@ -397,7 +404,7 @@ export default function ReportDetailPage({ reportType: propReportType }) {
       
       return null;
     },
-    enabled: !!currentInstitute?.id,
+    enabled: !!currentInstitute?.id && reportType !== 'fee' && reportType !== 'payroll',
   });
 
   // Debug logging (AFTER all hooks are declared)
@@ -477,8 +484,8 @@ export default function ReportDetailPage({ reportType: propReportType }) {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
 
-      {/* Header - Only show if not fee report (fee report has its own premium header) */}
-      {reportType !== 'fee' && (
+      {/* Header - Only show if not fee or payroll report (they have their own premium headers) */}
+      {reportType !== 'fee' && reportType !== 'payroll' && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => router.back()} className="rounded p-1 hover:bg-accent transition-colors">
@@ -503,6 +510,8 @@ export default function ReportDetailPage({ reportType: propReportType }) {
 
       {reportType === 'fee' ? (
         <FeeCollectionDummyApp />
+      ) : reportType === 'payroll' ? (
+        <PayrollDummyApp />
       ) : (
         <>
           {/* Filters */}
