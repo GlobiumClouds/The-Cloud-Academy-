@@ -3,8 +3,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
+import {
   Building2, Mail, Phone, MapPin, Globe, Calendar, Upload, Trash2, Save,
   Settings as SettingsIcon, Shield, CreditCard, Bell, Palette, Lock, Database,
   RefreshCw, CheckCircle, Loader2, Download, Facebook, Instagram, Twitter,
@@ -16,21 +17,39 @@ import Image from 'next/image';
 import useAuthStore from '@/store/authStore';
 import { settingService } from '@/services/settingService';
 import PolicyManagement from '@/components/settings/PolicyManagement';
+
+// Reusable Form Components
+import InputField from '@/components/common/InputField';
+import TextareaField from '@/components/common/TextareaField';
+import SelectField from '@/components/common/SelectField';
+import DatePickerField from '@/components/common/DatePickerField';
+import TimePickerField from '@/components/common/TimePickerField';
+import CheckboxField from '@/components/common/CheckboxField';
+import SwitchField from '@/components/common/SwitchField';
+
 import { cn } from '@/lib/utils';
 
 // Tab configurations
 const TABS = [
   { id: 'general', label: 'General Settings', icon: Building2 },
   { id: 'policies', label: 'Policies', icon: Shield },
-  { id: 'timings', label: 'Timings', icon: Clock },,
-  { id: 'backup', label: 'Backup', icon: Database },
+  { id: 'timings', label: 'Timings', icon: Clock },
+];
+
+const COUNTRY_OPTIONS = [
+  { value: 'Pakistan', label: '🇵🇰 Pakistan' },
+  { value: 'USA', label: '🇺🇸 United States' },
+  { value: 'UK', label: '🇬🇧 United Kingdom' },
+  { value: 'Canada', label: '🇨🇦 Canada' },
+  { value: 'India', label: '🇮🇳 India' },
+  { value: 'UAE', label: '🇦🇪 UAE' },
 ];
 
 export default function SettingsPage() {
-  const { 
+  const {
     user,
     refreshUserData,
-    setInstituteSettings, 
+    setInstituteSettings,
     updateSettingSection,
     setInstituteLogo,
     setInstituteName,
@@ -42,7 +61,7 @@ export default function SettingsPage() {
     communicationSettings,
     moduleSettings
   } = useAuthStore();
-  
+
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('general');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -55,69 +74,17 @@ export default function SettingsPage() {
   const currentModules = moduleSettings();
 
   // =========================================================
-  // Form States
+  // Form Setup with react-hook-form
   // =========================================================
 
-  // General Form
-  const [generalForm, setGeneralForm] = useState({
-    display_name: currentInstituteName,
-    tagline: currentSettings.tagline || '',
-    description: currentSettings.description || '',
-    email: user?.institute?.email || '',
-    phone: user?.institute?.phone || '',
-    address_line1: currentSettings.address_line1 || '',
-    city: currentSettings.city || user?.institute?.city || '',
-    country: currentSettings.country || 'Pakistan',
-    facebook_url: currentSettings.facebook_url || '',
-    instagram_url: currentSettings.instagram_url || '',
-    twitter_url: currentSettings.twitter_url || '',
-    linkedin_url: currentSettings.linkedin_url || '',
-    youtube_url: currentSettings.youtube_url || ''
-  });
-
-  // Academic Form
-  const [academicForm, setAcademicForm] = useState(academicSettings());
-
-  // Timings Form
-  const [timingsForm, setTimingsForm] = useState(timingsSettings());
-
-  // Finance Form
-  const [financeForm, setFinanceForm] = useState(financeSettings());
-
-  // Communication Form
-  const [communicationForm, setCommunicationForm] = useState(communicationSettings());
-
-  // Appearance Form
-  const [appearanceForm, setAppearanceForm] = useState({
-    primary_color: currentSettings.appearance?.primary_color || '#10b981',
-    secondary_color: currentSettings.appearance?.secondary_color || '#3b82f6',
-    accent_color: currentSettings.appearance?.accent_color || '#f59e0b',
-    font_family: currentSettings.appearance?.font_family || 'Inter',
-    portal_title: currentSettings.appearance?.portal_title || '',
-    login_bg_url: currentSettings.appearance?.login_bg_url || '',
-    custom_css: currentSettings.appearance?.custom_css || '',
-    custom_js: currentSettings.appearance?.custom_js || ''
-  });
-
-  // Security Form
-  const [securityForm, setSecurityForm] = useState(currentSettings.security || {
-    two_factor_auth: false,
-    password_expiry_days: 90,
-    session_timeout_minutes: 30,
-    max_login_attempts: 5,
-    ip_whitelist: [],
-    allowed_domains: [],
-    force_strong_password: true,
-    mfa_required_for_admins: false
-  });
-
-  // Modules Form
-  const [modulesForm, setModulesForm] = useState(currentModules);
-
-  // Update forms when store changes
-  useEffect(() => {
-    setGeneralForm(prev => ({
-      ...prev,
+  const {
+    control: generalControl,
+    register: generalRegister,
+    handleSubmit: generalHandleSubmit,
+    reset: generalReset,
+    formState: { errors: generalErrors }
+  } = useForm({
+    defaultValues: {
       display_name: currentInstituteName,
       tagline: currentSettings.tagline || '',
       description: currentSettings.description || '',
@@ -131,28 +98,34 @@ export default function SettingsPage() {
       twitter_url: currentSettings.twitter_url || '',
       linkedin_url: currentSettings.linkedin_url || '',
       youtube_url: currentSettings.youtube_url || ''
-    }));
-  }, [currentInstituteName, currentSettings, user?.institute]);
+    }
+  });
 
+  // State-based forms for others
+  const [timingsForm, setTimingsForm] = useState(timingsSettings());
+
+  // Update forms when store changes
   useEffect(() => {
-    setAcademicForm(academicSettings());
-  }, [academicSettings]);
+    generalReset({
+      display_name: currentInstituteName,
+      tagline: currentSettings.tagline || '',
+      description: currentSettings.description || '',
+      email: user?.institute?.email || '',
+      phone: user?.institute?.phone || '',
+      address_line1: currentSettings.address_line1 || '',
+      city: currentSettings.city || user?.institute?.city || '',
+      country: currentSettings.country || 'Pakistan',
+      facebook_url: currentSettings.facebook_url || '',
+      instagram_url: currentSettings.instagram_url || '',
+      twitter_url: currentSettings.twitter_url || '',
+      linkedin_url: currentSettings.linkedin_url || '',
+      youtube_url: currentSettings.youtube_url || ''
+    });
+  }, [currentInstituteName, currentSettings, user?.institute, generalReset]);
 
   useEffect(() => {
     setTimingsForm(timingsSettings());
   }, [timingsSettings]);
-
-  useEffect(() => {
-    setFinanceForm(financeSettings());
-  }, [financeSettings]);
-
-  useEffect(() => {
-    setCommunicationForm(communicationSettings());
-  }, [communicationSettings]);
-
-  useEffect(() => {
-    setModulesForm(currentModules);
-  }, [currentModules]);
 
   // =========================================================
   // Mutations
@@ -161,10 +134,7 @@ export default function SettingsPage() {
   const updateGeneralMutation = useMutation({
     mutationFn: (data) => settingService.updateGeneralSettings(data),
     onSuccess: async (response) => {
-      // Refresh user data to get updated institute name
       await refreshUserData();
-      
-      // Update store with new settings
       setInstituteSettings({
         tagline: response.data.tagline,
         description: response.data.description,
@@ -177,24 +147,11 @@ export default function SettingsPage() {
         linkedin_url: response.data.linkedin_url,
         youtube_url: response.data.youtube_url
       });
-      
       toast.success('General settings updated successfully');
       queryClient.invalidateQueries(['settings']);
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || 'Failed to update general settings');
-    }
-  });
-
-  const updateAcademicMutation = useMutation({
-    mutationFn: (data) => settingService.updateAcademicSettings(data),
-    onSuccess: (response) => {
-      updateSettingSection('academic', response.data.academic);
-      toast.success('Academic settings updated successfully');
-      queryClient.invalidateQueries(['settings']);
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to update academic settings');
     }
   });
 
@@ -210,83 +167,10 @@ export default function SettingsPage() {
     }
   });
 
-  const updateFinanceMutation = useMutation({
-    mutationFn: (data) => settingService.updateFinanceSettings(data),
-    onSuccess: (response) => {
-      updateSettingSection('finance', response.data.finance);
-      toast.success('Finance settings updated successfully');
-      queryClient.invalidateQueries(['settings']);
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to update finance settings');
-    }
-  });
-
-  const updateCommunicationMutation = useMutation({
-    mutationFn: (data) => settingService.updateCommunicationSettings(data),
-    onSuccess: (response) => {
-      updateSettingSection('communication', response.data.communication);
-      toast.success('Communication settings updated successfully');
-      queryClient.invalidateQueries(['settings']);
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to update communication settings');
-    }
-  });
-
-  const updateAppearanceMutation = useMutation({
-    mutationFn: ({ data, logoFile }) => settingService.updateAppearanceSettings(data, logoFile),
-    onSuccess: async (response) => {
-      // Refresh user data to get updated logo
-      await refreshUserData();
-      
-      if (response.data.appearance?.logo_url) {
-        setInstituteLogo(response.data.appearance.logo_url);
-      }
-      updateSettingSection('appearance', response.data.appearance);
-      toast.success('Appearance settings updated successfully');
-      setUploadingLogo(false);
-      queryClient.invalidateQueries(['settings']);
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to update appearance');
-      setUploadingLogo(false);
-    }
-  });
-
-  const updateSecurityMutation = useMutation({
-    mutationFn: (data) => settingService.updateSecuritySettings(data),
-    onSuccess: (response) => {
-      updateSettingSection('security', response.data.security);
-      toast.success('Security settings updated successfully');
-      queryClient.invalidateQueries(['settings']);
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to update security settings');
-    }
-  });
-
-  const updateModulesMutation = useMutation({
-    mutationFn: (data) => settingService.updateModuleSettings(data),
-    onSuccess: (response) => {
-      const updatedModules = response.data.modules;
-      Object.keys(updatedModules).forEach(moduleName => {
-        setModuleEnabled(moduleName, updatedModules[moduleName].enabled);
-      });
-      toast.success('Module settings updated successfully');
-      queryClient.invalidateQueries(['settings']);
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || 'Failed to update module settings');
-    }
-  });
-
   const resetSectionMutation = useMutation({
     mutationFn: (section) => settingService.resetSettingsSection(section),
     onSuccess: async (response) => {
-      // Refresh user data to get latest settings
       await refreshUserData();
-      
       if (response.data[activeTab]) {
         updateSettingSection(activeTab, response.data[activeTab]);
       }
@@ -304,47 +188,13 @@ export default function SettingsPage() {
   // Handlers
   // =========================================================
 
-  const handleGeneralSubmit = (e) => {
-    e.preventDefault();
-    updateGeneralMutation.mutate(generalForm);
-  };
-
-  const handleAcademicSubmit = (e) => {
-    e.preventDefault();
-    updateAcademicMutation.mutate(academicForm);
-  };
+  const handleGeneralSubmit = generalHandleSubmit((data) => {
+    updateGeneralMutation.mutate(data);
+  });
 
   const handleTimingsSubmit = (e) => {
     e.preventDefault();
     updateTimingsMutation.mutate(timingsForm);
-  };
-
-  const handleFinanceSubmit = (e) => {
-    e.preventDefault();
-    updateFinanceMutation.mutate(financeForm);
-  };
-
-  const handleCommunicationSubmit = (e) => {
-    e.preventDefault();
-    updateCommunicationMutation.mutate(communicationForm);
-  };
-
-  const handleAppearanceSubmit = (e) => {
-    e.preventDefault();
-    updateAppearanceMutation.mutate({
-      data: appearanceForm,
-      logoFile: null
-    });
-  };
-
-  const handleSecuritySubmit = (e) => {
-    e.preventDefault();
-    updateSecurityMutation.mutate(securityForm);
-  };
-
-  const handleModulesSubmit = (e) => {
-    e.preventDefault();
-    updateModulesMutation.mutate(modulesForm);
   };
 
   const handleLogoUpload = (e) => {
@@ -359,10 +209,8 @@ export default function SettingsPage() {
       return;
     }
     setUploadingLogo(true);
-    updateAppearanceMutation.mutate({
-      data: appearanceForm,
-      logoFile: file
-    });
+    // TODO: Implement logo upload mutation
+    setUploadingLogo(false);
   };
 
   const handleResetSection = (section) => {
@@ -394,18 +242,6 @@ export default function SettingsPage() {
     const newBreaks = [...(timingsForm.breaks || [])];
     newBreaks[index] = { ...newBreaks[index], [field]: value };
     setTimingsForm(prev => ({ ...prev, breaks: newBreaks }));
-  };
-
-  const toggleModule = (moduleName) => {
-    const currentModule = modulesForm[moduleName];
-    if (currentModule?.required) {
-      toast.info(`${moduleName} module is required and cannot be disabled`);
-      return;
-    }
-    setModulesForm(prev => ({
-      ...prev,
-      [moduleName]: { ...prev[moduleName], enabled: !prev[moduleName]?.enabled }
-    }));
   };
 
   // =========================================================
@@ -466,7 +302,7 @@ export default function SettingsPage() {
 
           {/* Main Content */}
           <div className="flex-1">
-            
+
             {/* ==================== GENERAL SETTINGS ==================== */}
             {activeTab === 'general' && (
               <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -483,15 +319,13 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                     <div className="relative">
                       {currentLogo ? (
-                        <div className="relative group">
-                          <Image
-                            src={currentLogo}
-                            alt="Institute Logo"
-                            width={80}
-                            height={80}
-                            className="rounded-lg object-cover border"
-                          />
-                        </div>
+                        <Image
+                          src={currentLogo}
+                          alt="Institute Logo"
+                          width={80}
+                          height={80}
+                          className="rounded-lg object-cover border"
+                        />
                       ) : (
                         <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                           <Building2 size={32} className="text-gray-400" />
@@ -515,81 +349,83 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Institute Name *</label>
-                      <input
-                        type="text"
-                        value={generalForm.display_name}
-                        onChange={(e) => setGeneralForm({ ...generalForm, display_name: e.target.value })}
-                        className="input-base w-full"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Tagline / Motto</label>
-                      <input
-                        type="text"
-                        value={generalForm.tagline}
-                        onChange={(e) => setGeneralForm({ ...generalForm, tagline: e.target.value })}
-                        className="input-base w-full"
-                        placeholder="Empowering minds, shaping futures"
-                      />
-                    </div>
+                    {/* Institute Name - InputField */}
+                    <InputField
+                      label="Institute Name"
+                      name="display_name"
+                      register={generalRegister}
+                      error={generalErrors.display_name}
+                      placeholder="e.g. ABC School"
+                      required
+                    />
+
+                    {/* Tagline - InputField */}
+                    <InputField
+                      label="Tagline / Motto"
+                      name="tagline"
+                      register={generalRegister}
+                      error={generalErrors.tagline}
+                      placeholder="Empowering minds, shaping futures"
+                    />
+
+                    {/* Description - TextareaField */}
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-1">Description</label>
-                      <textarea
-                        value={generalForm.description}
-                        onChange={(e) => setGeneralForm({ ...generalForm, description: e.target.value })}
-                        className="input-base w-full"
-                        rows={3}
+                      <TextareaField
+                        label="Description"
+                        name="description"
+                        register={generalRegister}
+                        error={generalErrors.description}
                         placeholder="About your institute..."
+                        rows={3}
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={generalForm.email}
-                        onChange={(e) => setGeneralForm({ ...generalForm, email: e.target.value })}
-                        className="input-base w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        value={generalForm.phone}
-                        onChange={(e) => setGeneralForm({ ...generalForm, phone: e.target.value })}
-                        className="input-base w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Address</label>
-                      <input
-                        type="text"
-                        value={generalForm.address_line1}
-                        onChange={(e) => setGeneralForm({ ...generalForm, address_line1: e.target.value })}
-                        className="input-base w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">City</label>
-                      <input
-                        type="text"
-                        value={generalForm.city}
-                        onChange={(e) => setGeneralForm({ ...generalForm, city: e.target.value })}
-                        className="input-base w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Country</label>
-                      <input
-                        type="text"
-                        value={generalForm.country}
-                        onChange={(e) => setGeneralForm({ ...generalForm, country: e.target.value })}
-                        className="input-base w-full"
-                      />
-                    </div>
+
+                    {/* Email - InputField */}
+                    <InputField
+                      label="Email"
+                      name="email"
+                      register={generalRegister}
+                      error={generalErrors.email}
+                      type="email"
+                      placeholder="contact@institute.com"
+                    />
+
+                    {/* Phone - InputField */}
+                    <InputField
+                      label="Phone"
+                      name="phone"
+                      register={generalRegister}
+                      error={generalErrors.phone}
+                      type="tel"
+                      placeholder="+92-300-1234567"
+                    />
+
+                    {/* Address - InputField */}
+                    <InputField
+                      label="Address"
+                      name="address_line1"
+                      register={generalRegister}
+                      error={generalErrors.address_line1}
+                      placeholder="Street address"
+                    />
+
+                    {/* City - InputField */}
+                    <InputField
+                      label="City"
+                      name="city"
+                      register={generalRegister}
+                      error={generalErrors.city}
+                      placeholder="e.g. Karachi"
+                    />
+
+                    {/* Country - SelectField */}
+                    <SelectField
+                      label="Country"
+                      name="country"
+                      control={generalControl}
+                      options={COUNTRY_OPTIONS}
+                      placeholder="Select country"
+                    />
                   </div>
 
                   {/* Social Media */}
@@ -599,66 +435,55 @@ export default function SettingsPage() {
                       Social Media
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
-                          <Facebook size={16} /> Facebook
-                        </label>
-                        <input
-                          type="url"
-                          value={generalForm.facebook_url}
-                          onChange={(e) => setGeneralForm({ ...generalForm, facebook_url: e.target.value })}
-                          className="input-base w-full"
-                          placeholder="https://facebook.com/..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
-                          <Instagram size={16} /> Instagram
-                        </label>
-                        <input
-                          type="url"
-                          value={generalForm.instagram_url}
-                          onChange={(e) => setGeneralForm({ ...generalForm, instagram_url: e.target.value })}
-                          className="input-base w-full"
-                          placeholder="https://instagram.com/..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
-                          <Twitter size={16} /> Twitter/X
-                        </label>
-                        <input
-                          type="url"
-                          value={generalForm.twitter_url}
-                          onChange={(e) => setGeneralForm({ ...generalForm, twitter_url: e.target.value })}
-                          className="input-base w-full"
-                          placeholder="https://twitter.com/..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
-                          <Linkedin size={16} /> LinkedIn
-                        </label>
-                        <input
-                          type="url"
-                          value={generalForm.linkedin_url}
-                          onChange={(e) => setGeneralForm({ ...generalForm, linkedin_url: e.target.value })}
-                          className="input-base w-full"
-                          placeholder="https://linkedin.com/..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center gap-2">
-                          <Youtube size={16} /> YouTube
-                        </label>
-                        <input
-                          type="url"
-                          value={generalForm.youtube_url}
-                          onChange={(e) => setGeneralForm({ ...generalForm, youtube_url: e.target.value })}
-                          className="input-base w-full"
-                          placeholder="https://youtube.com/..."
-                        />
-                      </div>
+                      {/* Facebook - InputField */}
+                      <InputField
+                        label="Facebook"
+                        name="facebook_url"
+                        register={generalRegister}
+                        error={generalErrors.facebook_url}
+                        type="url"
+                        placeholder="https://facebook.com/..."
+                      />
+
+                      {/* Instagram - InputField */}
+                      <InputField
+                        label="Instagram"
+                        name="instagram_url"
+                        register={generalRegister}
+                        error={generalErrors.instagram_url}
+                        type="url"
+                        placeholder="https://instagram.com/..."
+                      />
+
+                      {/* Twitter - InputField */}
+                      <InputField
+                        label="Twitter/X"
+                        name="twitter_url"
+                        register={generalRegister}
+                        error={generalErrors.twitter_url}
+                        type="url"
+                        placeholder="https://twitter.com/..."
+                      />
+
+                      {/* LinkedIn - InputField */}
+                      <InputField
+                        label="LinkedIn"
+                        name="linkedin_url"
+                        register={generalRegister}
+                        error={generalErrors.linkedin_url}
+                        type="url"
+                        placeholder="https://linkedin.com/..."
+                      />
+
+                      {/* YouTube - InputField */}
+                      <InputField
+                        label="YouTube"
+                        name="youtube_url"
+                        register={generalRegister}
+                        error={generalErrors.youtube_url}
+                        type="url"
+                        placeholder="https://youtube.com/..."
+                      />
                     </div>
                   </div>
 
@@ -700,65 +525,61 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium mb-3">Working Days</label>
                     <div className="flex flex-wrap gap-3">
                       {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
-                        <label key={day} className="flex items-center gap-2">
+                        <label key={day} className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-100">
                           <input
                             type="checkbox"
                             checked={timingsForm.working_days?.includes(day) || false}
                             onChange={() => toggleWorkingDay(day)}
                             className="rounded"
                           />
-                          <span className="capitalize">{day}</span>
+                          <span className="capitalize font-medium text-sm">{day}</span>
                         </label>
                       ))}
                     </div>
                   </div>
 
-                  {/* Working Hours */}
+                  {/* Working Hours - Using TimePickerField */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Regular Start Time</label>
-                      <input
-                        type="time"
+                      <label className="block text-sm font-medium mb-2">Regular Start Time</label>
+                      <TimePickerField
                         value={timingsForm.start_time || '08:00'}
-                        onChange={(e) => setTimingsForm({ ...timingsForm, start_time: e.target.value })}
-                        className="input-base w-full"
+                        onChange={(value) => setTimingsForm({ ...timingsForm, start_time: value })}
+                        placeholder="Select start time"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Regular End Time</label>
-                      <input
-                        type="time"
+                      <label className="block text-sm font-medium mb-2">Regular End Time</label>
+                      <TimePickerField
                         value={timingsForm.end_time || '14:00'}
-                        onChange={(e) => setTimingsForm({ ...timingsForm, end_time: e.target.value })}
-                        className="input-base w-full"
+                        onChange={(value) => setTimingsForm({ ...timingsForm, end_time: value })}
+                        placeholder="Select end time"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Friday Start Time</label>
-                      <input
-                        type="time"
+                      <label className="block text-sm font-medium mb-2">Friday Start Time</label>
+                      <TimePickerField
                         value={timingsForm.friday_start_time || '08:00'}
-                        onChange={(e) => setTimingsForm({ ...timingsForm, friday_start_time: e.target.value })}
-                        className="input-base w-full"
+                        onChange={(value) => setTimingsForm({ ...timingsForm, friday_start_time: value })}
+                        placeholder="Select start time"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Friday End Time</label>
-                      <input
-                        type="time"
+                      <label className="block text-sm font-medium mb-2">Friday End Time</label>
+                      <TimePickerField
                         value={timingsForm.friday_end_time || '12:30'}
-                        onChange={(e) => setTimingsForm({ ...timingsForm, friday_end_time: e.target.value })}
-                        className="input-base w-full"
+                        onChange={(value) => setTimingsForm({ ...timingsForm, friday_end_time: value })}
+                        placeholder="Select end time"
                       />
                     </div>
                   </div>
 
-                  {/* Breaks */}
+                  {/* Breaks - Using TimePickerField */}
                   <div>
                     <label className="block text-sm font-medium mb-3">Break Timings</label>
                     <div className="space-y-3">
                       {(timingsForm.breaks || []).map((breakItem, index) => (
-                        <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                           <label className="flex items-center gap-2 min-w-[100px]">
                             <input
                               type="checkbox"
@@ -766,23 +587,19 @@ export default function SettingsPage() {
                               onChange={(e) => updateBreak(index, 'enabled', e.target.checked)}
                               className="rounded"
                             />
-                            <span className="font-medium">{breakItem.name}</span>
+                            <span className="font-medium text-sm">{breakItem.name}</span>
                           </label>
                           {breakItem.enabled && (
                             <>
-                              <input
-                                type="time"
+                              <TimePickerField
                                 value={breakItem.start || ''}
-                                onChange={(e) => updateBreak(index, 'start', e.target.value)}
-                                className="input-base w-32"
+                                onChange={(value) => updateBreak(index, 'start', value)}
                                 placeholder="Start"
                               />
-                              <span>to</span>
-                              <input
-                                type="time"
+                              <span className="text-gray-500">to</span>
+                              <TimePickerField
                                 value={breakItem.end || ''}
-                                onChange={(e) => updateBreak(index, 'end', e.target.value)}
-                                className="input-base w-32"
+                                onChange={(value) => updateBreak(index, 'end', value)}
                                 placeholder="End"
                               />
                             </>
@@ -792,35 +609,35 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Attendance Window */}
+                  {/* Attendance Window - Using TimePickerField */}
                   <div className="border-t pt-6">
                     <h3 className="text-lg font-medium mb-4">Attendance Settings</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
-                        <label className="block text-sm font-medium mb-1">Attendance Start Time</label>
-                        <input
-                          type="time"
+                        <label className="block text-sm font-medium mb-2">Attendance Start Time</label>
+                        <TimePickerField
                           value={timingsForm.attendance_start_time || '07:30'}
-                          onChange={(e) => setTimingsForm({ ...timingsForm, attendance_start_time: e.target.value })}
-                          className="input-base w-full"
+                          onChange={(value) => setTimingsForm({ ...timingsForm, attendance_start_time: value })}
+                          placeholder="Select time"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-1">Attendance End Time</label>
-                        <input
-                          type="time"
+                        <label className="block text-sm font-medium mb-2">Attendance End Time</label>
+                        <TimePickerField
                           value={timingsForm.attendance_end_time || '09:00'}
-                          onChange={(e) => setTimingsForm({ ...timingsForm, attendance_end_time: e.target.value })}
-                          className="input-base w-full"
+                          onChange={(value) => setTimingsForm({ ...timingsForm, attendance_end_time: value })}
+                          placeholder="Select time"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-1">Late Grace Period (Minutes)</label>
-                        <input
+                        <InputField
+                          label="Late Grace Period (Minutes)"
+                          name="grace_minutes"
                           type="number"
-                          value={timingsForm.late_attendance_grace_minutes || 10}
-                          onChange={(e) => setTimingsForm({ ...timingsForm, late_attendance_grace_minutes: parseInt(e.target.value) })}
-                          className="input-base w-full"
+                          register={() => ({
+                            value: timingsForm.late_attendance_grace_minutes || 10,
+                            onChange: (e) => setTimingsForm({ ...timingsForm, late_attendance_grace_minutes: parseInt(e.target.value) })
+                          })}
                         />
                       </div>
                     </div>
@@ -831,14 +648,14 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium mb-3">Weekly Off Days</label>
                     <div className="flex flex-wrap gap-3">
                       {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
-                        <label key={day} className="flex items-center gap-2">
+                        <label key={day} className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-100">
                           <input
                             type="checkbox"
                             checked={timingsForm.weekly_off_days?.includes(day) || false}
                             onChange={() => toggleWeeklyOff(day)}
                             className="rounded"
                           />
-                          <span className="capitalize">{day}</span>
+                          <span className="capitalize font-medium text-sm">{day}</span>
                         </label>
                       ))}
                     </div>
@@ -850,49 +667,15 @@ export default function SettingsPage() {
                       disabled={updateTimingsMutation.isPending}
                       className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition disabled:opacity-50"
                     >
-                      {updateTimingsMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      {updateTimingsMutation.isPending ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Save size={16} />
+                      )}
                       Save Changes
                     </button>
                   </div>
                 </form>
-              </div>
-            )}
-
-            {/* ==================== BACKUP & DATA TAB ==================== */}
-            {activeTab === 'backup' && (
-              <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-950/20 dark:to-slate-950/20">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Database size={20} className="text-primary" />
-                    Backup & Data Management
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">Manage your data backups and exports</p>
-                </div>
-
-                <div className="p-6 space-y-6">
-                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                    <p className="text-sm text-amber-800 dark:text-amber-400">
-                      <strong>Note:</strong> Backups are automatically created daily. You can also manually create a backup below.
-                    </p>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition"
-                    >
-                      <RefreshCw size={16} />
-                      Create Backup Now
-                    </button>
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-                    >
-                      <Download size={16} />
-                      Export All Data
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
           </div>
