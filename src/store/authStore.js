@@ -248,36 +248,43 @@
 
 
 
-// frontend/src/stores/authStore.js (COMPLETE CODE - ADD setInstituteSettings METHOD)
+// frontend/src/stores/authStore.js
 
 /**
  * The Clouds Academy — Auth Store (Zustand)
+ * Complete with all settings and policy methods
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { setAccessToken, setSchoolCode, clearAuthData } from "@/lib/auth";
+import { settingService } from "@/services/settingService";
 
 export const useAuthStore = create(
   persist(
     (set, get) => ({
+      // =========================================================
+      // STATE
+      // =========================================================
       user: null,
       isAuthenticated: false,
       isLoading: false,
 
-      // ─────────────────────────────────────────
-      // Set User (Login)
-      // ─────────────────────────────────────────
+      // =========================================================
+      // CORE METHODS
+      // =========================================================
+      
+      /**
+       * Set user after login
+       */
       setUser: (user, accessToken) => {
         console.log("🔐 Setting User:", user);
-        console.log("🏫 Institute with Logo:", user?.institute);
-        console.log("🌿 Branch Info:", user?.branch);
+        console.log("🏫 Institute:", user?.institute);
+        console.log("🌿 Branch:", user?.branch);
 
         if (accessToken) setAccessToken(accessToken);
         
-        // Set school code from institute
         if (user?.institute?.code) setSchoolCode(user.institute.code);
-        // Fallback to old school object
         if (user?.school?.code) setSchoolCode(user.school.code);
 
         set({
@@ -286,14 +293,61 @@ export const useAuthStore = create(
         });
       },
 
-      // ─────────────────────────────────────────
-      // 🔥 NEW: Update Institute Settings in Store (Realtime)
-      // ─────────────────────────────────────────
+      /**
+       * Set loading state
+       */
+      setLoading: (val) => {
+        set({ isLoading: val });
+      },
+
+      /**
+       * Logout user
+       */
+      logout: () => {
+        console.log("🚪 User Logged Out:", get().user);
+        clearAuthData();
+        set({
+          user: null,
+          isAuthenticated: false,
+        });
+      },
+
+      /**
+       * Refresh user data from server (after updates)
+       */
+      refreshUserData: async () => {
+        try {
+          const response = await settingService.refreshUserData();
+          if (response.success && response.data) {
+            const currentUser = get().user;
+            const updatedUser = {
+              ...currentUser,
+              ...response.data,
+              institute: response.data.institute || currentUser?.institute,
+              branch: response.data.branch || currentUser?.branch
+            };
+            
+            set({ user: updatedUser });
+            console.log("🔄 User data refreshed successfully");
+            return true;
+          }
+        } catch (error) {
+          console.error("Failed to refresh user data:", error);
+          return false;
+        }
+      },
+
+      // =========================================================
+      // SETTINGS UPDATE METHODS (Realtime Store Updates)
+      // =========================================================
+      
+      /**
+       * Update entire institute settings object
+       */
       setInstituteSettings: (updatedSettings) => {
         const currentUser = get().user;
         if (!currentUser) return;
 
-        // Update settings in the user object
         const updatedUser = {
           ...currentUser,
           institute: {
@@ -305,12 +359,13 @@ export const useAuthStore = create(
           }
         };
 
-        console.log("🔄 Updating Institute Settings in Store:", updatedSettings);
-        
+        console.log("🔄 Updating Institute Settings:", updatedSettings);
         set({ user: updatedUser });
       },
 
-      // 🔥 NEW: Update specific section in settings
+      /**
+       * Update specific settings section (academic, timings, finance, etc.)
+       */
       updateSettingSection: (sectionName, sectionData) => {
         const currentUser = get().user;
         if (!currentUser) return;
@@ -332,11 +387,12 @@ export const useAuthStore = create(
         };
 
         console.log(`🔄 Updating ${sectionName} section:`, sectionData);
-        
         set({ user: updatedUser });
       },
 
-      // 🔥 NEW: Update institute logo in store
+      /**
+       * Update institute logo URL
+       */
       setInstituteLogo: (logoUrl) => {
         const currentUser = get().user;
         if (!currentUser) return;
@@ -350,11 +406,31 @@ export const useAuthStore = create(
         };
 
         console.log("🔄 Updating Institute Logo:", logoUrl);
-        
         set({ user: updatedUser });
       },
 
-      // 🔥 NEW: Update module enabled status
+      /**
+       * Update institute name
+       */
+      setInstituteName: (name) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+
+        const updatedUser = {
+          ...currentUser,
+          institute: {
+            ...currentUser.institute,
+            name: name
+          }
+        };
+
+        console.log("🔄 Updating Institute Name:", name);
+        set({ user: updatedUser });
+      },
+
+      /**
+       * Enable/disable a module
+       */
       setModuleEnabled: (moduleName, enabled) => {
         const currentUser = get().user;
         if (!currentUser) return;
@@ -379,35 +455,13 @@ export const useAuthStore = create(
         };
 
         console.log(`🔄 Module ${moduleName} set to:`, enabled);
-        
         set({ user: updatedUser });
       },
 
-      // ─────────────────────────────────────────
-      // Loading State
-      // ─────────────────────────────────────────
-      setLoading: (val) => {
-        set({ isLoading: val });
-      },
-
-      // ─────────────────────────────────────────
-      // Logout
-      // ─────────────────────────────────────────
-      logout: () => {
-        console.log("🚪 User Logged Out:", get().user);
-
-        clearAuthData();
-
-        set({
-          user: null,
-          isAuthenticated: false,
-        });
-      },
-
-      // ─────────────────────────────────────────
-      // Getters (EXISTING)
-      // ─────────────────────────────────────────
-
+      // =========================================================
+      // GETTERS - Institute Info
+      // =========================================================
+      
       isMasterAdmin: () => {
         const user = get().user;
         return user?.role_code === "MASTER_ADMIN" || user?.user_type === "MASTER_ADMIN";
@@ -439,8 +493,7 @@ export const useAuthStore = create(
 
       schoolHasBranches: () => {
         const u = get().user;
-        const hasBranchesFromInstitute = u?.institute?.settings?.has_branches === true;
-        return hasBranchesFromInstitute;
+        return u?.institute?.settings?.has_branches === true;
       },
 
       getBranch: () => {
@@ -465,12 +518,7 @@ export const useAuthStore = create(
 
       instituteType: () => {
         const u = get().user;
-        return (
-          u?.institute_type ||
-          u?.institute?.institute_type ||
-          u?.school?.institute_type ||
-          null
-        );
+        return u?.institute_type || u?.institute?.institute_type || u?.school?.institute_type || "school";
       },
 
       dashboardPath: () => {
@@ -480,10 +528,9 @@ export const useAuthStore = create(
           return "/master-admin";
         }
         if (u.branch_id || u.branch) {
-          const branchPath = `/branch/${u.branch_id || u.branch?.id}/dashboard`;
-          return branchPath;
+          return `/branch/${u.branch_id || u.branch?.id}/dashboard`;
         }
-        const type = get().instituteType() || "school";
+        const type = get().instituteType();
         const PATHS = {
           school: "/school/dashboard",
           coaching: "/coaching/dashboard",
@@ -514,7 +561,7 @@ export const useAuthStore = create(
       },
 
       // =========================================================
-      // NEW GETTERS (From Settings)
+      // GETTERS - Settings Sections
       // =========================================================
       
       instituteSettings: () => {
@@ -526,21 +573,6 @@ export const useAuthStore = create(
         const u = get().user;
         const settings = u?.institute?.settings || u?.school?.settings || {};
         return settings[sectionName] || {};
-      },
-
-      getAllPolicies: () => {
-        const u = get().user;
-        return u?.institute?.policies?.all || [];
-      },
-
-      getPoliciesByType: (policyType) => {
-        const u = get().user;
-        return u?.institute?.policies?.by_type?.[policyType] || [];
-      },
-
-      getLatestPolicy: (policyType) => {
-        const u = get().user;
-        return u?.institute?.policies?.latest?.[policyType] || null;
       },
 
       academicSettings: () => {
@@ -580,6 +612,35 @@ export const useAuthStore = create(
         return modules[moduleName]?.enabled === true;
       },
 
+      // =========================================================
+      // GETTERS - Policies
+      // =========================================================
+      
+      getAllPolicies: () => {
+        const u = get().user;
+        return u?.institute?.policies?.all || [];
+      },
+
+      getPoliciesByType: (policyType) => {
+        const u = get().user;
+        return u?.institute?.policies?.by_type?.[policyType] || [];
+      },
+
+      getLatestPolicy: (policyType) => {
+        const u = get().user;
+        return u?.institute?.policies?.latest?.[policyType] || null;
+      },
+
+      getPolicyConfig: (policyType, key = null) => {
+        const policy = get().getLatestPolicy(policyType);
+        if (!policy || !policy.config) return key ? null : {};
+        return key ? policy.config[key] : policy.config;
+      },
+
+      // =========================================================
+      // GETTERS - Branches
+      // =========================================================
+      
       getBranches: () => {
         const u = get().user;
         return u?.institute?.branches || [];
@@ -590,12 +651,6 @@ export const useAuthStore = create(
         const branches = u?.institute?.branches || [];
         return branches.find(b => b.is_main === true) || null;
       },
-
-      getPolicyConfig: (policyType, key = null) => {
-        const policy = get().getLatestPolicy(policyType);
-        if (!policy || !policy.config) return key ? null : {};
-        return key ? policy.config[key] : policy.config;
-      }
     }),
     {
       name: "clouds-auth",
@@ -605,6 +660,8 @@ export const useAuthStore = create(
       }),
       onRehydrateStorage: () => (state) => {
         console.log("♻️ Auth Store Rehydrated");
+        console.log("👤 User:", state?.user?.first_name);
+        console.log("🏫 Institute:", state?.user?.institute?.name);
       },
     }
   )

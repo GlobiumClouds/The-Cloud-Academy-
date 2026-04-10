@@ -113,7 +113,14 @@ export const settingService = {
     resetSettingsSection: async (section) => {
         const response = await api.delete(`${BASE_URL}/reset/${section}`);
         return response.data;
-    }
+    },
+        /**
+     * Refresh user data from server (to get updated institute info)
+     */
+    refreshUserData: async () => {
+        const response = await api.get('/auth/refresh-data');
+        return response.data;
+    },
 };
 
 export default settingService;
