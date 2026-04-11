@@ -43,7 +43,7 @@ import {
 import DataTable from "@/components/common/DataTable";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import SelectField from "@/components/common/SelectField";
+import { SelectField, DatePickerField } from "@/components/common";
 import FeeCollectionDummyApp from "./FeeCollectionDummyApp";
 import PayrollDummyApp from "./PayrollDummyApp";
 import ExportModal from "@/components/common/ExportModal";
@@ -467,28 +467,20 @@ function ReportFilters({
 
         {showFilter("dateRange") && (
           <div className="lg:col-span-2 grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
-                From
-              </label>
-              <input
-                type="date"
-                value={filters.from_date}
-                onChange={(e) => onFilterChange("from_date", e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs focus:ring-4 focus:ring-slate-100 focus:bg-white outline-none"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
-                To
-              </label>
-              <input
-                type="date"
-                value={filters.to_date}
-                onChange={(e) => onFilterChange("to_date", e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs focus:ring-4 focus:ring-slate-100 focus:bg-white outline-none"
-              />
-            </div>
+            <DatePickerField
+              label="From"
+              placeholder="From Date"
+              value={filters.from_date}
+              onChange={(val) => onFilterChange("from_date", val)}
+              className="w-full"
+            />
+            <DatePickerField
+              label="To"
+              placeholder="To Date"
+              value={filters.to_date}
+              onChange={(val) => onFilterChange("to_date", val)}
+              className="w-full"
+            />
           </div>
         )}
       </div>
