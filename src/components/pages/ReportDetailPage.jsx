@@ -2,16 +2,13 @@
 /**
  * ReportDetailPage — Interactive Report with Filters & DataTable
  * 
- * Features:
- * - Dynamic filters based on report type
- * - Real-time DataTable with sorting/pagination
- * - Export with current filters
- * - Full permission support
+ * Includes Student, Attendance, Exam reports (API based)
+ * and Fee Collection, Payroll (Dummy App based)
  */
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, Loader2, ChevronLeft } from 'lucide-react';
+import { Download, Loader2, ChevronLeft, Search, Filter, Calendar, Users, CheckCircle2, AlertCircle, TrendingUp, Sparkles, FileText, MoreHorizontal, Receipt, Wallet } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -19,11 +16,9 @@ import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import { reportService, classService, examService } from '@/services';
 import DataTable from '@/components/common/DataTable';
-import PageHeader from '@/components/common/PageHeader';
-import InputField from '@/components/common/InputField';
-import SelectField from '@/components/common/SelectField';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import SelectField from '@/components/common/SelectField';
 import FeeCollectionDummyApp from './FeeCollectionDummyApp';
 import PayrollDummyApp from './PayrollDummyApp';
 
@@ -37,15 +32,20 @@ const REPORT_CONFIGS = {
     filters: ['search', 'class', 'section', 'status'],
     columns: [
       { key: 'name', label: 'Name' },
-      { key: 'registration_no', label: 'Registration No.' },
-      { key: 'email', label: 'Email' },
+      { key: 'registration_no', label: 'Reg. No.' },
+      { key: 'student_id', label: 'Student ID' },
+      { key: 'father_name', label: "Father Name" },
       { key: 'phone', label: 'Phone' },
       { key: 'class_name', label: 'Class' },
       { key: 'section_name', label: 'Section' },
-      { key: 'father_name', label: "Father's Name" },
+      { key: 'gender', label: 'Gender' },
+      { key: 'blood_group', label: 'Blood' },
       { key: 'joined_on', label: 'Joined' },
+      { key: 'status', label: 'Status' },
     ],
     permission: 'reports.student',
+    theme: 'indigo',
+    icon: Users,
   },
   attendance: {
     title: 'Attendance Report',
@@ -55,25 +55,20 @@ const REPORT_CONFIGS = {
       { key: 'name', label: 'Student Name' },
       { key: 'registration_no', label: 'Reg. No.' },
       { key: 'class_name', label: 'Class' },
+      { key: 'section_name', label: 'Section' },
       { key: 'status', label: 'Status' },
-      { key: 'remarks', label: 'Remarks' },
+      { key: 'check_in', label: 'In' },
+      { key: 'check_out', label: 'Out' },
     ],
     permission: 'reports.attendance',
+    theme: 'emerald',
+    icon: CheckCircle2,
   },
   fee: {
     title: 'Fee Collection Report',
-    filters: ['dateRange', 'class', 'section', 'status'],
-    columns: [
-      { key: 'name', label: 'Student Name' },
-      { key: 'registration_no', label: 'Reg. No.' },
-      { key: 'email', label: 'Email' },
-      { key: 'amount', label: 'Amount' },
-      { key: 'paid_amount', label: 'Paid' },
-      { key: 'outstanding', label: 'Outstanding' },
-      { key: 'status', label: 'Status' },
-      { key: 'date', label: 'Date' },
-    ],
     permission: 'reports.fee',
+    theme: 'amber',
+    icon: Receipt,
   },
   exam: {
     title: 'Exam Results Report',
@@ -84,22 +79,32 @@ const REPORT_CONFIGS = {
       { key: 'exam', label: 'Exam' },
       { key: 'total_marks', label: 'Total' },
       { key: 'marks_obtained', label: 'Obtained' },
-      { key: 'percentage', label: 'Percentage' },
+      { key: 'percentage', label: '%' },
       { key: 'grade', label: 'Grade' },
       { key: 'status', label: 'Status' },
     ],
     permission: 'reports.exam',
+    theme: 'violet',
+    icon: Sparkles,
   },
   payroll: {
     title: 'Payroll Report',
-    filters: [],
-    columns: [],
     permission: 'reports.payroll',
+    theme: 'rose',
+    icon: Wallet,
   },
 };
 
+const THEMES = {
+  indigo: { main: 'text-indigo-600', bg: 'bg-indigo-50/50', grad: 'from-indigo-500/10 to-transparent', border: 'border-indigo-100/50' },
+  emerald: { main: 'text-emerald-600', bg: 'bg-emerald-50/50', grad: 'from-emerald-500/10 to-transparent', border: 'border-emerald-100/50' },
+  amber: { main: 'text-amber-600', bg: 'bg-amber-50/50', grad: 'from-amber-500/10 to-transparent', border: 'border-amber-100/50' },
+  rose: { main: 'text-rose-600', bg: 'bg-rose-50/50', grad: 'from-rose-500/10 to-transparent', border: 'border-rose-100/50' },
+  violet: { main: 'text-violet-600', bg: 'bg-violet-50/50', grad: 'from-violet-500/10 to-transparent', border: 'border-violet-100/50' },
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
-// FILTER COMPONENT (Using Reusable Components)
+// FILTER COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ReportFilters({ 
@@ -110,227 +115,97 @@ function ReportFilters({
   loading,
   sections = [],
   exams = [],
-  onClassChange
 }) {
   const config = REPORT_CONFIGS[reportType] || REPORT_CONFIGS.student;
-
-  // Debug incoming data
-  useEffect(() => {
-    console.log('🔍 ReportFilters received:', {
-      classesCount: options?.classes?.length || 0,
-      sectionsCount: sections?.length || 0,
-      examsCount: exams?.length || 0,
-    });
-  }, [options, sections, exams]);
-
-  // Status options per report type
-  const statusOptions = {
-    student: [
-      { value: '', label: 'All Statuses' },
-      { value: 'active', label: 'Active' },
-      { value: 'inactive', label: 'Inactive' },
-      { value: 'graduated', label: 'Graduated' },
-    ],
-    attendance: [
-      { value: '', label: 'All Statuses' },
-      { value: 'present', label: 'Present' },
-      { value: 'absent', label: 'Absent' },
-      { value: 'leave', label: 'Leave' },
-    ],
-    fee: [
-      { value: '', label: 'All Statuses' },
-      { value: 'paid', label: 'Paid' },
-      { value: 'unpaid', label: 'Unpaid' },
-      { value: 'partial', label: 'Partial' },
-      { value: 'overdue', label: 'Overdue' },
-    ],
-    exam: [
-      { value: '', label: 'All Statuses' },
-      { value: 'pass', label: 'Pass' },
-      { value: 'fail', label: 'Fail' },
-      { value: 'absent', label: 'Absent' },
-    ],
-  };
-
-  // Type options per report type
-  const typeOptions = {
-    attendance: [
-      { value: 'summary', label: 'Summary' },
-      { value: 'detailed', label: 'Detailed' },
-      { value: 'student_wise', label: 'Student Wise' },
-    ],
-    exam: [
-      { value: 'class_wise', label: 'Class Wise' },
-      { value: 'student_wise', label: 'Student Wise' },
-      { value: 'subject_wise', label: 'Subject Wise' },
-    ],
-  };
-
-  const classOptions = [
-    { value: '', label: 'All Classes' },
-    ...(Array.isArray(options?.classes) 
-      ? options.classes.map((cls) => ({
-          value: cls.id || cls._id,
-          label: cls.name || cls.title || 'Unknown Class',
-        }))
-      : []
-    ),
-  ];
-
-  // Section options based on selected class
-  const sectionOptions = [
-    { value: '', label: 'All Sections' },
-    ...(Array.isArray(sections)
-      ? sections.map((sec) => ({
-          value: sec.id || sec._id,
-          label: sec.name || sec.title || 'Unknown Section',
-        }))
-      : []
-    ),
-  ];
-
-  // Exam options
-  const examOptions = [
-    { value: '', label: 'All Exams' },
-    ...(Array.isArray(exams)
-      ? exams.map((exam) => ({
-          value: exam.id || exam._id,
-          label: exam.name || exam.title || 'Unknown Exam',
-        }))
-      : []
-    ),
-  ];
-
-  // Custom date validation: disable future dates
-  const disableFutureDateMatcher = (date) => {
-    return isAfter(startOfDay(date), startOfDay(new Date()));
-  };
+  const showFilter = (name) => config.filters?.includes(name);
 
   return (
-    <div className="space-y-4 rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold">🔍 Filters</h3>
-        {Object.entries(filters).filter(([_, v]) => v).length > 0 && (
-          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-            {Object.entries(filters).filter(([_, v]) => v).length} active
-          </span>
-        )}
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-slate-100 rounded-lg text-slate-500">
+            <Filter size={14} />
+          </div>
+          <h3 className="text-sm font-semibold text-slate-800 tracking-tight">Report Filters</h3>
+        </div>
+        {loading && <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+          <Loader2 size={12} className="animate-spin" /> Synchronizing...
+        </div>}
       </div>
       
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Search */}
-        {config.filters.includes('search') && (
-          <InputField
-            name="search"
-            label="🔎 Search Name/Email"
-            placeholder="Search..."
-            value={filters.search || ''}
-            onChange={(e) => onFilterChange('search', e.target.value)}
-            disabled={loading}
-            className="text-sm"
-          />
-        )}
-
-        {/* Date Range - From (Disable Future Dates) */}
-        {config.filters.includes('dateRange') && (
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 items-end">
+        {showFilter('search') && (
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">📅 From Date</label>
-            <input
-              type="date"
-              name="from_date"
-              value={filters.from_date || ''}
-              onChange={(e) => onFilterChange('from_date', e.target.value)}
-              disabled={loading}
-              max={new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-            />
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+               Search Records
+            </label>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => onFilterChange('search', e.target.value)}
+                placeholder="Name, ID or Number..."
+                className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs focus:ring-4 focus:ring-slate-100 focus:bg-white transition-all outline-none"
+              />
+            </div>
           </div>
         )}
 
-        {/* Date Range - To (Disable Future Dates) */}
-        {config.filters.includes('dateRange') && (
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">📅 To Date</label>
-            <input
-              type="date"
-              name="to_date"
-              value={filters.to_date || ''}
-              onChange={(e) => onFilterChange('to_date', e.target.value)}
-              disabled={loading}
-              max={new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-            />
-          </div>
-        )}
-
-        {/* Class */}
-        {config.filters.includes('class') && (
+        {showFilter('class') && (
           <SelectField
-            name="class_id"
-            label="🏫 Class"
-            value={filters.class_id || ''}
-            onChange={(v) => {
-              onFilterChange('class_id', v);
-              // Reset section when class changes
-              onFilterChange('section_id', '');
-              onClassChange?.(v);
-            }}
-            disabled={loading}
-            options={classOptions}
+            label="Class"
             placeholder="All Classes"
+            value={filters.class_id}
+            onChange={(v) => onFilterChange('class_id', v)}
+            options={(options.classes || []).map(c => ({ value: c.id, label: c.name }))}
+            className="w-full"
           />
         )}
 
-        {/* Section (Dynamic based on class) */}
-        {config.filters.includes('section') && (
+        {showFilter('section') && (
           <SelectField
-            name="section_id"
-            label="📚 Section"
-            value={filters.section_id || ''}
+            label="Section"
+            placeholder="All Sections"
+            value={filters.section_id}
             onChange={(v) => onFilterChange('section_id', v)}
-            disabled={loading || !filters.class_id}
-            options={sectionOptions}
-            placeholder={filters.class_id ? "Select Section" : "Choose class first"}
+            options={(sections || []).map(s => ({ value: s.id, label: s.name || s.section_name }))}
+            className="w-full"
           />
         )}
 
-        {/* Exam (For exam reports) */}
-        {config.filters.includes('exam') && exams.length > 0 && (
+        {showFilter('exam') && (
           <SelectField
-            name="exam_id"
-            label="📝 Exam"
-            value={filters.exam_id || ''}
+            label="Select Exam"
+            placeholder="Choose Exam"
+            value={filters.exam_id}
             onChange={(v) => onFilterChange('exam_id', v)}
-            disabled={loading}
-            options={examOptions}
-            placeholder="All Exams"
+            options={(exams || []).map(ex => ({ value: ex.id, label: ex.title }))}
+            className="w-full"
           />
         )}
 
-        {/* Status */}
-        {config.filters.includes('status') && (
-          <SelectField
-            name="status"
-            label="📊 Status"
-            value={filters.status || ''}
-            onChange={(v) => onFilterChange('status', v)}
-            disabled={loading}
-            options={statusOptions[reportType] || statusOptions.student}
-            placeholder="All Statuses"
-          />
-        )}
-
-        {/* Type */}
-        {config.filters.includes('type') && (
-          <SelectField
-            name="report_type"
-            label="📋 Report Type"
-            value={filters.type || 'summary'}
-            onChange={(v) => onFilterChange('type', v)}
-            disabled={loading}
-            options={typeOptions[reportType] || []}
-            placeholder="Select type"
-          />
+        {showFilter('dateRange') && (
+          <div className="lg:col-span-2 grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">From Date</label>
+              <input
+                type="date"
+                value={filters.from_date}
+                onChange={(e) => onFilterChange('from_date', e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs focus:ring-4 focus:ring-slate-100 focus:bg-white outline-none"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">To Date</label>
+              <input
+                type="date"
+                value={filters.to_date}
+                onChange={(e) => onFilterChange('to_date', e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs focus:ring-4 focus:ring-slate-100 focus:bg-white outline-none"
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -338,128 +213,68 @@ function ReportFilters({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
+// MAIN PAGE COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ReportDetailPage({ reportType: propReportType }) {
+export default function ReportDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reportType = propReportType || searchParams.get('report') || 'student';
-  
-  const canDo = useAuthStore((s) => s.canDo);
+  const reportType = searchParams.get('report') || 'student';
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
-
-  // Permission check
-  if (!canDo(REPORT_CONFIGS[reportType]?.permission)) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 py-20">
-        <p className="text-muted-foreground">Access denied to this report</p>
-        <Button onClick={() => router.back()}>Go Back</Button>
-      </div>
-    );
-  }
+  const canDo = useAuthStore((s) => s.canDo);
 
   const config = REPORT_CONFIGS[reportType] || REPORT_CONFIGS.student;
-  const [filters, setFilters] = useState({ skip: 0, limit: 50 });
+
+  // State
+  const [filters, setFilters] = useState({
+    page: 1,
+    limit: 50,
+    search: '',
+    class_id: '',
+    section_id: '',
+    from_date: '',
+    to_date: '',
+    exam_id: '',
+    status: '',
+  });
+
   const [exporting, setExporting] = useState(false);
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // FETCH: Classes (same as AttendancePage)
-  // ────────────────────────────────────────────────────────────────────────────
+  // FETCH: Helper data
   const { data: classesData } = useQuery({
-    queryKey: ['classes'],
-    queryFn: () => classService.getAll(),
+    queryKey: ['classes', currentInstitute?.id],
+    queryFn: () => classService.getAll({ limit: 100 }),
+    enabled: !!currentInstitute?.id,
   });
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // FETCH: Sections (from selected class sections array)
-  // ────────────────────────────────────────────────────────────────────────────
+  const { data: examsData } = useQuery({
+    queryKey: ['exams', currentInstitute?.id],
+    queryFn: () => examService.getAll({ limit: 100 }),
+    enabled: !!currentInstitute?.id && reportType === 'exam',
+  });
+
+  // Sections
   const sections = useMemo(() => {
     if (!filters.class_id || !classesData?.data) return [];
-    const selectedClass = classesData.data.find(c => String(c.id) === String(filters.class_id));
-    const sectionList = selectedClass?.sections || [];
-    console.log(`✅ Sections for class ${filters.class_id}:`, sectionList);
-    return sectionList;
+    return classesData.data.find(c => String(c.id) === String(filters.class_id))?.Sections || [];
   }, [filters.class_id, classesData]);
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // FETCH: Exams (for exam reports only)
-  // ────────────────────────────────────────────────────────────────────────────
-  const { data: examsData } = useQuery({
-    queryKey: ['exams'],
-    queryFn: () => examService.getAll(),
-    enabled: reportType === 'exam',
-  });
-
-  // ────────────────────────────────────────────────────────────────────────────
   // FETCH: Report data
-  // ────────────────────────────────────────────────────────────────────────────
-  const { data: reportData, isLoading: reportLoading, refetch } = useQuery({
+  const { data: reportData, isLoading: reportLoading } = useQuery({
     queryKey: ['report', reportType, filters],
     queryFn: async () => {
       if (reportType === 'student') return reportService.getStudentReport(filters);
       if (reportType === 'attendance') return reportService.getAttendanceReport(filters);
       if (reportType === 'fee') return reportService.getFeeReport(filters);
       if (reportType === 'exam') return reportService.getExamReport(filters);
-      
       return null;
     },
     enabled: !!currentInstitute?.id && reportType !== 'fee' && reportType !== 'payroll',
   });
 
-  // Debug logging (AFTER all hooks are declared)
-  useEffect(() => {
-    console.group('📊 ReportDetailPage - Data Status');
-    console.log('Classes:', classesData?.data);
-    console.log('Sections:', sections);
-    console.log('Exams:', examsData?.data);
-    console.log('Report Type:', reportType);
-    console.log('Current Institute:', currentInstitute);
-    console.groupEnd();
-  }, [classesData, sections, examsData, reportType, currentInstitute]);
-
-  // Build DataTable columns
-  const columns = useMemo(() => {
-    return config.columns.map((col) => ({
-      accessorKey: col.key,
-      header: col.label,
-      cell: ({ getValue }) => {
-        const value = getValue();
-        // Format currency
-        if (col.key.includes('amount') || col.key.includes('outstanding')) {
-          return <span className="font-medium">{value}</span>;
-        }
-        // Format status
-        if (col.key === 'status') {
-          const statusColors = {
-            paid: 'bg-emerald-100 text-emerald-700',
-            unpaid: 'bg-red-100 text-red-600',
-            partial: 'bg-amber-100 text-amber-700',
-            present: 'bg-emerald-100 text-emerald-700',
-            absent: 'bg-red-100 text-red-600',
-            leave: 'bg-blue-100 text-blue-700',
-            pass: 'bg-emerald-100 text-emerald-700',
-            fail: 'bg-red-100 text-red-600',
-            active: 'bg-emerald-100 text-emerald-700',
-            inactive: 'bg-slate-100 text-slate-700',
-          };
-          return (
-            <span className={cn('rounded-full px-2 py-1 text-xs font-medium capitalize', statusColors[value] || 'bg-slate-100')}>
-              {value}
-            </span>
-          );
-        }
-        return value || '—';
-      },
-    }));
-  }, [reportType]);
-
+  // Handlers
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value || null,
-      skip: 0, // Reset pagination on filter change
-    }));
+    setFilters(prev => ({ ...prev, [key]: value, page: key === 'page' ? value : 1 }));
   };
 
   const handleExport = async () => {
@@ -467,10 +282,10 @@ export default function ReportDetailPage({ reportType: propReportType }) {
     try {
       await reportService.exportReport({
         report_type: reportType,
-        format: 'excel',
         filters,
+        format: 'excel'
       });
-      toast.success('Report exported successfully!');
+      toast.success('Excel Report exported successfully');
     } catch (error) {
       toast.error('Failed to export report');
     } finally {
@@ -478,33 +293,89 @@ export default function ReportDetailPage({ reportType: propReportType }) {
     }
   };
 
-  const recordCount = reportData?.data?.records?.length || 0;
-  const totalRecords = reportData?.data?.total_records || 0;
+  // Build Columns
+  const columns = useMemo(() => {
+    if (!config.columns) return [];
+    return config.columns.map(col => ({
+      accessorKey: col.key,
+      header: col.label,
+      cell: ({ getValue }) => {
+        const value = getValue();
+        if (col.key === 'status') {
+          const colors = {
+            paid: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+            present: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+            absent: 'bg-rose-50 text-rose-600 border-rose-100',
+            unpaid: 'bg-rose-50 text-rose-600 border-rose-100'
+          };
+          return (
+            <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase border tracking-tight", colors[String(value).toLowerCase()] || "bg-slate-50 border-slate-200")}>
+              {value}
+            </span>
+          );
+        }
+        if (col.key === 'name') return <span className="font-semibold text-slate-800 text-sm">{value}</span>;
+        return <span className="text-slate-500 text-xs font-medium">{value}</span>;
+      }
+    }));
+  }, [config.columns]);
+
+  if (!canDo(config.permission)) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center animate-in fade-in duration-500">
+        <div className="h-20 w-20 bg-rose-50 text-rose-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-rose-100 border border-rose-100">
+          <AlertCircle size={38} />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Report Restricted</h2>
+          <p className="text-sm text-slate-500 max-w-xs mx-auto font-medium leading-relaxed">You don't have the necessary administrative privileges to view the {config.title}.</p>
+        </div>
+        <Button onClick={() => router.back()} variant="outline" className="h-10 rounded-xl border-slate-200 px-6 font-semibold">Return Back</Button>
+      </div>
+    );
+  }
+
+  const totalRecords = reportData?.data?.pagination?.total || 0;
+  const totalPages = Math.ceil(totalRecords / filters.limit);
+  const theme = THEMES[config.theme] || THEMES.indigo;
+  const Icon = config.icon;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-
-      {/* Header - Only show if not fee or payroll report (they have their own premium headers) */}
+    <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-700 max-w-[1600px] mx-auto pb-10 px-2 sm:px-0">
+      
+      {/* HEADER OVERHAUL */}
       {reportType !== 'fee' && reportType !== 'payroll' && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => router.back()} className="rounded p-1 hover:bg-accent transition-colors">
-              <ChevronLeft size={20} />
-            </button>
-            <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">{config.title}</h1>
-              <p className="text-sm text-muted-foreground font-medium">{totalRecords} total records found</p>
-            </div>
-          </div>
-          <Button
-            onClick={handleExport}
-            disabled={exporting || !reportData}
-            variant="outline"
-            className="gap-2 border-slate-200 shadow-sm hover:shadow-md transition-all active:scale-95"
-          >
-            {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Export as Excel
-          </Button>
+        <div className="relative rounded-2xl p-7 flex flex-col sm:flex-row items-center justify-between gap-6 bg-white border border-slate-200 shadow-xl shadow-slate-200/40">
+           <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-slate-50/50 pointer-events-none" />
+           <div className="flex items-center gap-5 relative z-10 w-full sm:w-auto">
+              <button onClick={() => router.back()} className="h-11 w-11 flex items-center justify-center rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition-all shadow-sm active:scale-95">
+                <ChevronLeft size={22} className="text-slate-600" />
+              </button>
+              <div className="space-y-1">
+                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+                   <Icon size={12} /> Detailed Insights System
+                 </div>
+                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{config.title}</h1>
+              </div>
+           </div>
+
+           <div className="flex items-center gap-3 relative z-10 w-full sm:w-auto">
+             <Button 
+               disabled={exporting || !reportData}
+               onClick={handleExport}
+               variant="outline" 
+               className="flex-1 sm:flex-none h-11 border-slate-200 rounded-2xl px-5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 shadow-sm transition-all active:scale-95"
+             >
+               {exporting ? <Loader2 size={16} className="animate-spin mr-2" /> : <Download size={16} className="mr-2" />}
+               Export Excel
+             </Button>
+             <Button 
+               onClick={() => window.print()}
+               className="flex-1 sm:flex-none h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-6 text-[13px] font-bold shadow-lg shadow-slate-200 transition-all active:scale-95"
+             >
+               Print PDF
+             </Button>
+           </div>
         </div>
       )}
 
@@ -514,63 +385,47 @@ export default function ReportDetailPage({ reportType: propReportType }) {
         <PayrollDummyApp />
       ) : (
         <>
-          {/* Filters */}
-          <ReportFilters
-            reportType={reportType}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            options={{
-              classes: Array.isArray(classesData?.data) ? classesData.data : [],
-            }}
-            loading={reportLoading}
-            sections={sections || []}
-            exams={Array.isArray(examsData?.data) ? examsData.data : examsData || []}
-            onClassChange={(classId) => {
-              console.log('📍 Class changed to:', classId);
-            }}
-          />
-
-          {/* Summary Stats */}
+          {/* STATS OVERHAUL */}
           {reportData?.data?.summary && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {Object.entries(reportData.data.summary).map(([key, value]) => (
-                <div key={key} className="rounded-lg border bg-card p-3">
-                  <p className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
-                  <p className="text-lg font-semibold">{value}</p>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(reportData.data.summary).map(([key, value], i) => (
+                <div key={key} className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-slate-200")}>
+                  <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", theme.grad)} />
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">{key.replace(/_/g, ' ')}</p>
+                  <h3 className="text-2xl font-bold text-slate-900 tabular-nums relative z-10 mt-1">{value}</h3>
+                  <div className={cn("absolute bottom-4 right-4 h-1 w-8 rounded-full opacity-50 transition-all group-hover:w-12", theme.bg.replace('bg-', 'bg-').split('/')[0])} />
                 </div>
               ))}
             </div>
           )}
 
-          {/* DataTable */}
-          <div className="rounded-lg border bg-card">
-            {reportLoading ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 size={20} className="animate-spin" />
-              </div>
-            ) : recordCount === 0 ? (
-              <div className="py-10 text-center text-muted-foreground">
-                <p>No data found</p>
-                <p className="text-xs">Try adjusting your filters</p>
-              </div>
-            ) : (
-              <DataTable
-                columns={columns}
-                data={reportData?.data?.records || []}
-                pagination={{
-                  skip: filters.skip,
-                  limit: filters.limit,
-                  total: totalRecords,
-                  onSkipChange: (skip) => setFilters((prev) => ({ ...prev, skip })),
-                  onLimitChange: (limit) => setFilters((prev) => ({ ...prev, limit })),
-                }}
-              />
-            )}
-          </div>
+          <ReportFilters
+            reportType={reportType}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            options={{ classes: classesData?.data || [] }}
+            loading={reportLoading}
+            sections={sections}
+            exams={examsData?.data || []}
+          />
 
-          {/* Footer Info */}
-          <div className="text-xs text-muted-foreground">
-            Showing {filters.skip + 1} to {Math.min(filters.skip + filters.limit, totalRecords)} of {totalRecords} records
+          {/* TABLE OVERHAUL */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40 overflow-hidden">
+             <div className="p-0 compact-table border-none">
+               <DataTable
+                 columns={columns}
+                 data={reportData?.data?.records || []}
+                 loading={reportLoading}
+                 pagination={{
+                   page: filters.page,
+                   totalPages: totalPages,
+                   total: totalRecords,
+                   onPageChange: (p) => handleFilterChange('page', p),
+                   onPageSizeChange: (s) => handleFilterChange('limit', s),
+                   pageSize: filters.limit
+                 }}
+               />
+             </div>
           </div>
         </>
       )}
