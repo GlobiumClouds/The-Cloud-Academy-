@@ -134,7 +134,21 @@ const REPORT_CONFIGS = {
     filters: ["search", "class", "section", "status"],
     columns: [
       STUDENT_REPORT_COLUMNS.find(c => c.id === 'name'),
-      STUDENT_REPORT_COLUMNS.find(c => c.id === 'roll_no'),
+      { 
+        id: "ids", 
+        header: "Roll / Reg No", 
+        cell: ({ row }) => {
+          const s = row.original;
+          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.Student?.details?.studentDetails?.roll_no || s.student?.details?.studentDetails?.roll_no || s.details?.studentDetails?.roll_no;
+          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.Student?.details?.studentDetails?.registration_no || s.student?.details?.studentDetails?.registration_no || s.details?.studentDetails?.registration_no;
+          return (
+            <div className="flex flex-col py-1">
+              <span className="text-slate-700 font-bold text-[11px] leading-none mb-1">{roll || "—"}</span>
+              <span className="text-slate-400 text-[10px] leading-tight font-medium uppercase tracking-wider">{reg || "—"}</span>
+            </div>
+          );
+        }
+      },
       { 
         id: 'academic', 
         header: 'Class (Section)', 
@@ -178,14 +192,46 @@ const REPORT_CONFIGS = {
     title: "Attendance Report",
     filters: ["dateRange", "class", "section", "type"],
     columns: [
-      { key: "date", label: "Date" },
-      { key: "name", label: "Student Name" },
-      { key: "registration_no", label: "Reg. No." },
-      { key: "class_name", label: "Class" },
-      { key: "section_name", label: "Section" },
-      { key: "status", label: "Status" },
-      { key: "check_in", label: "In" },
-      { key: "check_out", label: "Out" },
+      { id: "date", header: "Date", accessorFn: s => s.date || s.attendance_date || "—" },
+      { 
+        id: "name", 
+        header: "Student", 
+        accessorFn: s => s.student_name || s.name || s.Student?.name || `${s.Student?.first_name || ""} ${s.Student?.last_name || ""}`.trim() || s.first_name || "—" 
+      },
+      { 
+        id: "ids", 
+        header: "Roll / Reg No", 
+        cell: ({ row }) => {
+          const s = row.original;
+          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.Student?.details?.studentDetails?.roll_no || s.student?.details?.studentDetails?.roll_no || s.details?.studentDetails?.roll_no;
+          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.Student?.details?.studentDetails?.registration_no || s.student?.details?.studentDetails?.registration_no || s.details?.studentDetails?.registration_no;
+          return (
+            <div className="flex flex-col py-1">
+              <span className="text-emerald-700 font-bold text-[11px] leading-none mb-1">{roll || "—"}</span>
+              <span className="text-emerald-400/80 text-[10px] leading-tight font-medium uppercase tracking-wider">{reg || "—"}</span>
+            </div>
+          );
+        }
+      },
+      { 
+        id: "academic", 
+        header: "Class (Section)", 
+        accessorFn: s => {
+          const cls = s.class_name || s.class?.name || s.Class?.name || s.current_class || "—";
+          const sec = s.section_name || s.section?.name || s.Section?.name || s.section || "—";
+          return `${cls} (${sec})`;
+        }
+      },
+      { 
+        id: "status", 
+        header: "Status", 
+        accessorFn: s => (s.status || "—").toUpperCase() 
+      },
+      { 
+        id: "timing", 
+        header: "In / Out", 
+        accessorFn: s => s.check_in && s.check_out ? `${s.check_in} - ${s.check_out}` : s.check_in || s.check_out || "—" 
+      },
     ],
     permission: "reports.attendance",
     theme: "emerald",
@@ -198,17 +244,46 @@ const REPORT_CONFIGS = {
     icon: Receipt,
   },
   exam: {
-    title: "Exam Results Report",
+    title: "Exam Result Report",
     filters: ["class", "section", "exam", "type"],
     columns: [
-      { key: "name", label: "Student Name" },
-      { key: "registration_no", label: "Reg. No." },
-      { key: "exam", label: "Exam" },
-      { key: "total_marks", label: "Total" },
-      { key: "marks_obtained", label: "Obtained" },
-      { key: "percentage", label: "%" },
-      { key: "grade", label: "Grade" },
-      { key: "status", label: "Status" },
+      { 
+        id: "name", 
+        header: "Student", 
+        accessorFn: s => s.student_name || s.name || s.Student?.name || `${s.Student?.first_name || ""} ${s.Student?.last_name || ""}`.trim() || s.first_name || "—" 
+      },
+      { 
+        id: "ids", 
+        header: "Roll / Reg No", 
+        cell: ({ row }) => {
+          const s = row.original;
+          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.Student?.details?.studentDetails?.roll_no || s.student?.details?.studentDetails?.roll_no || s.details?.studentDetails?.roll_no;
+          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.Student?.details?.studentDetails?.registration_no || s.student?.details?.studentDetails?.registration_no || s.details?.studentDetails?.registration_no;
+          return (
+            <div className="flex flex-col py-1">
+              <span className="text-violet-700 font-bold text-[11px] leading-none mb-1">{roll || "—"}</span>
+              <span className="text-violet-400/80 text-[10px] leading-tight font-medium uppercase tracking-wider">{reg || "—"}</span>
+            </div>
+          );
+        }
+      },
+      { 
+        id: "academic", 
+        header: "Class (Section)", 
+        accessorFn: s => {
+          const cls = s.class_name || s.class?.name || s.Class?.name || "—";
+          const sec = s.section_name || s.section?.name || s.Section?.name || "—";
+          return `${cls} (${sec})`;
+        }
+      },
+      { id: "exam", header: "Exam", accessorFn: s => s.exam_title || s.exam_name || s.exam || s.Exam?.title || "—" },
+      { 
+        id: "result", 
+        header: "Marks (Obt/Total)", 
+        accessorFn: s => (s.marks_obtained !== undefined && s.total_marks !== undefined) ? `${s.marks_obtained} / ${s.total_marks}` : (s.marks || "—")
+      },
+      { id: "percentage", header: "%", accessorFn: s => s.percentage ? `${s.percentage}%` : "—" },
+      { id: "grade", header: "Grade", accessorFn: s => s.grade || "—" },
     ],
     permission: "reports.exam",
     theme: "violet",
