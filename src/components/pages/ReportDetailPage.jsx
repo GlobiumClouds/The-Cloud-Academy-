@@ -228,9 +228,16 @@ const REPORT_CONFIGS = {
         accessorFn: s => (s.status || "—").toUpperCase() 
       },
       { 
-        id: "timing", 
-        header: "In / Out", 
-        accessorFn: s => s.check_in && s.check_out ? `${s.check_in} - ${s.check_out}` : s.check_in || s.check_out || "—" 
+        id: 'guardian_contact', 
+        header: 'Guardian / Phone', 
+        accessorFn: s => {
+          const student = s.Student || s.student || {};
+          const guardians = student.guardians || student.details?.studentDetails?.guardians || [];
+          const g = (Array.isArray(guardians) ? guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (guardians && guardians[0]);
+          const name = g?.name || student.father_name || student.guardian_name || student.details?.studentDetails?.father_name || '—';
+          const phone = g?.phone || student.phone || student.details?.studentDetails?.phone || '—';
+          return `${name} | ${phone}`;
+        }
       },
     ],
     permission: "reports.attendance",
