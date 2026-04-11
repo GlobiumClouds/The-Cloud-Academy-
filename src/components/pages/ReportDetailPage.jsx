@@ -25,6 +25,7 @@ import {
   Receipt,
   Wallet,
   Printer,
+  FileDown,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -132,30 +133,40 @@ const REPORT_CONFIGS = {
     title: "Student Report",
     filters: ["search", "class", "section", "status"],
     columns: [
-      ...STUDENT_REPORT_COLUMNS.slice(0, 2),
-      STUDENT_REPORT_COLUMNS.find(c => c.id === 'class'),
-      STUDENT_REPORT_COLUMNS.find(c => c.id === 'section'),
-      STUDENT_REPORT_COLUMNS.find(c => c.id === 'primary_guardian'),
-      STUDENT_REPORT_COLUMNS.find(c => c.id === 'phone'),
+      STUDENT_REPORT_COLUMNS.find(c => c.id === 'name'),
+      STUDENT_REPORT_COLUMNS.find(c => c.id === 'roll_no'),
+      { 
+        id: 'academic', 
+        header: 'Class (Section)', 
+        accessorFn: s => `${s.class_name || s.class?.name || '—'} (${s.section_name || s.section?.name || '—'})` 
+      },
+      { 
+        id: 'guardian_contact', 
+        header: 'Guardian / Phone', 
+        accessorFn: s => {
+          const g = (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (s.guardians && s.guardians[0]);
+          const name = g?.name || s.father_name || s.guardian_name || '—';
+          const phone = g?.phone || s.phone || '—';
+          return `${name} | ${phone}`;
+        }
+      },
       STUDENT_REPORT_COLUMNS.find(c => c.id === 'status'),
       {
         id: "actions",
-        header: "Actions",
-        size: 100,
+        header: "Action",
+        size: 80,
         cell: ({ row }) => (
-          <div className="flex justify-end pr-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 text-[11px] font-extrabold border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 rounded-xl shadow-sm bg-white"
-              onClick={(e) => {
-                e.stopPropagation();
-                window.__handleIndividualDownload?.(row.original);
-              }}
-            >
-              <Download size={12} /> DETAILS
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 gap-1.5 text-[10px] font-bold border-indigo-100 text-indigo-600 hover:bg-indigo-50 rounded-lg shadow-sm bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.__handleIndividualDownload?.(row.original);
+            }}
+          >
+            <FileDown size={11} /> REPORT
+          </Button>
         ),
       },
     ],
@@ -276,15 +287,32 @@ function ReportFilters({
         </div>
         <div className="flex items-center gap-3">
           {loading && (
-            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider hidden sm:flex">
               <Loader2 size={12} className="animate-spin" /> Fetching...
             </div>
           )}
+          
+          {showFilter("search") && (
+            <div className="relative w-48 sm:w-64">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => onFilterChange("search", e.target.value)}
+                placeholder="Search by name..."
+                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50/50 text-[11px] focus:ring-4 focus:ring-slate-100 focus:bg-white transition-all outline-none"
+              />
+            </div>
+          )}
+
           <Button
             onClick={onExport}
             disabled={!canExport || isExporting}
             size="sm"
-            className="h-9 px-4 rounded-xl bg-slate-900 border-none hover:bg-slate-800 text-white font-bold text-[11px] shadow-lg shadow-slate-200 transition-all active:scale-95"
+            className="h-9 px-4 rounded-xl bg-slate-900 border-none hover:bg-slate-800 text-white font-bold text-[11px] shadow-lg shadow-slate-200 transition-all active:scale-95 whitespace-nowrap"
           >
             {isExporting ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Download size={14} className="mr-2" />}
             {isExporting ? "PREPARING..." : "EXPORT RECORDS"}
@@ -306,27 +334,6 @@ function ReportFilters({
           options={options.years || []}
           className="w-full"
         />
-
-        {showFilter("search") && (
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
-              Global Search
-            </label>
-            <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="text"
-                value={filters.search}
-                onChange={(e) => onFilterChange("search", e.target.value)}
-                placeholder="Name or Reg No..."
-                className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs focus:ring-4 focus:ring-slate-100 focus:bg-white transition-all outline-none"
-              />
-            </div>
-          </div>
-        )}
 
         {showFilter("class") && (
           <SelectField
@@ -812,15 +819,15 @@ export default function ReportDetailPage() {
               else setExporting(true);
             }}
             isExporting={hydratingBulk}
-            canExport={!!reportData?.data?.records?.length}
+            canExport={!!reportData?.data?.records?.length && !!filters.class_id}
           />
 
           {/* TABLE OVERHAUL */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40 overflow-hidden relative min-h-[400px]">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden relative">
             {!filters.class_id &&
             reportType !== "fee" &&
             reportType !== "payroll" ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-center space-y-4">
+              <div className="flex flex-col items-center justify-center p-20 text-center space-y-4 min-h-[300px]">
                 <div className="h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 border border-slate-100">
                   <Filter size={32} />
                 </div>
@@ -837,7 +844,7 @@ export default function ReportDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="p-0 compact-table border-none">
+              <div className="p-0 pb-6 compact-table border-none">
                 <DataTable
                   columns={columns}
                   data={reportData?.data?.records || []}

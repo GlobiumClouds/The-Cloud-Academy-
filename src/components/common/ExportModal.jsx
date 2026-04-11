@@ -442,17 +442,22 @@ export default function ExportModal({
   async function appendProfileToDoc(doc, student, headers, orderedCols) {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-    let yPos = 20;
+    const margin = 15;
+    let yPos = 15;
 
-    // 1. Header with branding
+    // A4 Border
+    doc.setDrawColor(30, 41, 59); // Slate-800
+    doc.setLineWidth(0.5);
+    doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+
+    // 1. Official Header
     if (pdfSettings.showLogo && instituteInfo.logo) {
       try {
         const img = new Image();
         img.src = instituteInfo.logo;
         await new Promise((resolve) => {
           img.onload = () => {
-            doc.addImage(img, 'PNG', margin, yPos, 25, 25);
+            doc.addImage(img, 'PNG', margin, yPos, 22, 22);
             resolve();
           };
           img.onerror = resolve;
@@ -462,93 +467,153 @@ export default function ExportModal({
     }
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
-    doc.setTextColor(30, 41, 59); // Slate-800
-    doc.text(instituteInfo.name, 50, yPos + 10);
+    doc.setFontSize(24);
+    doc.setTextColor(30, 41, 59);
+    doc.text(instituteInfo.name, 42, yPos + 10);
     
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139); // Slate-500
-    doc.text(`${instituteInfo.address}, ${instituteInfo.city}`, 50, yPos + 16);
-    doc.text(`${instituteInfo.phone} | ${instituteInfo.email}`, 50, yPos + 21);
-    
-    yPos += 35;
+    doc.setTextColor(71, 85, 105);
+    doc.text(`${instituteInfo.address}, ${instituteInfo.city}`, 42, yPos + 16);
+    doc.text(`Phone: ${instituteInfo.phone} | Email: ${instituteInfo.email}`, 42, yPos + 21);
 
-    // 2. Profile Title Ribbon
-    doc.setFillColor(99, 102, 241); // Indigo-600
-    doc.rect(margin, yPos, pageWidth - (margin * 2), 12, 'F');
+    // Student Photo Box (Top Right)
+    const photoX = pageWidth - margin - 35;
+    const photoY = yPos;
+    doc.setDrawColor(203, 213, 225); // Slate-200
+    doc.setFillColor(248, 250, 252); // Slate-50
+    doc.rect(photoX, photoY, 35, 40, 'FD');
+    
+    // Attempt to load student image
+    const studentImageUrl = student.image || student.profile_image || student.profile_photo;
+    if (studentImageUrl) {
+      try {
+        const simg = new Image();
+        simg.crossOrigin = "Anonymous";
+        simg.src = studentImageUrl;
+        await new Promise((resolve) => {
+          simg.onload = () => {
+            doc.addImage(simg, 'JPEG', photoX + 1, photoY + 1, 33, 38);
+            resolve();
+          };
+          simg.onerror = resolve;
+          if (simg.complete) simg.onload();
+        });
+      } catch(e) {
+        doc.setFontSize(8);
+        doc.text("PHOTO", photoX + 17.5, photoY + 22, { align: 'center' });
+      }
+    } else {
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text("STUDENT", photoX + 17.5, photoY + 18, { align: 'center' });
+      doc.text("PHOTO", photoX + 17.5, photoY + 23, { align: 'center' });
+    }
+
+    yPos += 30;
+
+    // 2. Form Title
+    doc.setFillColor(30, 41, 59); // Slate-800
+    doc.rect(margin, yPos, pageWidth - (margin * 2) - 40, 10, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
-    doc.text("OFFICIAL STUDENT PROFILE REPORT", pageWidth / 2, yPos + 8, { align: 'center' });
+    doc.text("STUDENT ADMISSION & RECORD FORM", margin + 5, yPos + 7);
     
-    yPos += 20;
+    yPos += 18;
 
-    // 3. Organization helper
-    const drawSection = (title, items) => {
-      // Check for page break
+    // Helper to draw boxed entries
+    const drawFormSection = (title, items) => {
       if (yPos > pageHeight - 40) {
         doc.addPage();
+        doc.setDrawColor(30, 41, 59);
+        doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
         yPos = 20;
       }
 
+      // Section Header
+      doc.setFillColor(241, 245, 249); // Slate-100
+      doc.rect(margin, yPos, pageWidth - (margin * 2), 8, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(99, 102, 241);
-      doc.text(title.toUpperCase(), margin, yPos);
-      doc.setDrawColor(226, 232, 240); // Slate-200
-      doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2);
-      yPos += 10;
-
-      doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      doc.setTextColor(71, 85, 105); // Slate-600
+      doc.setTextColor(51, 65, 85); // Slate-700
+      doc.text(title.toUpperCase(), margin + 3, yPos + 5.5);
+      yPos += 8;
 
-      const colWidth = (pageWidth - (margin * 2)) / 2;
+      // Draw Grid
+      const rowHeight = 10;
+      const colWidth = (pageWidth - (margin * 2)) / 3;
       
+      doc.setFontSize(8);
       items.forEach((item, idx) => {
-        const x = margin + (idx % 2 === 0 ? 0 : colWidth);
-        const currentY = yPos + (Math.floor(idx / 2) * 8);
+        const colIdx = idx % 3;
+        const rowIdx = Math.floor(idx / 3);
+        const x = margin + (colIdx * colWidth);
+        const y = yPos + (rowIdx * rowHeight);
 
+        // Box
+        doc.setDrawColor(226, 232, 240); // Slate-200
+        doc.rect(x, y, colWidth, rowHeight);
+        
+        // Label
         doc.setFont('helvetica', 'bold');
-        doc.text(`${item.label}:`, x, currentY);
+        doc.setTextColor(100, 116, 139);
+        doc.text(item.label, x + 2, y + 4);
+        
+        // Value
         doc.setFont('helvetica', 'normal');
-        doc.text(String(item.value || '—'), x + 35, currentY);
+        doc.setTextColor(30, 41, 59);
+        doc.text(String(item.value || '—'), x + 2, y + 8);
 
-        if (idx % 2 !== 0 || idx === items.length - 1) {
-          // Add row spacing only after full row or last item
-          if (idx === items.length - 1) yPos = currentY + 12;
+        if (idx === items.length - 1) {
+          yPos = y + rowHeight + 5;
         }
       });
     };
 
-    // Grouping the orderedCols into logic
     const getVal = (id) => {
       const col = colDefs.find(c => c.key === id);
-      const val = student[id] ?? '—';
+      const val = student[id] ?? (student.details?.[id]) ?? '—';
       return { label: col?.label || id, value: val };
     };
 
-    // Segment mappings
-    const personal = ['name', 'roll_no', 'reg_no', 'gender', 'dob', 'cnic', 'admission_date', 'nationality', 'status', 'religion'].map(getVal).filter(v => v.value !== '—');
-    const academic = ['academic_year', 'class', 'section', 'previous_school', 'previous_class'].map(getVal).filter(v => v.value !== '—');
-    const contact = ['phone', 'email', 'city', 'address', 'permanent_address'].map(getVal).filter(v => v.value !== '—');
-    const guardian = ['primary_guardian', 'guardian_relation', 'guardian_phone', 'guardian_email', 'guardian_cnic', 'mother_name'].map(getVal).filter(v => v.value !== '—');
-    const finance = ['monthly_fee', 'admission_fee', 'concession_type', 'concession_percentage'].map(getVal).filter(v => v.value !== '—');
+    // Data Segments
+    const personal = ['name', 'roll_no', 'reg_no', 'gender', 'dob', 'cnic', 'admission_date', 'nationality', 'religion'].map(getVal);
+    const academic = ['academic_year', 'class', 'section', 'previous_school', 'previous_class', 'status'].map(getVal);
+    const contact = ['phone', 'email', 'city', 'country', 'address', 'permanent_address'].map(getVal);
+    const family = ['primary_guardian', 'guardian_relation', 'guardian_phone', 'mother_name', 'guardian_cnic', 'guardian_occupation'].map(getVal);
+    const finance = ['monthly_fee', 'admission_fee', 'concession_type', 'concession_p'].map(getVal);
 
-    if (personal.length) drawSection("Personal Information", personal);
-    if (academic.length) drawSection("Academic Record", academic);
-    if (contact.length) drawSection("Contact Details", contact);
-    if (guardian.length) drawSection("Family & Guardian", guardian);
-    if (finance.length) drawSection("Fee & Concessions", finance);
+    drawFormSection("I. Personal Identification", personal);
+    drawFormSection("II. Enrollment & Academic Details", academic);
+    drawFormSection("III. Contact & Residential Info", contact);
+    drawFormSection("IV. Parental & Guardian Information", family);
+    drawFormSection("V. Financial & Concession Summary", finance);
 
-    // 4. Footer
+    // Certification Box
+    if (yPos > pageHeight - 50) { doc.addPage(); doc.rect(5, 5, pageWidth - 10, pageHeight - 10); yPos = 20; }
+    
+    yPos += 5;
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(margin, yPos, pageWidth - (margin * 2), 25);
+    doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184); // Slate-400
-    doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
-    doc.text(`System Generated Report • ${formatDate(new Date())}`, margin, pageHeight - 20);
-    // doc.text(`Page 1 of 1`, pageWidth - margin, pageHeight - 20, { align: 'right' });
-    doc.text(instituteInfo.website, pageWidth / 2, pageHeight - 15, { align: 'center' });
+    doc.text("Declaration: I hereby certify that the information provided above is correct to the best of my knowledge and system records.", margin + 5, yPos + 8);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text("System Administrator Signature:", margin + 5, yPos + 20);
+    doc.line(margin + 58, yPos + 20, margin + 110, yPos + 20);
+    
+    doc.text("Date:", pageWidth - margin - 40, yPos + 20);
+    doc.line(pageWidth - margin - 30, yPos + 20, pageWidth - margin - 5, yPos + 20);
+
+    // Footer
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Official Document ID: STU-${student.id}-${Date.now()}`, margin, pageHeight - 12);
+    doc.text(`Printed By: The Clouds Academy ERP System`, pageWidth / 2, pageHeight - 12, { align: 'center' });
+    doc.text(`www.thecloudsacademy.com`, pageWidth - margin, pageHeight - 12, { align: 'right' });
   }
   
   async function handleExport() {
@@ -593,16 +658,30 @@ export default function ExportModal({
         let doc;
         // Detect Individual Export Mode OR Multi-Profile Mode
         if (fileName.includes('Profile')) {
-          for (let i = 0; i < filtered.length; i++) {
+          // IMPORTANT: Profiles need ALL data fields, not just the selected columns
+          const fullHydratedData = rows.map(row => {
+            const out = {};
+            columns.forEach(col => {
+              const k = col.accessorKey ?? col.id;
+              if (col.accessorFn) out[k] = col.accessorFn(row) ?? '';
+              else if (col.accessorKey) {
+                const keys = col.accessorKey.split('.');
+                let v = row;
+                for (const key of keys) v = v?.[key];
+                out[k] = v ?? '';
+              } else out[k] = row[k] ?? '';
+            });
+            return out;
+          });
+
+          for (let i = 0; i < fullHydratedData.length; i++) {
             if (i === 0) {
-              doc = await generateProfilePDF(filtered[i], headers, orderedCols);
+              doc = await generateProfilePDF(fullHydratedData[i], headers, orderedCols);
             } else {
               doc.addPage();
-              // Reset yPos for the new page in generateProfilePDF logic but wait, 
-              // generateProfilePDF returns a new doc. I should refactor it.
-              await appendProfileToDoc(doc, filtered[i], headers, orderedCols);
+              await appendProfileToDoc(doc, fullHydratedData[i], headers, orderedCols);
             }
-            setExportProgress(70 + Math.floor((i / filtered.length) * 25));
+            setExportProgress(70 + Math.floor((i / fullHydratedData.length) * 25));
           }
         } else {
           doc = await generateProfessionalPDF(filtered, headers, orderedCols);
