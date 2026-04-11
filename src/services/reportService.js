@@ -134,6 +134,7 @@ export const reportService = {
         section_id: filters.section_id,
         from_date: filters.from_date,
         to_date: filters.to_date,
+        search: filters.search,
         page: filters.page || 1,
         limit: filters.limit || 50,
       };
@@ -244,6 +245,7 @@ export const reportService = {
         const resultsParams = {
           class_id: filters.class_id,
           section_id: filters.section_id,
+          search: filters.search,
           page: filters.page || 1,
           limit: filters.limit || 50,
         };

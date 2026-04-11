@@ -58,73 +58,178 @@ import ExportModal from "@/components/common/ExportModal";
 
 const STUDENT_REPORT_COLUMNS = [
   // SECTION: PERSONAL
-  { id: 'name', header: 'Full Name', accessorFn: s => `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.name || '—' },
-  { id: 'roll_no', header: 'Roll Number', accessorFn: s => s.roll_no || s.registration_no || s.roll_number || '—' },
-  { id: 'reg_no', header: 'Registration ID', accessorFn: s => s.registration_no || '—' },
-  { id: 'gender', header: 'Gender', accessorFn: s => s.gender || '—' },
-  { id: 'dob', header: 'Date of Birth', accessorFn: s => s.dob || s.date_of_birth || '—' },
-  { id: 'admission_date', header: 'Admission Date', accessorFn: s => s.admission_date || s.enrollment_date || '—' },
-  { id: 'cnic', header: 'CNIC / B-Form', accessorFn: s => s.cnic || '—' },
-  { id: 'blood_group', header: 'Blood Group', accessorFn: s => s.blood_group || '—' },
-  { id: 'religion', header: 'Religion', accessorFn: s => s.religion || '—' },
-  { id: 'nationality', header: 'Nationality', accessorFn: s => s.nationality || '—' },
+  {
+    id: "name",
+    header: "Full Name",
+    accessorFn: (s) =>
+      `${s.first_name || ""} ${s.last_name || ""}`.trim() || s.name || "—",
+  },
+  {
+    id: "roll_no",
+    header: "Roll Number",
+    accessorFn: (s) => s.roll_no || s.registration_no || s.roll_number || "—",
+  },
+  {
+    id: "reg_no",
+    header: "Registration ID",
+    accessorFn: (s) => s.registration_no || "—",
+  },
+  { id: "gender", header: "Gender", accessorFn: (s) => s.gender || "—" },
+  {
+    id: "dob",
+    header: "Date of Birth",
+    accessorFn: (s) => s.dob || s.date_of_birth || "—",
+  },
+  {
+    id: "admission_date",
+    header: "Admission Date",
+    accessorFn: (s) => s.admission_date || s.enrollment_date || "—",
+  },
+  { id: "cnic", header: "CNIC / B-Form", accessorFn: (s) => s.cnic || "—" },
+  {
+    id: "blood_group",
+    header: "Blood Group",
+    accessorFn: (s) => s.blood_group || "—",
+  },
+  { id: "religion", header: "Religion", accessorFn: (s) => s.religion || "—" },
+  {
+    id: "nationality",
+    header: "Nationality",
+    accessorFn: (s) => s.nationality || "—",
+  },
 
   // SECTION: ACADEMIC
-  { id: 'academic_year', header: 'Academic Year', accessorFn: s => s.academic_year_name || s.academic_year?.name || '—' },
-  { id: 'class', header: 'Class / Program', accessorFn: s => s.class_name || s.class?.name || '—' },
-  { id: 'section', header: 'Section / Batch', accessorFn: s => s.section_name || s.section?.name || '—' },
-  { id: 'previous_school', header: 'Previous School', accessorFn: s => s.previous_school || '—' },
-  { id: 'previous_class', header: 'Previous Class', accessorFn: s => s.previous_class || '—' },
+  {
+    id: "academic_year",
+    header: "Academic Year",
+    accessorFn: (s) => s.academic_year_name || s.academic_year?.name || "—",
+  },
+  {
+    id: "class",
+    header: "Class / Program",
+    accessorFn: (s) => s.class_name || s.class?.name || "—",
+  },
+  {
+    id: "section",
+    header: "Section / Batch",
+    accessorFn: (s) => s.section_name || s.section?.name || "—",
+  },
+  {
+    id: "previous_school",
+    header: "Previous School",
+    accessorFn: (s) => s.previous_school || "—",
+  },
+  {
+    id: "previous_class",
+    header: "Previous Class",
+    accessorFn: (s) => s.previous_class || "—",
+  },
 
   // SECTION: CONTACT
-  { id: 'phone', header: 'Phone Number', accessorFn: s => s.phone || '—' },
-  { id: 'email', header: 'Email Address', accessorFn: s => s.email || '—' },
-  { id: 'city', header: 'City', accessorFn: s => s.city || '—' },
-  { id: 'address', header: 'Present Address', accessorFn: s => s.present_address || s.address || '—' },
-  { id: 'permanent_address', header: 'Permanent Address', accessorFn: s => s.permanent_address || '—' },
+  { id: "phone", header: "Phone Number", accessorFn: (s) => s.phone || "—" },
+  { id: "email", header: "Email Address", accessorFn: (s) => s.email || "—" },
+  { id: "city", header: "City", accessorFn: (s) => s.city || "—" },
+  {
+    id: "address",
+    header: "Present Address",
+    accessorFn: (s) => s.present_address || s.address || "—",
+  },
+  {
+    id: "permanent_address",
+    header: "Permanent Address",
+    accessorFn: (s) => s.permanent_address || "—",
+  },
 
   // SECTION: GUARDIAN
-  { 
-    id: 'primary_guardian', 
-    header: 'Primary Guardian', 
-    accessorFn: s => {
-      const g = (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (s.guardians && s.guardians[0]);
-      return g?.name || s.father_name || s.guardian_name || '—';
-    }
+  {
+    id: "primary_guardian",
+    header: "Primary Guardian",
+    accessorFn: (s) => {
+      const g =
+        (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(
+          (x) => x.type === "father" || x.type === "guardian",
+        ) ||
+        (s.guardians && s.guardians[0]);
+      return g?.name || s.father_name || s.guardian_name || "—";
+    },
   },
-  { 
-    id: 'guardian_relation', 
-    header: 'Relation', 
-    accessorFn: s => {
-      const g = (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (s.guardians && s.guardians[0]);
-      return g?.relation || g?.type || (s.father_name ? 'Father' : '—');
-    }
+  {
+    id: "guardian_relation",
+    header: "Relation",
+    accessorFn: (s) => {
+      const g =
+        (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(
+          (x) => x.type === "father" || x.type === "guardian",
+        ) ||
+        (s.guardians && s.guardians[0]);
+      return g?.relation || g?.type || (s.father_name ? "Father" : "—");
+    },
   },
-  { 
-    id: 'guardian_phone', 
-    header: 'Guardian Phone', 
-    accessorFn: s => {
-      const g = (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (s.guardians && s.guardians[0]);
-      return g?.phone || s.father_phone || '—';
-    }
+  {
+    id: "guardian_phone",
+    header: "Guardian Phone",
+    accessorFn: (s) => {
+      const g =
+        (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(
+          (x) => x.type === "father" || x.type === "guardian",
+        ) ||
+        (s.guardians && s.guardians[0]);
+      return g?.phone || s.father_phone || "—";
+    },
   },
-  { id: 'guardian_email', header: 'Guardian Email', accessorFn: s => (s.guardians?.find(x => x.email)?.email) || s.guardian_email || '—' },
-  { id: 'mother_name', header: 'Mother Name', accessorFn: s => s.mother_name || s.guardians?.find(x => x.type === 'mother')?.name || '—' },
-  
+  {
+    id: "guardian_email",
+    header: "Guardian Email",
+    accessorFn: (s) =>
+      s.guardians?.find((x) => x.email)?.email || s.guardian_email || "—",
+  },
+  {
+    id: "mother_name",
+    header: "Mother Name",
+    accessorFn: (s) =>
+      s.mother_name ||
+      s.guardians?.find((x) => x.type === "mother")?.name ||
+      "—",
+  },
+
   // SECTION: HEALTH
-  { id: 'medical_conditions', header: 'Medical Conditions', accessorFn: s => s.medical_conditions || '—' },
-  { id: 'allergies', header: 'Allergies', accessorFn: s => s.allergies || '—' },
+  {
+    id: "medical_conditions",
+    header: "Medical Conditions",
+    accessorFn: (s) => s.medical_conditions || "—",
+  },
+  {
+    id: "allergies",
+    header: "Allergies",
+    accessorFn: (s) => s.allergies || "—",
+  },
 
   // SECTION: FINANCE
-  { id: 'monthly_fee', header: 'Monthly Fee', accessorFn: s => s.monthly_fee || '—' },
-  { id: 'admission_fee', header: 'Admission Fee', accessorFn: s => s.admission_fee || '—' },
-  { id: 'concession_type', header: 'Concession Type', accessorFn: s => s.concession_type || '—' },
-  { id: 'concession_p', header: 'Concession (%)', accessorFn: s => s.concession_percentage || '—' },
+  {
+    id: "monthly_fee",
+    header: "Monthly Fee",
+    accessorFn: (s) => s.monthly_fee || "—",
+  },
+  {
+    id: "admission_fee",
+    header: "Admission Fee",
+    accessorFn: (s) => s.admission_fee || "—",
+  },
+  {
+    id: "concession_type",
+    header: "Concession Type",
+    accessorFn: (s) => s.concession_type || "—",
+  },
+  {
+    id: "concession_p",
+    header: "Concession (%)",
+    accessorFn: (s) => s.concession_percentage || "—",
+  },
 
-  { 
-    id: 'status', 
-    header: 'Status', 
-    accessorFn: s => (s.is_active ? 'Active' : 'Inactive') 
+  {
+    id: "status",
+    header: "Status",
+    accessorFn: (s) => (s.is_active ? "Active" : "Inactive"),
   },
 ];
 
@@ -133,38 +238,63 @@ const REPORT_CONFIGS = {
     title: "Student Report",
     filters: ["search", "class", "section", "status"],
     columns: [
-      STUDENT_REPORT_COLUMNS.find(c => c.id === 'name'),
-      { 
-        id: "ids", 
-        header: "Roll / Reg No", 
+      STUDENT_REPORT_COLUMNS.find((c) => c.id === "name"),
+      {
+        id: "ids",
+        header: "Roll / Reg No",
         cell: ({ row }) => {
           const s = row.original;
-          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.Student?.details?.studentDetails?.roll_no || s.student?.details?.studentDetails?.roll_no || s.details?.studentDetails?.roll_no;
-          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.Student?.details?.studentDetails?.registration_no || s.student?.details?.studentDetails?.registration_no || s.details?.studentDetails?.registration_no;
+          const roll =
+            s.roll_no ||
+            s.roll_number ||
+            s.Student?.roll_no ||
+            s.Student?.roll_number ||
+            s.student?.roll_no ||
+            s.student?.roll_number ||
+            s.Student?.details?.studentDetails?.roll_no ||
+            s.student?.details?.studentDetails?.roll_no ||
+            s.details?.studentDetails?.roll_no;
+          const reg =
+            s.registration_no ||
+            s.reg_no ||
+            s.Student?.registration_no ||
+            s.student?.registration_no ||
+            s.Student?.details?.studentDetails?.registration_no ||
+            s.student?.details?.studentDetails?.registration_no ||
+            s.details?.studentDetails?.registration_no;
           return (
             <div className="flex flex-col py-1">
-              <span className="text-slate-700 font-bold text-[11px] leading-none mb-1">{roll || "—"}</span>
-              <span className="text-slate-400 text-[10px] leading-tight font-medium uppercase tracking-wider">{reg || "—"}</span>
+              <span className="text-slate-700 font-bold text-[11px] leading-none mb-1">
+                {roll || "—"}
+              </span>
+              <span className="text-slate-400 text-[10px] leading-tight font-medium uppercase tracking-wider">
+                {reg || "—"}
+              </span>
             </div>
           );
-        }
+        },
       },
-      { 
-        id: 'academic', 
-        header: 'Class (Section)', 
-        accessorFn: s => `${s.class_name || s.class?.name || '—'} (${s.section_name || s.section?.name || '—'})` 
+      {
+        id: "academic",
+        header: "Class (Section)",
+        accessorFn: (s) =>
+          `${s.class_name || s.class?.name || "—"} (${s.section_name || s.section?.name || "—"})`,
       },
-      { 
-        id: 'guardian_contact', 
-        header: 'Guardian / Phone', 
-        accessorFn: s => {
-          const g = (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (s.guardians && s.guardians[0]);
-          const name = g?.name || s.father_name || s.guardian_name || '—';
-          const phone = g?.phone || s.phone || '—';
+      {
+        id: "guardian_contact",
+        header: "Guardian / Phone",
+        accessorFn: (s) => {
+          const g =
+            (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(
+              (x) => x.type === "father" || x.type === "guardian",
+            ) ||
+            (s.guardians && s.guardians[0]);
+          const name = g?.name || s.father_name || s.guardian_name || "—";
+          const phone = g?.phone || s.phone || "—";
           return `${name} | ${phone}`;
-        }
+        },
       },
-      STUDENT_REPORT_COLUMNS.find(c => c.id === 'status'),
+      STUDENT_REPORT_COLUMNS.find((c) => c.id === "status"),
       {
         id: "actions",
         header: "Action",
@@ -192,52 +322,108 @@ const REPORT_CONFIGS = {
     title: "Attendance Report",
     filters: ["dateRange", "class", "section", "type"],
     columns: [
-      { id: "date", header: "Date", accessorFn: s => s.date || s.attendance_date || "—" },
-      { 
-        id: "name", 
-        header: "Student", 
-        accessorFn: s => s.student_name || s.name || s.Student?.name || `${s.Student?.first_name || ""} ${s.Student?.last_name || ""}`.trim() || s.first_name || "—" 
+      {
+        id: "date",
+        header: "Date",
+        accessorFn: (s) => s.date || s.attendance_date || "—",
       },
-      { 
-        id: "ids", 
-        header: "Roll / Reg No", 
+      {
+        id: "name",
+        header: "Student",
+        accessorFn: (s) =>
+          s.student_name ||
+          s.name ||
+          s.Student?.name ||
+          `${s.Student?.first_name || ""} ${s.Student?.last_name || ""}`.trim() ||
+          s.first_name ||
+          "—",
+      },
+      {
+        id: "ids",
+        header: "Roll / Reg No",
         cell: ({ row }) => {
           const s = row.original;
-          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.Student?.details?.studentDetails?.roll_no || s.student?.details?.studentDetails?.roll_no || s.details?.studentDetails?.roll_no;
-          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.Student?.details?.studentDetails?.registration_no || s.student?.details?.studentDetails?.registration_no || s.details?.studentDetails?.registration_no;
+          const roll =
+            s.roll_no ||
+            s.roll_number ||
+            s.Student?.roll_no ||
+            s.Student?.roll_number ||
+            s.student?.roll_no ||
+            s.student?.roll_number ||
+            s.Student?.details?.studentDetails?.roll_no ||
+            s.student?.details?.studentDetails?.roll_no ||
+            s.details?.studentDetails?.roll_no;
+          const reg =
+            s.registration_no ||
+            s.reg_no ||
+            s.Student?.registration_no ||
+            s.student?.registration_no ||
+            s.Student?.details?.studentDetails?.registration_no ||
+            s.student?.details?.studentDetails?.registration_no ||
+            s.details?.studentDetails?.registration_no;
           return (
             <div className="flex flex-col py-1">
-              <span className="text-emerald-700 font-bold text-[11px] leading-none mb-1">{roll || "—"}</span>
-              <span className="text-emerald-400/80 text-[10px] leading-tight font-medium uppercase tracking-wider">{reg || "—"}</span>
+              <span className="text-emerald-700 font-bold text-[11px] leading-none mb-1">
+                {roll || "—"}
+              </span>
+              <span className="text-emerald-400/80 text-[10px] leading-tight font-medium uppercase tracking-wider">
+                {reg || "—"}
+              </span>
             </div>
           );
-        }
+        },
       },
-      { 
-        id: "academic", 
-        header: "Class (Section)", 
-        accessorFn: s => {
-          const cls = s.class_name || s.class?.name || s.Class?.name || s.current_class || "—";
-          const sec = s.section_name || s.section?.name || s.Section?.name || s.section || "—";
+      {
+        id: "academic",
+        header: "Class (Section)",
+        accessorFn: (s) => {
+          const cls =
+            s.class_name ||
+            s.class?.name ||
+            s.Class?.name ||
+            s.current_class ||
+            "—";
+          const sec =
+            s.section_name ||
+            s.section?.name ||
+            s.Section?.name ||
+            s.section ||
+            "—";
           return `${cls} (${sec})`;
-        }
+        },
       },
-      { 
-        id: "status", 
-        header: "Status", 
-        accessorFn: s => (s.status || "—").toUpperCase() 
+      {
+        id: "status",
+        header: "Status",
+        accessorFn: (s) => (s.status || "—").toUpperCase(),
       },
-      { 
-        id: 'guardian_contact', 
-        header: 'Guardian / Phone', 
-        accessorFn: s => {
+      {
+        id: "guardian_contact",
+        header: "Guardian / Phone",
+        accessorFn: (s) => {
           const student = s.Student || s.student || {};
-          const guardians = student.guardians || student.details?.studentDetails?.guardians || [];
-          const g = (Array.isArray(guardians) ? guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (guardians && guardians[0]);
-          const name = g?.name || student.father_name || student.guardian_name || student.details?.studentDetails?.father_name || '—';
-          const phone = g?.phone || student.phone || student.details?.studentDetails?.phone || '—';
+          const guardians =
+            student.guardians ||
+            student.details?.studentDetails?.guardians ||
+            [];
+          const g =
+            (Array.isArray(guardians) ? guardians : []).find(
+              (x) => x.type === "father" || x.type === "guardian",
+            ) ||
+            (guardians && guardians[0]);
+          const name =
+            g?.name ||
+            student.father_name ||
+            student.guardian_name ||
+            student.details?.studentDetails?.father_name ||
+            "—";
+          const phone =
+            g?.phone ||
+            student.phone ||
+            student.details?.studentDetails?.phone ||
+            "—";
           return `${name} | ${phone}`;
-        }
+        },
       },
     ],
     permission: "reports.attendance",
@@ -252,45 +438,173 @@ const REPORT_CONFIGS = {
   },
   exam: {
     title: "Exam Result Report",
-    filters: ["class", "section", "exam", "type"],
+    filters: ["exam", "class", "section", "status"],
     columns: [
-      { 
-        id: "name", 
-        header: "Student", 
-        accessorFn: s => s.student_name || s.name || s.Student?.name || `${s.Student?.first_name || ""} ${s.Student?.last_name || ""}`.trim() || s.first_name || "—" 
+      {
+        id: "name",
+        header: "Student",
+        accessorFn: (s) => {
+          const student = s.student || s.Student || {};
+          const details =
+            student.details?.studentDetails || s.details?.studentDetails || {};
+          const first =
+            student.first_name ||
+            s.first_name ||
+            details.first_name ||
+            s.student_name ||
+            student.student_name ||
+            "";
+          const last =
+            student.last_name || s.last_name || details.last_name || "";
+          const full =
+            s.full_name ||
+            student.full_name ||
+            s.name ||
+            student.name ||
+            `${first} ${last}`.trim();
+          return full || "—";
+        },
       },
-      { 
-        id: "ids", 
-        header: "Roll / Reg No", 
+      {
+        id: "ids",
+        header: "Roll / Reg No",
         cell: ({ row }) => {
           const s = row.original;
-          const roll = s.roll_no || s.roll_number || s.Student?.roll_no || s.Student?.roll_number || s.student?.roll_no || s.student?.roll_number || s.Student?.details?.studentDetails?.roll_no || s.student?.details?.studentDetails?.roll_no || s.details?.studentDetails?.roll_no;
-          const reg = s.registration_no || s.reg_no || s.Student?.registration_no || s.student?.registration_no || s.Student?.details?.studentDetails?.registration_no || s.student?.details?.studentDetails?.registration_no || s.details?.studentDetails?.registration_no;
+          const student = s.student || s.Student || {};
+          const roll =
+            student.roll_no ||
+            student.roll_number ||
+            s.roll_no ||
+            s.roll_number ||
+            student.details?.studentDetails?.roll_no ||
+            s.details?.studentDetails?.roll_no ||
+            "—";
+          const reg =
+            student.registration_no ||
+            student.reg_no ||
+            s.registration_no ||
+            s.reg_no ||
+            student.details?.studentDetails?.registration_no ||
+            s.details?.studentDetails?.registration_no ||
+            "—";
           return (
             <div className="flex flex-col py-1">
-              <span className="text-violet-700 font-bold text-[11px] leading-none mb-1">{roll || "—"}</span>
-              <span className="text-violet-400/80 text-[10px] leading-tight font-medium uppercase tracking-wider">{reg || "—"}</span>
+              <span className="text-violet-700 font-bold text-[11px] leading-none mb-1">
+                {roll || "—"}
+              </span>
+              <span className="text-violet-400/80 text-[10px] leading-tight font-medium uppercase tracking-wider">
+                {reg || "—"}
+              </span>
             </div>
           );
-        }
+        },
       },
-      { 
-        id: "academic", 
-        header: "Class (Section)", 
-        accessorFn: s => {
-          const cls = s.class_name || s.class?.name || s.Class?.name || "—";
-          const sec = s.section_name || s.section?.name || s.Section?.name || "—";
+      {
+        id: "academic",
+        header: "Class (Section)",
+        accessorFn: (s) => {
+          const student = s.student || s.Student || {};
+          const cls =
+            s.class_name ||
+            s.class?.name ||
+            s.Class?.name ||
+            s.current_class ||
+            student.class?.name ||
+            s.exam_schedule?.class?.name ||
+            "—";
+          const sec =
+            s.section_name ||
+            s.section?.name ||
+            s.Section?.name ||
+            s.section ||
+            student.section?.name ||
+            s.exam_schedule?.section?.name ||
+            "—";
           return `${cls} (${sec})`;
-        }
+        },
       },
-      { id: "exam", header: "Exam", accessorFn: s => s.exam_title || s.exam_name || s.exam || s.Exam?.title || "—" },
-      { 
-        id: "result", 
-        header: "Marks (Obt/Total)", 
-        accessorFn: s => (s.marks_obtained !== undefined && s.total_marks !== undefined) ? `${s.marks_obtained} / ${s.total_marks}` : (s.marks || "—")
+      {
+        id: "exam",
+        header: "Exam",
+        accessorFn: (s) =>
+          s.exam_title ||
+          s.exam_name ||
+          s.exam ||
+          s.Exam?.title ||
+          s.exam?.name ||
+          s.exam_schedule?.exam?.title ||
+          "—",
       },
-      { id: "percentage", header: "%", accessorFn: s => s.percentage ? `${s.percentage}%` : "—" },
-      { id: "grade", header: "Grade", accessorFn: s => s.grade || "—" },
+      {
+        id: "subject",
+        header: "Subject",
+        accessorFn: (s) =>
+          s.subject_name ||
+          s.subject ||
+          s.Subject?.name ||
+          s.subject?.name ||
+          s.exam_schedule?.subject?.name ||
+          "—",
+      },
+      {
+        id: "result",
+        header: "Marks (Obt/Total)",
+        accessorFn: (s) => {
+          const obt =
+            s.total_marks_obtained ??
+            s.total_obtained ??
+            s.marks_obtained ??
+            s.marks ??
+            s.obtained_marks ??
+            s.score ??
+            s.marks_obt ??
+            s.result_marks ??
+            s.obtained;
+          const total =
+            s.total_marks ??
+            s.max_marks ??
+            s.total ??
+            s.max_score ??
+            s.total_score ??
+            s.exam_total_marks;
+          return obt !== undefined && total !== undefined
+            ? `${obt} / ${total}`
+            : obt || "—";
+        },
+      },
+      {
+        id: "percentage",
+        header: "%",
+        accessorFn: (s) =>
+          s.percentage ||
+          s.pct ||
+          (s.marks_obtained && s.total_marks
+            ? `${((s.marks_obtained / s.total_marks) * 100).toFixed(2)}%`
+            : "—"),
+      },
+      {
+        id: "grade",
+        header: "Grade",
+        accessorFn: (s) => s.grade || s.result_grade || "—",
+      },
+      {
+        id: "status",
+        header: "Status",
+        accessorFn: (s) => {
+          const status = s.status || s.result_status || s.outcome;
+          if (status) return status.toUpperCase();
+          const perc = parseFloat(
+            s.percentage || (s.marks_obtained / s.total_marks) * 100 || 0,
+          );
+          if (!s.percentage && s.marks_obtained === undefined) return "—";
+          return perc >= 33 ? "PASS" : "FAIL";
+        },
+      },
+      {
+        id: "position",
+        header: "Pos.",
+        accessorFn: (s) => s.position || s.rank || s.class_position || "—",
+      },
     ],
     permission: "reports.exam",
     theme: "violet",
@@ -373,7 +687,7 @@ function ReportFilters({
               <Loader2 size={12} className="animate-spin" /> Fetching...
             </div>
           )}
-          
+
           {showFilter("search") && (
             <div className="relative w-48 sm:w-64">
               <Search
@@ -396,7 +710,11 @@ function ReportFilters({
             size="sm"
             className="h-9 px-4 rounded-xl bg-slate-900 border-none hover:bg-slate-800 text-white font-bold text-[11px] shadow-lg shadow-slate-200 transition-all active:scale-95 whitespace-nowrap"
           >
-            {isExporting ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Download size={14} className="mr-2" />}
+            {isExporting ? (
+              <Loader2 size={14} className="mr-2 animate-spin" />
+            ) : (
+              <Download size={14} className="mr-2" />
+            )}
             {isExporting ? "PREPARING..." : "EXPORT RECORDS"}
           </Button>
         </div>
@@ -416,6 +734,25 @@ function ReportFilters({
           options={options.years || []}
           className="w-full"
         />
+
+        {showFilter("exam") && (
+          <SelectField
+            label="Select Exam"
+            placeholder="Choose Exam"
+            value={filters.exam_id}
+            onChange={(v) => {
+              onFilterChange("exam_id", v);
+              onFilterChange("class_id", "");
+              onFilterChange("section_id", "");
+            }}
+            options={(exams || []).map((ex) => ({
+              value: ex.id,
+              label: ex.title || ex.name,
+            }))}
+            className="w-full"
+            disabled={!filters.academic_year_id}
+          />
+        )}
 
         {showFilter("class") && (
           <SelectField
@@ -444,21 +781,6 @@ function ReportFilters({
             options={(sections || []).map((s) => ({
               value: String(s.value || s.id || ""),
               label: s.label || s.name || s.section_name || "—",
-            }))}
-            className="w-full"
-            disabled={!filters.class_id}
-          />
-        )}
-
-        {showFilter("exam") && (
-          <SelectField
-            label="Select Exam"
-            placeholder="Choose Exam"
-            value={filters.exam_id}
-            onChange={(v) => onFilterChange("exam_id", v)}
-            options={(exams || []).map((ex) => ({
-              value: ex.id,
-              label: ex.title || ex.name,
             }))}
             className="w-full"
             disabled={!filters.class_id}
@@ -535,9 +857,13 @@ export default function ReportDetailPage() {
   });
 
   const { data: examsData } = useQuery({
-    queryKey: ["exams", currentInstitute?.id, filters.class_id],
-    queryFn: () => examService.getAll({ class_id: filters.class_id }),
-    enabled: !!filters.class_id && reportType === "exam",
+    queryKey: ["exams", currentInstitute?.id, filters.academic_year_id],
+    queryFn: () =>
+      examService.getAll({
+        academic_year_id: filters.academic_year_id,
+        limit: 100,
+      }),
+    enabled: !!filters.academic_year_id && reportType === "exam",
   });
 
   // Sections
@@ -622,7 +948,8 @@ export default function ReportDetailPage() {
     enabled:
       !!currentInstitute?.id &&
       reportType !== "fee" &&
-      reportType !== "payroll",
+      reportType !== "payroll" &&
+      (reportType !== "exam" || (!!filters.exam_id && !!filters.class_id)),
   });
 
   const [individualExportData, setIndividualExportData] = useState(null);
@@ -635,7 +962,9 @@ export default function ReportDetailPage() {
     if (!rawRecords.length) return;
 
     setHydratingBulk(true);
-    const loadingToast = toast.loading(`Preparing high-detail profiles for ${rawRecords.length} students...`);
+    const loadingToast = toast.loading(
+      `Preparing high-detail profiles for ${rawRecords.length} students...`,
+    );
 
     try {
       // Fetch all full records in parallel
@@ -649,7 +978,7 @@ export default function ReportDetailPage() {
           } catch {
             return s; // Fallback to basic if fetch fails
           }
-        })
+        }),
       );
 
       setHydratedBulkData(fullyLoaded);
@@ -667,12 +996,12 @@ export default function ReportDetailPage() {
   useEffect(() => {
     window.__handleIndividualDownload = async (student) => {
       if (!student?.id) return;
-      
+
       const loadingToast = toast.loading("Fetching full student profile...");
       try {
         const res = await studentService.getById(student.id);
         const fullData = res.data || student;
-        
+
         // Ensure flattening matches ExportModal expectations
         const details = fullData.details?.studentDetails || {};
         const flattened = {
@@ -832,7 +1161,6 @@ export default function ReportDetailPage() {
               </h1>
             </div>
           </div>
-
         </div>
       )}
 
@@ -889,16 +1217,20 @@ export default function ReportDetailPage() {
             sections={sectionList}
             exams={examList}
             onExport={() => {
-              if (reportType === 'student') handleBulkProfileDownload();
+              if (reportType === "student") handleBulkProfileDownload();
               else setExporting(true);
             }}
             isExporting={hydratingBulk}
-            canExport={!!reportData?.data?.records?.length && !!filters.class_id}
+            canExport={
+              !!reportData?.data?.records?.length && !!filters.class_id
+            }
           />
 
           {/* TABLE OVERHAUL */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden relative">
-            {!filters.class_id &&
+            {((reportType === "exam" &&
+              (!filters.exam_id || !filters.class_id)) ||
+              (!filters.class_id && reportType !== "exam")) &&
             reportType !== "fee" &&
             reportType !== "payroll" ? (
               <div className="flex flex-col items-center justify-center p-20 text-center space-y-4 min-h-[300px]">
@@ -907,13 +1239,14 @@ export default function ReportDetailPage() {
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-slate-800">
-                    No Data to Display
+                    {reportType === "exam"
+                      ? "Examination Results"
+                      : "No Data to Display"}
                   </h3>
                   <p className="text-sm text-slate-400 max-w-[280px]">
-                    Please select{" "}
-                    <span className="font-bold text-slate-600">Class</span> and{" "}
-                    <span className="font-bold text-slate-600">Section</span> to
-                    load the report.
+                    {reportType === "exam"
+                      ? "Please select an Exam and Class to view the performance report."
+                      : "Please select Class and Section to load the report data."}
                   </p>
                 </div>
               </div>
@@ -944,7 +1277,11 @@ export default function ReportDetailPage() {
               setHydratedBulkData([]); // Clear after use
             }}
             columns={STUDENT_REPORT_COLUMNS}
-            rows={hydratedBulkData.length > 0 ? hydratedBulkData : (reportData?.data?.records || [])}
+            rows={
+              hydratedBulkData.length > 0
+                ? hydratedBulkData
+                : reportData?.data?.records || []
+            }
             fileName={`${config.title}-Profiles-Class`}
           />
 
