@@ -251,12 +251,30 @@ export default function ExportModal({
     
     return data.map((row) => {
       const out = {};
-      orderedCols.forEach((k) => { out[k] = row[k] ?? ''; });
+      orderedCols.forEach((k) => { 
+        // Find the original column definition to check for accessorFn
+        const colDef = columns.find(c => (c.accessorKey ?? c.id) === k);
+        
+        if (colDef?.accessorFn) {
+          out[k] = colDef.accessorFn(row) ?? '';
+        } else if (colDef?.accessorKey) {
+          // Handle nested keys like "details.phone"
+          const keys = colDef.accessorKey.split('.');
+          let val = row;
+          for (const key of keys) {
+            val = val?.[key];
+          }
+          out[k] = val ?? '';
+        } else {
+          out[k] = row[k] ?? ''; 
+        }
+      });
       return out;
     });
   }
   
   // Professional PDF Generation
+  // Professional PDF Generation (Tabular)
   async function generateProfessionalPDF(data, headers, orderedCols) {
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
@@ -296,11 +314,10 @@ export default function ExportModal({
             yPos += height + 5;
             resolve();
           };
+          img.onerror = resolve;
           if (img.complete) img.onload();
         });
-      } catch (err) {
-        console.error('Logo load error:', err);
-      }
+      } catch (err) {}
     }
     
     // Institute Name
@@ -370,7 +387,6 @@ export default function ExportModal({
       orderedCols.map(key => String(row[key] ?? ''))
     );
     
-    // Table Colors based on theme
     const headerColor = pdfSettings.colorTheme === 'primary' ? [99, 102, 241] : [52, 211, 153];
     
     autoTable(doc, {
@@ -391,40 +407,148 @@ export default function ExportModal({
         halign: 'center',
       },
       alternateRowStyles: pdfSettings.tableStriped ? { fillColor: [245, 246, 250] } : {},
-      columnStyles: {
-        // Custom column widths if needed
-      },
       margin: { left: 15, right: 15 },
       didDrawPage: (data) => {
-        // Footer with page numbers
         if (pdfSettings.showPageNumbers) {
           const pageCount = doc.internal.getNumberOfPages();
           const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
           doc.setFontSize(8);
           doc.setTextColor(150, 150, 150);
-          doc.text(
-            `Page ${pageNumber} of ${pageCount}`,
-            pageWidth / 2,
-            doc.internal.pageSize.getHeight() - 10,
-            { align: 'center' }
-          );
+          doc.text(`Page ${pageNumber} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
         }
-        
-        // Footer text
         if (pdfSettings.showFooter) {
           doc.setFontSize(7);
           doc.setTextColor(150, 150, 150);
-          doc.text(
-            instituteInfo.website || 'www.thecloudsacademy.com',
-            pageWidth / 2,
-            doc.internal.pageSize.getHeight() - 5,
-            { align: 'center' }
-          );
+          doc.text(instituteInfo.website || 'www.thecloudsacademy.com', pageWidth / 2, doc.internal.pageSize.getHeight() - 5, { align: 'center' });
         }
       },
     });
     
     return doc;
+  }
+
+  // Segmented Profile PDF for Individual Export
+  async function generateProfilePDF(student, headers, orderedCols) {
+    const { default: jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ 
+      orientation: 'portrait', 
+      unit: 'mm',
+      format: 'a4' 
+    });
+    await appendProfileToDoc(doc, student, headers, orderedCols);
+    return doc;
+  }
+
+  async function appendProfileToDoc(doc, student, headers, orderedCols) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    let yPos = 20;
+
+    // 1. Header with branding
+    if (pdfSettings.showLogo && instituteInfo.logo) {
+      try {
+        const img = new Image();
+        img.src = instituteInfo.logo;
+        await new Promise((resolve) => {
+          img.onload = () => {
+            doc.addImage(img, 'PNG', margin, yPos, 25, 25);
+            resolve();
+          };
+          img.onerror = resolve;
+          if (img.complete) img.onload();
+        });
+      } catch (err) {}
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(30, 41, 59); // Slate-800
+    doc.text(instituteInfo.name, 50, yPos + 10);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139); // Slate-500
+    doc.text(`${instituteInfo.address}, ${instituteInfo.city}`, 50, yPos + 16);
+    doc.text(`${instituteInfo.phone} | ${instituteInfo.email}`, 50, yPos + 21);
+    
+    yPos += 35;
+
+    // 2. Profile Title Ribbon
+    doc.setFillColor(99, 102, 241); // Indigo-600
+    doc.rect(margin, yPos, pageWidth - (margin * 2), 12, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.text("OFFICIAL STUDENT PROFILE REPORT", pageWidth / 2, yPos + 8, { align: 'center' });
+    
+    yPos += 20;
+
+    // 3. Organization helper
+    const drawSection = (title, items) => {
+      // Check for page break
+      if (yPos > pageHeight - 40) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(99, 102, 241);
+      doc.text(title.toUpperCase(), margin, yPos);
+      doc.setDrawColor(226, 232, 240); // Slate-200
+      doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2);
+      yPos += 10;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105); // Slate-600
+
+      const colWidth = (pageWidth - (margin * 2)) / 2;
+      
+      items.forEach((item, idx) => {
+        const x = margin + (idx % 2 === 0 ? 0 : colWidth);
+        const currentY = yPos + (Math.floor(idx / 2) * 8);
+
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${item.label}:`, x, currentY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(item.value || '—'), x + 35, currentY);
+
+        if (idx % 2 !== 0 || idx === items.length - 1) {
+          // Add row spacing only after full row or last item
+          if (idx === items.length - 1) yPos = currentY + 12;
+        }
+      });
+    };
+
+    // Grouping the orderedCols into logic
+    const getVal = (id) => {
+      const col = colDefs.find(c => c.key === id);
+      const val = student[id] ?? '—';
+      return { label: col?.label || id, value: val };
+    };
+
+    // Segment mappings
+    const personal = ['name', 'roll_no', 'reg_no', 'gender', 'dob', 'cnic', 'admission_date', 'nationality', 'status', 'religion'].map(getVal).filter(v => v.value !== '—');
+    const academic = ['academic_year', 'class', 'section', 'previous_school', 'previous_class'].map(getVal).filter(v => v.value !== '—');
+    const contact = ['phone', 'email', 'city', 'address', 'permanent_address'].map(getVal).filter(v => v.value !== '—');
+    const guardian = ['primary_guardian', 'guardian_relation', 'guardian_phone', 'guardian_email', 'guardian_cnic', 'mother_name'].map(getVal).filter(v => v.value !== '—');
+    const finance = ['monthly_fee', 'admission_fee', 'concession_type', 'concession_percentage'].map(getVal).filter(v => v.value !== '—');
+
+    if (personal.length) drawSection("Personal Information", personal);
+    if (academic.length) drawSection("Academic Record", academic);
+    if (contact.length) drawSection("Contact Details", contact);
+    if (guardian.length) drawSection("Family & Guardian", guardian);
+    if (finance.length) drawSection("Fee & Concessions", finance);
+
+    // 4. Footer
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184); // Slate-400
+    doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
+    doc.text(`System Generated Report • ${formatDate(new Date())}`, margin, pageHeight - 20);
+    // doc.text(`Page 1 of 1`, pageWidth - margin, pageHeight - 20, { align: 'right' });
+    doc.text(instituteInfo.website, pageWidth / 2, pageHeight - 15, { align: 'center' });
   }
   
   async function handleExport() {
@@ -466,7 +590,23 @@ export default function ExportModal({
       }
       else if (format === 'pdf') {
         setExportProgress(70);
-        const doc = await generateProfessionalPDF(filtered, headers, orderedCols);
+        let doc;
+        // Detect Individual Export Mode OR Multi-Profile Mode
+        if (fileName.includes('Profile')) {
+          for (let i = 0; i < filtered.length; i++) {
+            if (i === 0) {
+              doc = await generateProfilePDF(filtered[i], headers, orderedCols);
+            } else {
+              doc.addPage();
+              // Reset yPos for the new page in generateProfilePDF logic but wait, 
+              // generateProfilePDF returns a new doc. I should refactor it.
+              await appendProfileToDoc(doc, filtered[i], headers, orderedCols);
+            }
+            setExportProgress(70 + Math.floor((i / filtered.length) * 25));
+          }
+        } else {
+          doc = await generateProfessionalPDF(filtered, headers, orderedCols);
+        }
         doc.save(`${fileName}.pdf`);
       }
       

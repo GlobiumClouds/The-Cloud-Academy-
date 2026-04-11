@@ -37,6 +37,7 @@ import {
   examService,
   academicYearService,
   sectionService,
+  studentService,
 } from "@/services";
 import DataTable from "@/components/common/DataTable";
 import { Button } from "@/components/ui/button";
@@ -50,66 +51,93 @@ import ExportModal from "@/components/common/ExportModal";
 // REPORT TYPE CONFIGS
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED COLUMN DEFINITIONS (A to Z)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STUDENT_REPORT_COLUMNS = [
+  // SECTION: PERSONAL
+  { id: 'name', header: 'Full Name', accessorFn: s => `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.name || '—' },
+  { id: 'roll_no', header: 'Roll Number', accessorFn: s => s.roll_no || s.registration_no || s.roll_number || '—' },
+  { id: 'reg_no', header: 'Registration ID', accessorFn: s => s.registration_no || '—' },
+  { id: 'gender', header: 'Gender', accessorFn: s => s.gender || '—' },
+  { id: 'dob', header: 'Date of Birth', accessorFn: s => s.dob || s.date_of_birth || '—' },
+  { id: 'admission_date', header: 'Admission Date', accessorFn: s => s.admission_date || s.enrollment_date || '—' },
+  { id: 'cnic', header: 'CNIC / B-Form', accessorFn: s => s.cnic || '—' },
+  { id: 'blood_group', header: 'Blood Group', accessorFn: s => s.blood_group || '—' },
+  { id: 'religion', header: 'Religion', accessorFn: s => s.religion || '—' },
+  { id: 'nationality', header: 'Nationality', accessorFn: s => s.nationality || '—' },
+
+  // SECTION: ACADEMIC
+  { id: 'academic_year', header: 'Academic Year', accessorFn: s => s.academic_year_name || s.academic_year?.name || '—' },
+  { id: 'class', header: 'Class / Program', accessorFn: s => s.class_name || s.class?.name || '—' },
+  { id: 'section', header: 'Section / Batch', accessorFn: s => s.section_name || s.section?.name || '—' },
+  { id: 'previous_school', header: 'Previous School', accessorFn: s => s.previous_school || '—' },
+  { id: 'previous_class', header: 'Previous Class', accessorFn: s => s.previous_class || '—' },
+
+  // SECTION: CONTACT
+  { id: 'phone', header: 'Phone Number', accessorFn: s => s.phone || '—' },
+  { id: 'email', header: 'Email Address', accessorFn: s => s.email || '—' },
+  { id: 'city', header: 'City', accessorFn: s => s.city || '—' },
+  { id: 'address', header: 'Present Address', accessorFn: s => s.present_address || s.address || '—' },
+  { id: 'permanent_address', header: 'Permanent Address', accessorFn: s => s.permanent_address || '—' },
+
+  // SECTION: GUARDIAN
+  { 
+    id: 'primary_guardian', 
+    header: 'Primary Guardian', 
+    accessorFn: s => {
+      const g = (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (s.guardians && s.guardians[0]);
+      return g?.name || s.father_name || s.guardian_name || '—';
+    }
+  },
+  { 
+    id: 'guardian_relation', 
+    header: 'Relation', 
+    accessorFn: s => {
+      const g = (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (s.guardians && s.guardians[0]);
+      return g?.relation || g?.type || (s.father_name ? 'Father' : '—');
+    }
+  },
+  { 
+    id: 'guardian_phone', 
+    header: 'Guardian Phone', 
+    accessorFn: s => {
+      const g = (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(x => x.type === 'father' || x.type === 'guardian') || (s.guardians && s.guardians[0]);
+      return g?.phone || s.father_phone || '—';
+    }
+  },
+  { id: 'guardian_email', header: 'Guardian Email', accessorFn: s => (s.guardians?.find(x => x.email)?.email) || s.guardian_email || '—' },
+  { id: 'mother_name', header: 'Mother Name', accessorFn: s => s.mother_name || s.guardians?.find(x => x.type === 'mother')?.name || '—' },
+  
+  // SECTION: HEALTH
+  { id: 'medical_conditions', header: 'Medical Conditions', accessorFn: s => s.medical_conditions || '—' },
+  { id: 'allergies', header: 'Allergies', accessorFn: s => s.allergies || '—' },
+
+  // SECTION: FINANCE
+  { id: 'monthly_fee', header: 'Monthly Fee', accessorFn: s => s.monthly_fee || '—' },
+  { id: 'admission_fee', header: 'Admission Fee', accessorFn: s => s.admission_fee || '—' },
+  { id: 'concession_type', header: 'Concession Type', accessorFn: s => s.concession_type || '—' },
+  { id: 'concession_p', header: 'Concession (%)', accessorFn: s => s.concession_percentage || '—' },
+
+  { 
+    id: 'status', 
+    header: 'Status', 
+    accessorFn: s => (s.is_active ? 'Active' : 'Inactive') 
+  },
+];
+
 const REPORT_CONFIGS = {
   student: {
     title: "Student Report",
     filters: ["search", "class", "section", "status"],
     columns: [
-      {
-        id: "name",
-        header: "Student Name",
-        accessorFn: (s) => {
-          const name = `${s.first_name || ""} ${s.last_name || ""}`.trim();
-          return name || s.name || "—";
-        },
-      },
-      {
-        id: "roll_no",
-        header: "Roll/Reg No.",
-        accessorFn: (s) =>
-          s.roll_no ||
-          s.roll_number ||
-          s.registration_no ||
-          s.candidate_id ||
-          s.trainee_id ||
-          s.reg_number ||
-          s.student_id ||
-          "—",
-      },
-      {
-        id: "class",
-        header: "Class",
-        accessorFn: (s) =>
-          s.class_name || s.class?.name || s.Class?.name || s.class_id || "—",
-      },
-      {
-        id: "section",
-        header: "Section",
-        accessorFn: (s) =>
-          s.section_name ||
-          s.section?.name ||
-          s.Section?.name ||
-          s.section_id ||
-          "—",
-      },
-      {
-        id: "guardian",
-        header: "Guardian",
-        accessorFn: (s) =>
-          s.guardian_name || s.father_name || s.guardians?.[0]?.name || "—",
-      },
-      { key: "phone", label: "Phone" },
-      { key: "gender", label: "Gender" },
-      {
-        id: "status",
-        header: "Status",
-        accessorFn: (s) =>
-          s.is_active === true ||
-          s.status === "active" ||
-          s.is_active === "true"
-            ? "Active"
-            : "Inactive",
-      },
+      ...STUDENT_REPORT_COLUMNS.slice(0, 2),
+      STUDENT_REPORT_COLUMNS.find(c => c.id === 'class'),
+      STUDENT_REPORT_COLUMNS.find(c => c.id === 'section'),
+      STUDENT_REPORT_COLUMNS.find(c => c.id === 'primary_guardian'),
+      STUDENT_REPORT_COLUMNS.find(c => c.id === 'phone'),
+      STUDENT_REPORT_COLUMNS.find(c => c.id === 'status'),
       {
         id: "actions",
         header: "Actions",
@@ -228,6 +256,9 @@ function ReportFilters({
   loading,
   sections = [],
   exams = [],
+  onExport,
+  isExporting,
+  canExport,
 }) {
   const config = REPORT_CONFIGS[reportType] || REPORT_CONFIGS.student;
   const showFilter = (name) => config.filters?.includes(name);
@@ -243,12 +274,22 @@ function ReportFilters({
             Search & Filters
           </h3>
         </div>
-        {loading && (
-          <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-            <Loader2 size={12} className="animate-spin" /> Fetching latest
-            data...
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {loading && (
+            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+              <Loader2 size={12} className="animate-spin" /> Fetching...
+            </div>
+          )}
+          <Button
+            onClick={onExport}
+            disabled={!canExport || isExporting}
+            size="sm"
+            className="h-9 px-4 rounded-xl bg-slate-900 border-none hover:bg-slate-800 text-white font-bold text-[11px] shadow-lg shadow-slate-200 transition-all active:scale-95"
+          >
+            {isExporting ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Download size={14} className="mr-2" />}
+            {isExporting ? "PREPARING..." : "EXPORT RECORDS"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 items-end">
@@ -504,11 +545,68 @@ export default function ReportDetailPage() {
   });
 
   const [individualExportData, setIndividualExportData] = useState(null);
+  const [hydratingBulk, setHydratingBulk] = useState(false);
+  const [hydratedBulkData, setHydratedBulkData] = useState([]);
+
+  // Bulk Profile Download (Parallel Hydration)
+  const handleBulkProfileDownload = async () => {
+    const rawRecords = reportData?.data?.records || [];
+    if (!rawRecords.length) return;
+
+    setHydratingBulk(true);
+    const loadingToast = toast.loading(`Preparing high-detail profiles for ${rawRecords.length} students...`);
+
+    try {
+      // Fetch all full records in parallel
+      const fullyLoaded = await Promise.all(
+        rawRecords.map(async (s) => {
+          try {
+            const res = await studentService.getById(s.id);
+            const full = res.data || s;
+            const details = full.details?.studentDetails || {};
+            return { ...full, ...details };
+          } catch {
+            return s; // Fallback to basic if fetch fails
+          }
+        })
+      );
+
+      setHydratedBulkData(fullyLoaded);
+      setExporting(true); // Open the modal
+      toast.dismiss(loadingToast);
+    } catch (error) {
+      console.error("Bulk hydration error:", error);
+      toast.error("Failed to prepare full profiles", { id: loadingToast });
+    } finally {
+      setHydratingBulk(false);
+    }
+  };
 
   // Expose individual download to window for the cell button
   useEffect(() => {
-    window.__handleIndividualDownload = (student) => {
-      setIndividualExportData([student]);
+    window.__handleIndividualDownload = async (student) => {
+      if (!student?.id) return;
+      
+      const loadingToast = toast.loading("Fetching full student profile...");
+      try {
+        const res = await studentService.getById(student.id);
+        const fullData = res.data || student;
+        
+        // Ensure flattening matches ExportModal expectations
+        const details = fullData.details?.studentDetails || {};
+        const flattened = {
+          ...fullData,
+          ...details,
+          // Add any specific mappings if needed (ExportModal handleIndividualDownload style)
+        };
+
+        setIndividualExportData([flattened]);
+        toast.dismiss(loadingToast);
+      } catch (error) {
+        console.error("Profile fetch error:", error);
+        toast.error("Using basic data as fetch failed", { id: loadingToast });
+        setIndividualExportData([student]);
+      }
     };
     return () => delete window.__handleIndividualDownload;
   }, []);
@@ -654,23 +752,6 @@ export default function ReportDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 relative z-10 w-full sm:w-auto">
-            <Button
-              onClick={() => setExporting(true)}
-              variant="outline"
-              className="flex-1 sm:flex-none h-11 border-slate-200 rounded-2xl px-5 text-[13px] font-bold text-slate-600 hover:bg-slate-50 shadow-sm transition-all active:scale-95"
-            >
-              <Download size={16} className="mr-2" />
-              Export Records
-            </Button>
-            <Button
-              onClick={() => window.print()}
-              className="flex-1 sm:flex-none h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-6 text-[13px] font-bold shadow-lg shadow-slate-200 transition-all active:scale-95"
-            >
-              <Printer size={16} className="mr-2" />
-              Print PDF
-            </Button>
-          </div>
         </div>
       )}
 
@@ -726,6 +807,12 @@ export default function ReportDetailPage() {
             loading={reportLoading}
             sections={sectionList}
             exams={examList}
+            onExport={() => {
+              if (reportType === 'student') handleBulkProfileDownload();
+              else setExporting(true);
+            }}
+            isExporting={hydratingBulk}
+            canExport={!!reportData?.data?.records?.length}
           />
 
           {/* TABLE OVERHAUL */}
@@ -755,22 +842,6 @@ export default function ReportDetailPage() {
                   columns={columns}
                   data={reportData?.data?.records || []}
                   loading={reportLoading}
-                  exportConfig={{
-                    fileName: `${
-                      config.title
-                    }-${new Date().toLocaleDateString()}`,
-                    exportRows: reportData?.data?.records?.map((s) => {
-                      const obj = {};
-                      config.columns.forEach((col) => {
-                        if (col.id === "actions") return;
-                        const key = col.header || col.label;
-                        obj[key] = col.accessorFn
-                          ? col.accessorFn(s)
-                          : s[col.key];
-                      });
-                      return obj;
-                    }),
-                  }}
                   pagination={{
                     page: filters.page,
                     totalPages: totalPages,
@@ -787,83 +858,21 @@ export default function ReportDetailPage() {
           {/* Export Modals Overlay */}
           <ExportModal
             open={exporting}
-            onClose={() => setExporting(false)}
-            columns={columns.filter((c) => c.id !== "actions")}
-            rows={reportData?.data?.records || []}
-            fileName={`${config.title}-Bulk`}
+            onClose={() => {
+              setExporting(false);
+              setHydratedBulkData([]); // Clear after use
+            }}
+            columns={STUDENT_REPORT_COLUMNS}
+            rows={hydratedBulkData.length > 0 ? hydratedBulkData : (reportData?.data?.records || [])}
+            fileName={`${config.title}-Profiles-Class`}
           />
 
           <ExportModal
             open={!!individualExportData}
             onClose={() => setIndividualExportData(null)}
-            columns={[
-              {
-                id: "name",
-                header: "Student Name",
-                accessorFn: (s) =>
-                  `${s.first_name || ""} ${s.last_name || ""}`.trim(),
-              },
-              {
-                id: "roll_no",
-                header: "Roll Number",
-                accessorFn: (s) => s.roll_no || s.roll_number || s.registration_no,
-              },
-              {
-                id: "class",
-                header: "Class",
-                accessorFn: (s) => s.class_name || s.class?.name,
-              },
-              {
-                id: "section",
-                header: "Section",
-                accessorFn: (s) => s.section_name || s.section?.name,
-              },
-              {
-                id: "academic_year",
-                header: "Academic Year",
-                accessorFn: (s) => s.academic_year_name || s.academic_year?.name,
-              },
-              {
-                id: "reg_no",
-                header: "Registration ID",
-                accessorFn: (s) => s.registration_no || s.registration_id,
-              },
-              { id: "gender", header: "Gender", accessorFn: (s) => s.gender },
-              {
-                id: "dob",
-                header: "Date of Birth",
-                accessorFn: (s) => s.dob || s.date_of_birth,
-              },
-              { id: "phone", header: "Phone Number", accessorFn: (s) => s.phone },
-              { id: "email", header: "Email Address", accessorFn: (s) => s.email },
-              {
-                id: "guardian_name",
-                header: "Primary Guardian",
-                accessorFn: (s) => s.guardian_name || s.father_name,
-              },
-              {
-                id: "guardian_relation",
-                header: "Guardian Relation",
-                accessorFn: (s) => s.guardian_relation || "Parent",
-              },
-              {
-                id: "guardian_phone",
-                header: "Guardian Phone",
-                accessorFn: (s) => s.guardian_phone || s.father_phone,
-              },
-              {
-                id: "address",
-                header: "Mailing Address",
-                accessorFn: (s) => s.address || s.present_address,
-              },
-              {
-                id: "status",
-                header: "Enrollment Status",
-                accessorFn: (s) => (s.is_active ? "Active" : "Inactive"),
-              },
-            ]}
+            columns={STUDENT_REPORT_COLUMNS}
             rows={individualExportData || []}
-            fileName={`Profile-${
+            fileName={`Full-Profile-${
               individualExportData?.[0]?.first_name || "Student"
             }`}
           />
