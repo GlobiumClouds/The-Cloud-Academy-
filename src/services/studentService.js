@@ -26,7 +26,7 @@ function normalizeFilters(filters = {}, type = 'school') {
     page: filters.page ?? 1,
     limit: filters.limit ?? 20,
     search: filters.search,
-    is_active: filters.is_active,
+    status: filters.is_active,
     branch_id: filters.branch_id,
   };
   switch (type) {
