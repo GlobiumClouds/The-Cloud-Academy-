@@ -61,6 +61,7 @@ export const studentService = {
   update: (id, body) => api.put(`/students/${id}`, body).then((r) => r.data),
 
   delete: (id) => api.delete(`/students/${id}`).then((r) => r.data),
+  toggleStatus: (id, is_active) => api.patch(`/students/${id}/toggle-status`, { is_active }).then((r) => r.data),
 
   uploadPhoto: (id, formData) =>
     api.post(`/students/${id}/photo`, formData, {

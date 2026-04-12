@@ -14,7 +14,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Plus, Eye, Pencil, Trash2, Loader2, IdCard } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Loader2, IdCard, Power } from 'lucide-react';
 import { toast } from 'sonner';
 
 import useInstituteConfig from '@/hooks/useInstituteConfig';
@@ -39,7 +39,7 @@ const STATUS_COLORS = {
 };
 
 // Build react-table ColumnDef[] dynamically from studentColumns config
-function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEdit, onGenerateIdCard) {
+function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEdit, onGenerateIdCard, onToggleStatus) {
   const cols = studentColumns.map((col) => ({
     accessorKey: col.key,
     header: col.label,
@@ -96,6 +96,18 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEd
               title="Generate ID Card"
             >
               <IdCard size={13} />
+            </button>
+          )}
+          {canDo('students.update') && (
+            <button
+              onClick={() => onToggleStatus(stu.id, !stu.is_active)}
+              className={cn(
+                "flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent",
+                stu.is_active ? "text-amber-600" : "text-emerald-600"
+              )}
+              title={stu.is_active ? "Deactivate" : "Activate"}
+            >
+              <Power size={13} />
             </button>
           )}
         </div>
@@ -167,6 +179,15 @@ export default function StudentsPage({ type }) {
     },
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, is_active }) => studentService.toggleStatus(id, is_active),
+    onSuccess: (_, variables) => {
+      toast.success(variables.is_active ? 'Student activated' : 'Student deactivated');
+      qc.invalidateQueries({ queryKey: ['students', type] });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const remove = useMutation({
     mutationFn: async (id) => {
       return await studentService.delete(id, type);
@@ -219,7 +240,7 @@ export default function StudentsPage({ type }) {
   };
 
   const columns = useMemo(
-    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting, (stu) => setEditingId(stu.id), handleGenerateIdCard),
+    () => buildColumns(studentColumns, type, terms, canDo, router, setDeleting, (stu) => setEditingId(stu.id), handleGenerateIdCard, (id, is_active) => toggleStatusMutation.mutate({ id, is_active })),
     [studentColumns, type, terms, canDo, router, currentInstitute, user],
   );
 
