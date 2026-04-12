@@ -12,8 +12,6 @@
 
 import api from '@/lib/api';
 import { buildQuery } from '@/lib/utils';
-import { withFallback } from '@/lib/withFallback';
-import { DUMMY_STUDENTS, paginate } from '@/data/dummyData';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Normalize filters per institute type

@@ -2,8 +2,7 @@
 /**
  * ReportDetailPage — Interactive Report with Filters & DataTable
  *
- * Includes Student, Attendance, Exam reports (API based)
- * and Fee Collection, Payroll (Dummy App based)
+ * Includes Student, Attendance, Exam, Fee, and Payroll reports (API based)
  */
 
 import { useState, useEffect, useMemo } from "react";
@@ -44,8 +43,6 @@ import DataTable from "@/components/common/DataTable";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SelectField, DatePickerField } from "@/components/common";
-import FeeCollectionDummyApp from "./FeeCollectionDummyApp";
-import PayrollDummyApp from "./PayrollDummyApp";
 import ExportModal from "@/components/common/ExportModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -498,6 +495,53 @@ const REPORT_CONFIGS = {
   },
   fee: {
     title: "Fee Collection Report",
+    filters: ["search", "class", "section", "status", "dateRange"],
+    columns: [
+      {
+        id: "name",
+        header: "Student",
+        accessorFn: (s) =>
+          `${s.student?.first_name || ""} ${s.student?.last_name || ""}`.trim() ||
+          s.student_name ||
+          s.name ||
+          "—",
+      },
+      {
+        id: "ids",
+        header: "Roll / Reg No",
+        cell: ({ row }) => {
+          const s = row.original;
+          const roll = s.roll_no || s.student?.roll_no || "—";
+          const reg = s.registration_no || s.student?.registration_no || "—";
+          return (
+            <div className="flex flex-col py-1">
+              <span className="text-amber-700 font-bold text-[11px] mb-1">{roll}</span>
+              <span className="text-amber-400 text-[10px] uppercase">{reg}</span>
+            </div>
+          );
+        },
+      },
+      {
+        id: "amount",
+        header: "Total Amount",
+        accessorFn: (s) => (s.amount ? `$${s.amount}` : "—"),
+      },
+      {
+        id: "paid",
+        header: "Paid Amount",
+        accessorFn: (s) => (s.paid_amount ? `$${s.paid_amount}` : "—"),
+      },
+      {
+        id: "status",
+        header: "Status",
+        accessorFn: (s) => (s.status || "—").toUpperCase(),
+      },
+      {
+        id: "date",
+        header: "Due Date",
+        accessorFn: (s) => s.due_date || s.date || "—",
+      },
+    ],
     permission: "reports.fee",
     theme: "amber",
     icon: Receipt,
@@ -698,6 +742,39 @@ const REPORT_CONFIGS = {
   },
   payroll: {
     title: "Payroll Report",
+    filters: ["search", "dateRange", "status"],
+    columns: [
+      {
+        id: "name",
+        header: "Staff Name",
+        accessorFn: (s) => s.staff_name || s.name || s.user?.name || "—",
+      },
+      {
+        id: "role",
+        header: "Role",
+        accessorFn: (s) => s.role || s.user?.role || "—",
+      },
+      {
+        id: "month",
+        header: "Month",
+        accessorFn: (s) => s.month || "—",
+      },
+      {
+        id: "basic",
+        header: "Basic",
+        accessorFn: (s) => (s.basic_salary ? `$${s.basic_salary}` : "—"),
+      },
+      {
+        id: "net",
+        header: "Net Salary",
+        accessorFn: (s) => (s.net_salary ? `$${s.net_salary}` : "—"),
+      },
+      {
+        id: "status",
+        header: "Status",
+        accessorFn: (s) => (s.status || "—").toUpperCase(),
+      },
+    ],
     permission: "reports.payroll",
     theme: "rose",
     icon: Wallet,
@@ -1413,6 +1490,8 @@ export default function ReportDetailPage() {
     });
   }, [config.columns]);
 
+  if (!hasHydrated) return <div className="min-h-screen bg-white" />;
+
   if (!canDo(config.permission)) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20 text-center animate-in fade-in duration-500">
@@ -1438,8 +1517,6 @@ export default function ReportDetailPage() {
       </div>
     );
   }
-
-  if (!hasHydrated) return <div className="min-h-screen bg-white" />;
 
   const totalRecords = reportData?.data?.pagination?.total || 0;
   const totalPages = Math.ceil(totalRecords / filters.limit);
@@ -1471,11 +1548,7 @@ export default function ReportDetailPage() {
         </div>
       )}
 
-      {reportType === "fee" ? (
-        <FeeCollectionDummyApp />
-      ) : reportType === "payroll" ? (
-        <PayrollDummyApp />
-      ) : (
+      {true ? (
         <>
           {/* STATS OVERHAUL */}
           {reportData?.data?.summary && (
@@ -1538,9 +1611,10 @@ export default function ReportDetailPage() {
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden relative">
             {((reportType === "exam" &&
               (!filters.exam_id || !filters.class_id)) ||
-              (!filters.class_id && reportType !== "exam")) &&
-            reportType !== "fee" &&
-            reportType !== "payroll" ? (
+              (!filters.class_id && 
+                reportType !== "exam" && 
+                reportType !== "payroll" && 
+                reportType !== "analytics")) ? (
               <div className="flex flex-col items-center justify-center p-20 text-center space-y-4 min-h-[300px]">
                 <div className="h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 border border-slate-100">
                   <Filter size={32} />
@@ -1609,7 +1683,7 @@ export default function ReportDetailPage() {
             }
           />
         </>
-      )}
+      ) : null}
     </div>
   );
 }
