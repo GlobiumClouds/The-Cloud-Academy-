@@ -245,6 +245,52 @@ const STUDENT_REPORT_COLUMNS = [
   },
 ];
 
+const EXAM_REPORT_COLUMNS = [
+  {
+    id: "name",
+    header: "Student Name",
+    accessorFn: (r) => {
+      const s = r.student || r.Student || r;
+      return `${s.first_name || ""} ${s.last_name || ""}`.trim() || r.student_name || "—";
+    },
+  },
+  {
+    id: "roll_no",
+    header: "Roll Number",
+    accessorFn: (r) => r.roll_no || r.student?.roll_no || r.roll_number || "—",
+  },
+  {
+    id: "class",
+    header: "Class (Section)",
+    accessorFn: (r) => `${r.class_name || "—"} (${r.section_name || "—"})`,
+  },
+  {
+    id: "exam",
+    header: "Examination",
+    accessorFn: (r) => r._injectedExamTitle || r.exam_title || "—",
+  },
+  {
+    id: "marks",
+    header: "Marks Obtained",
+    accessorFn: (r) => r.total_marks_obtained || r.marks_obtained || "—",
+  },
+  {
+    id: "percentage",
+    header: "Percentage",
+    accessorFn: (r) => (r.percentage ? `${parseFloat(r.percentage).toFixed(1)}%` : "—"),
+  },
+  {
+    id: "grade",
+    header: "Grade",
+    accessorFn: (r) => r.grade || "—",
+  },
+  {
+    id: "status",
+    header: "Result Status",
+    accessorFn: (r) => (r.status || "—").toUpperCase(),
+  },
+];
+
 const REPORT_CONFIGS = {
   student: {
     title: "Student Report",
@@ -742,12 +788,13 @@ function ReportFilters({
                   const timer = setTimeout(() => {
                     onFilterChange("search", val);
                   }, 500);
-                  // Clean up previous timer would require state/ref, 
+                  // Clean up previous timer would require state/ref,
                   // but simplest way is to handle it in parent or use a dedicated hook.
                   // Actually, let's keep it simple and just ensure it filters.
                 }}
                 onKeyUp={(e) => {
-                  if (e.key === 'Enter') onFilterChange("search", e.target.value);
+                  if (e.key === "Enter")
+                    onFilterChange("search", e.target.value);
                 }}
                 placeholder="Search students..."
                 className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50/50 text-[11px] focus:ring-4 focus:ring-slate-100 focus:bg-white transition-all outline-none"
@@ -888,9 +935,15 @@ export default function ReportDetailPage() {
     to_date: "",
     exam_id: "",
     status: "",
+    academic_year_id: "",
   });
 
   const [exporting, setExporting] = useState(false);
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   // FETCH: Helper data
   const { data: yearsData } = useQuery({
@@ -928,6 +981,13 @@ export default function ReportDetailPage() {
     enabled: !!filters.class_id,
   });
 
+  // Exam Details (for GradeSheet generation fallback)
+  const { data: currentExamDetails } = useQuery({
+    queryKey: ["exam-details", filters.exam_id],
+    queryFn: () => examService.getById(filters.exam_id),
+    enabled: reportType === "exam" && !!filters.exam_id,
+  });
+
   // Default Year Effect
   useEffect(() => {
     if (yearsData?.data?.length && !filters.academic_year_id) {
@@ -935,7 +995,7 @@ export default function ReportDetailPage() {
         yearsData.data.find((y) => y.is_current) || yearsData.data[0];
       setFilters((prev) => ({
         ...prev,
-        academic_year_id: String(current.value),
+        academic_year_id: String(current.value || current.id),
       }));
     }
   }, [yearsData, filters.academic_year_id]);
@@ -1085,37 +1145,124 @@ export default function ReportDetailPage() {
   };
 
   const handleExamDownload = async (record) => {
-    const studentId = record.student_id || record.id || record.Student?.id;
-    const examId = filters.exam_id;
-
-    if (!studentId || !examId) {
-      toast.error("Student or Exam information not found.");
+    if (!filters.exam_id) {
+      toast.error("Please select an exam first");
+      return;
+    }
+    const studentId = record?.student_id || record?.student?.id || record?.id;
+    if (!studentId) {
+      toast.error("Student ID not found for this record");
       return;
     }
 
-    const t = toast.loading("Preparing Grade Sheet...");
+    const loadingToast = toast.loading("Preparing report card...");
     try {
-      const response = await api.get(`/exams/${examId}/grade-sheet`, {
-        params: { student_id: studentId },
-        responseType: "blob",
-      });
+      let data = null;
+      try {
+        const res = await examService.generateGradeSheet(filters.exam_id, {
+          student_id: studentId,
+          class_id: filters.class_id,
+          section_id: filters.section_id,
+        });
+        data = res?.data || res;
+      } catch (apiError) {
+        console.warn("Grade sheet API failed, using table record fallback", apiError);
+        data = {
+          student: record.student || record.Student || record,
+          result: record,
+          exam: currentExamDetails?.data || currentExamDetails || {},
+        };
+      }
+      
+      if (!data || (!data.student && !data.id)) {
+        throw new Error("Could not prepare report data");
+      }
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `ResultCard_${record.student_name || record.first_name || studentId}.pdf`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.dismiss(t);
+      const student = data.student || data || {};
+      const result = data.result || record || {};
+      const exam = data.exam || currentExamDetails?.data || currentExamDetails || {};
+
+      const flattened = {
+        ...(student || {}),
+        ...(result || {}),
+        ...(exam || {}),
+        _isGradeSheet: true, 
+        student,
+        exam,
+        result,
+        first_name: student.first_name || student.name || "Student",
+      };
+
+      setIndividualExportData([flattened]);
+      toast.dismiss(loadingToast);
     } catch (error) {
-      toast.dismiss(t);
-      toast.error("Failed to download Grade Sheet");
-      console.error(error);
+      console.error("Grade sheet prep error:", error);
+      toast.error(error.message || "Failed to prepare report", { id: loadingToast });
+    }
+  };
+
+  const handleBulkGradeSheetDownload = async () => {
+    const rawRecords = reportData?.data?.records || [];
+    if (!rawRecords.length) return;
+
+    setHydratingBulk(true);
+    const loadingToast = toast.loading(`Preparing ${rawRecords.length} grade sheets for class export...`);
+
+    try {
+      const allGradeSheets = await Promise.all(
+        rawRecords.map(async (r) => {
+          try {
+            const studentId = r?.student_id || r?.student?.id || r?.id;
+            if (!studentId) return null;
+            
+            let data = null;
+            try {
+              const res = await examService.generateGradeSheet(filters.exam_id, {
+                student_id: studentId,
+                class_id: filters.class_id,
+                section_id: filters.section_id,
+              });
+              data = res?.data || res;
+            } catch (apiError) {
+              data = {
+                student: r.student || r.Student || r,
+                result: r,
+                exam: currentExamDetails?.data || currentExamDetails || {},
+              };
+            }
+
+            const student = data.student || data || {};
+            const result = data.result || r || {};
+            const exam = data.exam || currentExamDetails?.data || currentExamDetails || {};
+
+            return {
+              ...student,
+              ...result,
+              ...exam,
+              _isGradeSheet: true,
+              student,
+              exam,
+              result,
+              first_name: student.first_name || student.name || "Student",
+            };
+          } catch (e) {
+            console.warn("Failed to prepare grade sheet for record", r, e);
+            return null;
+          }
+        })
+      );
+
+      const filtered = allGradeSheets.filter(Boolean);
+      if (filtered.length === 0) throw new Error("No data could be prepared");
+
+      setHydratedBulkData(filtered);
+      setExporting(true);
+      toast.dismiss(loadingToast);
+    } catch (error) {
+      console.error("Bulk grade sheet error:", error);
+      toast.error("Failed to prepare bulk reports", { id: loadingToast });
+    } finally {
+      setHydratingBulk(false);
     }
   };
 
@@ -1152,47 +1299,6 @@ export default function ReportDetailPage() {
     };
     return () => delete window.__handleIndividualDownload;
   }, [reportType, filters.exam_id]);
-
-  const handleBulkGradeSheetDownload = async () => {
-    const examId = filters.exam_id;
-    const classId = filters.class_id;
-    const sectionId = filters.section_id;
-
-    if (!examId || !classId) {
-      toast.error("Please select Exam and Class to download bulk reports.");
-      return;
-    }
-
-    const t = toast.loading("Generating All Result Cards (Please wait)...");
-    try {
-      const response = await api.get(`/exams/${examId}/grade-sheet`, {
-        params: {
-          bulk: true,
-          class_id: classId,
-          section_id: sectionId,
-        },
-        responseType: "blob",
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `Bulk_Results_Exam_${examId}_${classId}.pdf`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.dismiss(t);
-      toast.success("Bulk Grade Sheets downloaded successfully!");
-    } catch (error) {
-      toast.dismiss(t);
-      toast.error("Failed to generate bulk reports");
-      console.error(error);
-    }
-  };
 
   // Handlers
   const handleFilterChange = (key, value) => {
@@ -1332,6 +1438,8 @@ export default function ReportDetailPage() {
       </div>
     );
   }
+
+  if (!hasHydrated) return <div className="min-h-screen bg-white" />;
 
   const totalRecords = reportData?.data?.pagination?.total || 0;
   const totalPages = Math.ceil(totalRecords / filters.limit);
@@ -1476,23 +1584,29 @@ export default function ReportDetailPage() {
               setExporting(false);
               setHydratedBulkData([]); // Clear after use
             }}
-            columns={STUDENT_REPORT_COLUMNS}
+            columns={reportType === "exam" ? EXAM_REPORT_COLUMNS : STUDENT_REPORT_COLUMNS}
             rows={
               hydratedBulkData.length > 0
                 ? hydratedBulkData
                 : reportData?.data?.records || []
             }
-            fileName={`${config.title}-Profiles-Class`}
+            fileName={
+              reportType === "exam" 
+                ? `${config.title}-GradeSheets-Class` 
+                : `${config.title}-Profiles-Class`
+            }
           />
 
           <ExportModal
             open={!!individualExportData}
             onClose={() => setIndividualExportData(null)}
-            columns={STUDENT_REPORT_COLUMNS}
+            columns={reportType === "exam" ? EXAM_REPORT_COLUMNS : STUDENT_REPORT_COLUMNS}
             rows={individualExportData || []}
-            fileName={`Full-Profile-${
-              individualExportData?.[0]?.first_name || "Student"
-            }`}
+            fileName={
+              reportType === "exam"
+                ? `GradeSheet-${individualExportData?.[0]?.first_name || "Student"}`
+                : `Full-Profile-${individualExportData?.[0]?.first_name || "Student"}`
+            }
           />
         </>
       )}

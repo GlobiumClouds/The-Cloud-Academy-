@@ -611,9 +611,253 @@ export default function ExportModal({
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184);
-    doc.text(`Official Document ID: STU-${student.id}-${Date.now()}`, margin, pageHeight - 12);
+    doc.text(`Officially Document ID: STU-${student?.id || 'N/A'}-${Date.now()}`, margin, pageHeight - 12);
     doc.text(`Printed By: The Clouds Academy ERP System`, pageWidth / 2, pageHeight - 12, { align: 'center' });
     doc.text(`www.thecloudsacademy.com`, pageWidth - margin, pageHeight - 12, { align: 'right' });
+  }
+
+  // Segmented Grade Sheet PDF for Examination results
+  async function generateGradeSheetPDF(data) {
+    const { default: jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ 
+      orientation: 'portrait', 
+      unit: 'mm',
+      format: 'a4' 
+    });
+    await appendGradeSheetToDoc(doc, data);
+    return doc;
+  }
+
+  async function appendGradeSheetToDoc(doc, data) {
+    const { default: autoTable } = await import('jspdf-autotable');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPos = 15;
+
+    const student = data.student || {};
+    const exam = data.exam || {};
+    const result = data.result || {};
+
+    // A4 Border
+    doc.setDrawColor(26, 41, 66); // Dark Navy
+    doc.setLineWidth(0.5);
+    doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+
+    // 1. Official Header
+    if (pdfSettings.showLogo && instituteInfo.logo) {
+      try {
+        const img = new Image();
+        img.src = instituteInfo.logo;
+        await new Promise((resolve) => {
+          img.onload = () => {
+            doc.addImage(img, 'PNG', margin, yPos, 22, 22);
+            resolve();
+          };
+          img.onerror = resolve;
+          if (img.complete) img.onload();
+        });
+      } catch (err) {}
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(26, 41, 66);
+    doc.text(instituteInfo.name, 42, yPos + 10);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${instituteInfo.address}, ${instituteInfo.city}`, 42, yPos + 16);
+    doc.text(`Website: ${instituteInfo.website} | Email: ${instituteInfo.email}`, 42, yPos + 21);
+
+    // Status Badge
+    const status = (result?.status || 'ABSENT').toUpperCase();
+    const isPass = status === 'PASS';
+    doc.setFillColor(isPass ? 230 : 253, isPass ? 247 : 236, isPass ? 238 : 234);
+    // Use standard rect if roundedRect is not available
+    if (typeof doc.roundedRect === 'function') {
+      doc.roundedRect(pageWidth - margin - 30, yPos + 5, 30, 8, 2, 2, 'F');
+    } else {
+      doc.rect(pageWidth - margin - 30, yPos + 5, 30, 8, 'F');
+    }
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(isPass ? 26 : 179, isPass ? 122 : 43, isPass ? 74 : 26);
+    doc.text(status, pageWidth - margin - 15, yPos + 10.5, { align: 'center' });
+
+    yPos += 35;
+
+    // 2. Report Title
+    doc.setFillColor(26, 41, 66);
+    doc.rect(margin, yPos, pageWidth - (margin * 2), 10, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(255, 255, 255);
+    doc.text("EXAMINATION RESULT CARD / GRADE SHEET", pageWidth / 2, yPos + 7, { align: 'center' });
+    
+    yPos += 18;
+
+    // 3. Info Grid
+    const drawGrid = (items) => {
+      const colWidth = (pageWidth - (margin * 2)) / 2;
+      const rowHeight = 10;
+      doc.setFontSize(8);
+      items.forEach((item, idx) => {
+        const colIdx = idx % 2;
+        const rowIdx = Math.floor(idx / 2);
+        const x = margin + (colIdx * colWidth);
+        const y = yPos + (rowIdx * rowHeight);
+
+        doc.setDrawColor(226, 232, 240);
+        doc.rect(x, y, colWidth, rowHeight);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(100, 116, 139);
+        doc.text(item.label, x + 3, y + 4);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(26, 41, 66);
+        doc.text(String(item.value || '—'), x + 3, y + 8);
+
+        if (idx === items.length - 1) yPos = y + rowHeight + 10;
+      });
+    };
+
+    const info = [
+      { label: "STUDENT NAME", value: `${student?.first_name || ''} ${student?.last_name || ''}`.trim() || student?.name || '—' },
+      { label: "ROLL NUMBER", value: student?.roll_number || student?.roll_no || '—' },
+      { label: "REGISTRATION ID", value: student?.registration_no || '—' },
+      { label: "CLASS / SECTION", value: `${exam?.class_name || '—'} (${exam?.section_name || '—'})` },
+      { label: "EXAMINATION", value: exam?.name || '—' },
+      { label: "DATE GENERATED", value: new Date().toLocaleDateString() },
+    ];
+    drawGrid(info);
+
+    // 4. Stats Summary Cards
+    const cardWidth = (pageWidth - (margin * 2) - 10) / 3;
+    const cards = [
+      { label: "TOTAL MARKS", value: exam?.total_marks || '0', color: [45, 106, 159] },
+      { label: "MARKS OBTAINED", value: result?.total_marks_obtained || '0', color: [26, 122, 74] },
+      { label: "PERCENTAGE", value: `${parseFloat(result?.percentage || 0).toFixed(1)}%`, color: [179, 106, 0] },
+    ];
+
+    cards.forEach((card, i) => {
+      const x = margin + (i * (cardWidth + 5));
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      if (typeof doc.roundedRect === 'function') {
+        doc.roundedRect(x, yPos, cardWidth, 18, 2, 2, 'FD');
+      } else {
+        doc.rect(x, yPos, cardWidth, 18, 'FD');
+      }
+      
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(148, 163, 184);
+      doc.text(card.label, x + (cardWidth / 2), yPos + 6, { align: 'center' });
+      
+      doc.setFontSize(16);
+      doc.setTextColor(card.color?.[0] || 0, card.color?.[1] || 0, card.color?.[2] || 0);
+      doc.text(String(card.value ?? '0'), x + (cardWidth / 2), yPos + 14, { align: 'center' });
+    });
+
+    yPos += 28;
+
+    // 5. Subject Table
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(26, 41, 66);
+    doc.text("SUBJECT-WISE PERFORMANCE", margin, yPos);
+    yPos += 4;
+
+    const subjectMarks = Array.isArray(result?.subject_marks) ? result.subject_marks : [];
+    const examSubjects = Array.isArray(exam?.subject_schedules) ? exam.subject_schedules : [];
+
+    const tableRows = examSubjects.map((subj, idx) => {
+      const mark = subjectMarks.find(m => m.subject_id === subj.subject_id) || {};
+      const total = subj?.total_marks || 0;
+      const obtained = mark?.marks_obtained || 0;
+      const pct = total > 0 ? ((obtained / total) * 100).toFixed(1) : '0.0';
+      return [
+        subj?.subject_name || '—',
+        total,
+        obtained,
+        `${pct}%`,
+        mark?.grade || '—'
+      ];
+    });
+
+    try {
+      autoTable(doc, {
+        head: [['SUBJECT', 'TOTAL', 'OBTAINED', 'PERCENTAGE', 'GRADE']],
+        body: tableRows,
+        startY: yPos,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [26, 41, 66], halign: 'center' },
+        columnStyles: {
+          0: { halign: 'left', fontStyle: 'bold' },
+          1: { halign: 'center' },
+          2: { halign: 'center' },
+          3: { halign: 'center' },
+          4: { halign: 'center' },
+        }
+      });
+      yPos = doc.lastAutoTable.finalY + 15;
+    } catch (err) {
+      console.warn("AutoTable failed", err);
+      yPos += 20;
+    }
+
+    // 6. Summary Strip
+    doc.setFillColor(26, 41, 66);
+    if (typeof doc.roundedRect === 'function') {
+      doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 15, 2, 2, 'F');
+    } else {
+      doc.rect(margin, yPos, pageWidth - (margin * 2), 15, 'F');
+    }
+    
+    const sumWidth = (pageWidth - (margin * 2)) / 3;
+    const summary = [
+      { label: "GRADE", value: result?.grade || '—' },
+      { label: "OVERALL SCORE", value: `${parseFloat(result?.percentage || 0).toFixed(1)}%` },
+      { label: "OUTCOME", value: status }
+    ];
+
+    summary.forEach((s, i) => {
+      const x = margin + (i * sumWidth);
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text(s.label, x + (sumWidth / 2), yPos + 5, { align: 'center' });
+      doc.setFontSize(12);
+      doc.setTextColor(255, 255, 255);
+      doc.text(s.value, x + (sumWidth / 2), yPos + 11, { align: 'center' });
+    });
+
+    yPos += 30;
+
+    // 7. Signatures
+    const sigWidth = (pageWidth - (margin * 2) - 40) / 2;
+    doc.setDrawColor(148, 163, 184);
+    if (typeof doc.setLineDashPattern === 'function') {
+      doc.setLineDashPattern([1, 1], 0);
+    }
+    doc.line(margin + 10, yPos + 10, margin + 10 + sigWidth, yPos + 10);
+    doc.line(pageWidth - margin - 10 - sigWidth, yPos + 10, pageWidth - margin - 10, yPos + 10);
+    
+    if (typeof doc.setLineDashPattern === 'function') {
+      doc.setLineDashPattern([], 0);
+    }
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text("CLASS TEACHER", margin + 10 + (sigWidth / 2), yPos + 15, { align: 'center' });
+    doc.text("HEAD OF INSTITUTE", pageWidth - margin - 10 - (sigWidth / 2), yPos + 15, { align: 'center' });
+
+    // Footer
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Officially issued document by ${instituteInfo.name} Management System`, pageWidth / 2, pageHeight - 12, { align: 'center' });
   }
   
   async function handleExport() {
@@ -682,6 +926,16 @@ export default function ExportModal({
               await appendProfileToDoc(doc, fullHydratedData[i], headers, orderedCols);
             }
             setExportProgress(70 + Math.floor((i / fullHydratedData.length) * 25));
+          }
+        } else if (fileName.includes('GradeSheet')) {
+          for (let i = 0; i < rows.length; i++) {
+            if (i === 0) {
+              doc = await generateGradeSheetPDF(rows[i]);
+            } else {
+              doc.addPage();
+              await appendGradeSheetToDoc(doc, rows[i]);
+            }
+            setExportProgress(70 + Math.floor((i / rows.length) * 25));
           }
         } else {
           doc = await generateProfessionalPDF(filtered, headers, orderedCols);
