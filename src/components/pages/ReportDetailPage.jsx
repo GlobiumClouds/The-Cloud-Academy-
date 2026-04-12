@@ -107,12 +107,24 @@ const STUDENT_REPORT_COLUMNS = [
   {
     id: "class",
     header: "Class / Program",
-    accessorFn: (s) => s.class_name || s.class?.name || "—",
+    accessorFn: (s) =>
+      s.class_name ||
+      s.class?.name ||
+      s.Class?.name ||
+      s.student?.class?.name ||
+      s.student?.Class?.name ||
+      "—",
   },
   {
     id: "section",
     header: "Section / Batch",
-    accessorFn: (s) => s.section_name || s.section?.name || "—",
+    accessorFn: (s) =>
+      s.section_name ||
+      s.section?.name ||
+      s.Section?.name ||
+      s.student?.section?.name ||
+      s.student?.Section?.name ||
+      "—",
   },
   {
     id: "previous_school",
@@ -277,8 +289,12 @@ const REPORT_CONFIGS = {
       {
         id: "academic",
         header: "Class (Section)",
-        accessorFn: (s) =>
-          `${s.class_name || s.class?.name || "—"} (${s.section_name || s.section?.name || "—"})`,
+        accessorFn: (s) => {
+          const cls = s.class_name || s.class?.name || s.Class?.name || "—";
+          const sec =
+            s.section_name || s.section?.name || s.Section?.name || "—";
+          return `${cls} (${sec})`;
+        },
       },
       {
         id: "guardian_contact",
@@ -320,7 +336,7 @@ const REPORT_CONFIGS = {
   },
   attendance: {
     title: "Attendance Report",
-    filters: ["dateRange", "class", "section", "type"],
+    filters: ["search", "dateRange", "class", "section", "type"],
     columns: [
       {
         id: "date",
@@ -382,12 +398,16 @@ const REPORT_CONFIGS = {
             s.class?.name ||
             s.Class?.name ||
             s.current_class ||
+            s.Student?.class?.name ||
+            s.Student?.Class?.name ||
             "—";
           const sec =
             s.section_name ||
             s.section?.name ||
             s.Section?.name ||
             s.section ||
+            s.Student?.section?.name ||
+            s.Student?.Section?.name ||
             "—";
           return `${cls} (${sec})`;
         },
@@ -438,7 +458,7 @@ const REPORT_CONFIGS = {
   },
   exam: {
     title: "Exam Result Report",
-    filters: ["exam", "class", "section", "status"],
+    filters: ["search", "exam", "class", "section", "status"],
     columns: [
       {
         id: "name",
@@ -509,16 +529,22 @@ const REPORT_CONFIGS = {
             s.class?.name ||
             s.Class?.name ||
             s.current_class ||
+            student.class_name ||
             student.class?.name ||
+            student.Class?.name ||
             s.exam_schedule?.class?.name ||
+            s.exam_schedule?.Class?.name ||
             "—";
           const sec =
             s.section_name ||
             s.section?.name ||
             s.Section?.name ||
             s.section ||
+            student.section_name ||
             student.section?.name ||
+            student.Section?.name ||
             s.exam_schedule?.section?.name ||
+            s.exam_schedule?.Section?.name ||
             "—";
           return `${cls} (${sec})`;
         },
@@ -527,23 +553,19 @@ const REPORT_CONFIGS = {
         id: "exam",
         header: "Exam",
         accessorFn: (s) =>
+          s._injectedExamTitle ||
           s.exam_title ||
           s.exam_name ||
-          s.exam ||
           s.Exam?.title ||
+          s.Exam?.name ||
+          s.exam?.title ||
           s.exam?.name ||
+          s.exam ||
+          s.ExamTitle ||
+          s.ExamName ||
           s.exam_schedule?.exam?.title ||
-          "—",
-      },
-      {
-        id: "subject",
-        header: "Subject",
-        accessorFn: (s) =>
-          s.subject_name ||
-          s.subject ||
-          s.Subject?.name ||
-          s.subject?.name ||
-          s.exam_schedule?.subject?.name ||
+          s.exam_schedule?.exam?.name ||
+          s.exam_schedule?.Exam?.Title ||
           "—",
       },
       {
@@ -604,6 +626,24 @@ const REPORT_CONFIGS = {
         id: "position",
         header: "Pos.",
         accessorFn: (s) => s.position || s.rank || s.class_position || "—",
+      },
+      {
+        id: "actions",
+        header: "Action",
+        size: 80,
+        cell: ({ row }) => (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 gap-1.5 text-[10px] font-bold border-violet-100 text-violet-600 hover:bg-violet-50 rounded-lg shadow-sm bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.__handleIndividualDownload?.(row.original);
+            }}
+          >
+            <FileDown size={11} /> REPORT
+          </Button>
+        ),
       },
     ],
     permission: "reports.exam",
@@ -696,9 +736,20 @@ function ReportFilters({
               />
               <input
                 type="text"
-                value={filters.search}
-                onChange={(e) => onFilterChange("search", e.target.value)}
-                placeholder="Search by name..."
+                defaultValue={filters.search}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const timer = setTimeout(() => {
+                    onFilterChange("search", val);
+                  }, 500);
+                  // Clean up previous timer would require state/ref, 
+                  // but simplest way is to handle it in parent or use a dedicated hook.
+                  // Actually, let's keep it simple and just ensure it filters.
+                }}
+                onKeyUp={(e) => {
+                  if (e.key === 'Enter') onFilterChange("search", e.target.value);
+                }}
+                placeholder="Search students..."
                 className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50/50 text-[11px] focus:ring-4 focus:ring-slate-100 focus:bg-white transition-all outline-none"
               />
             </div>
@@ -728,6 +779,7 @@ function ReportFilters({
           value={filters.academic_year_id}
           onChange={(v) => {
             onFilterChange("academic_year_id", v);
+            onFilterChange("exam_id", "");
             onFilterChange("class_id", "");
             onFilterChange("section_id", "");
           }}
@@ -754,38 +806,40 @@ function ReportFilters({
           />
         )}
 
-        {showFilter("class") && (
-          <SelectField
-            label="Class / Course"
-            placeholder="Select Class"
-            value={filters.class_id}
-            onChange={(v) => {
-              onFilterChange("class_id", v);
-              onFilterChange("section_id", "");
-            }}
-            options={(options.classes || []).map((c) => ({
-              value: String(c.value || c.id || ""),
-              label: c.label || c.name || "Unknown",
-            }))}
-            className="w-full"
-            disabled={!filters.academic_year_id}
-          />
-        )}
+        {showFilter("class") &&
+          (reportType !== "exam" || !!filters.exam_id) && (
+            <SelectField
+              label="Class / Course"
+              placeholder="Select Class"
+              value={filters.class_id}
+              onChange={(v) => {
+                onFilterChange("class_id", v);
+                onFilterChange("section_id", "");
+              }}
+              options={(options.classes || []).map((c) => ({
+                value: String(c.value || c.id || ""),
+                label: c.label || c.name || "Unknown",
+              }))}
+              className="w-full"
+              disabled={!filters.academic_year_id}
+            />
+          )}
 
-        {showFilter("section") && (
-          <SelectField
-            label="Section / Batch"
-            placeholder="Select Section"
-            value={filters.section_id}
-            onChange={(v) => onFilterChange("section_id", v)}
-            options={(sections || []).map((s) => ({
-              value: String(s.value || s.id || ""),
-              label: s.label || s.name || s.section_name || "—",
-            }))}
-            className="w-full"
-            disabled={!filters.class_id}
-          />
-        )}
+        {showFilter("section") &&
+          (reportType !== "exam" || !!filters.exam_id) && (
+            <SelectField
+              label="Section / Batch"
+              placeholder="Select Section"
+              value={filters.section_id}
+              onChange={(v) => onFilterChange("section_id", v)}
+              options={(sections || []).map((s) => ({
+                value: String(s.value || s.id || ""),
+                label: s.label || s.name || s.section_name || "—",
+              }))}
+              className="w-full"
+              disabled={!filters.class_id}
+            />
+          )}
 
         {showFilter("dateRange") && (
           <div className="lg:col-span-2 grid grid-cols-2 gap-3">
@@ -886,12 +940,41 @@ export default function ReportDetailPage() {
     }
   }, [yearsData, filters.academic_year_id]);
 
-  // Extract actual arrays with deep nesting support
-  const classList = (() => {
-    const raw = classesData?.data || classesData;
+  const examList = (() => {
+    const raw = examsData?.data || examsData;
     if (Array.isArray(raw)) return raw;
     if (raw?.items && Array.isArray(raw.items)) return raw.items;
     return [];
+  })();
+
+  // Extract actual arrays with deep nesting support
+  const classList = (() => {
+    let list = [];
+    const raw = classesData?.data || classesData;
+    if (Array.isArray(raw)) list = raw;
+    else if (raw?.items && Array.isArray(raw.items)) list = raw.items;
+
+    // FOR EXAM REPORT: Filter classes to only show those assigned to the selected exam
+    if (reportType === "exam" && filters.exam_id) {
+      const selectedExam = examList.find(
+        (ex) => String(ex.id) === String(filters.exam_id),
+      );
+      if (selectedExam) {
+        const targetClassId =
+          selectedExam.class_id ||
+          selectedExam.Class?.id ||
+          selectedExam.ClassId ||
+          selectedExam.exam_schedule?.class_id;
+
+        if (targetClassId) {
+          return list.filter(
+            (c) => String(c.id || c.value) === String(targetClassId),
+          );
+        }
+      }
+    }
+
+    return list;
   })();
 
   const sectionList = (() => {
@@ -914,13 +997,6 @@ export default function ReportDetailPage() {
     return [];
   })();
 
-  const examList = (() => {
-    const raw = examsData?.data || examsData;
-    if (Array.isArray(raw)) return raw;
-    if (raw?.items && Array.isArray(raw.items)) return raw.items;
-    return [];
-  })();
-
   // FETCH: Report data
   const { data: reportData, isLoading: reportLoading } = useQuery({
     queryKey: ["report", reportType, filters],
@@ -936,13 +1012,29 @@ export default function ReportDetailPage() {
         res = await reportService.getExamReport(filters);
       else return null;
 
-      // Flatten data for student reports if needed
+      // ─── Flatten data for student reports ───
       if (reportType === "student" && res?.data?.records) {
         res.data.records = res.data.records.map((s) => {
           const details = s.details?.studentDetails || {};
           return { ...s, ...details };
         });
       }
+
+      // ─── Inject Mapping and Metadata for Exam Reports ───
+      if (reportType === "exam" && res?.data?.records && filters.exam_id) {
+        const selectedExam = examList.find(
+          (ex) => String(ex.id) === String(filters.exam_id),
+        );
+        if (selectedExam) {
+          res.data.records = res.data.records.map((r) => ({
+            ...r,
+            _injectedExamTitle: selectedExam.title || selectedExam.name,
+            // Ensure student details are flattened for the ExportModal (just like student report)
+            ...(r.student || r.Student || {}),
+          }));
+        }
+      }
+
       return res;
     },
     enabled:
@@ -992,9 +1084,50 @@ export default function ReportDetailPage() {
     }
   };
 
+  const handleExamDownload = async (record) => {
+    const studentId = record.student_id || record.id || record.Student?.id;
+    const examId = filters.exam_id;
+
+    if (!studentId || !examId) {
+      toast.error("Student or Exam information not found.");
+      return;
+    }
+
+    const t = toast.loading("Preparing Grade Sheet...");
+    try {
+      const response = await api.get(`/exams/${examId}/grade-sheet`, {
+        params: { student_id: studentId },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `ResultCard_${record.student_name || record.first_name || studentId}.pdf`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.dismiss(t);
+    } catch (error) {
+      toast.dismiss(t);
+      toast.error("Failed to download Grade Sheet");
+      console.error(error);
+    }
+  };
+
   // Expose individual download to window for the cell button
   useEffect(() => {
-    window.__handleIndividualDownload = async (student) => {
+    window.__handleIndividualDownload = async (record) => {
+      if (reportType === "exam") {
+        handleExamDownload(record);
+        return;
+      }
+
+      const student = record; // record is treated as student in other reports
       if (!student?.id) return;
 
       const loadingToast = toast.loading("Fetching full student profile...");
@@ -1007,7 +1140,6 @@ export default function ReportDetailPage() {
         const flattened = {
           ...fullData,
           ...details,
-          // Add any specific mappings if needed (ExportModal handleIndividualDownload style)
         };
 
         setIndividualExportData([flattened]);
@@ -1019,7 +1151,48 @@ export default function ReportDetailPage() {
       }
     };
     return () => delete window.__handleIndividualDownload;
-  }, []);
+  }, [reportType, filters.exam_id]);
+
+  const handleBulkGradeSheetDownload = async () => {
+    const examId = filters.exam_id;
+    const classId = filters.class_id;
+    const sectionId = filters.section_id;
+
+    if (!examId || !classId) {
+      toast.error("Please select Exam and Class to download bulk reports.");
+      return;
+    }
+
+    const t = toast.loading("Generating All Result Cards (Please wait)...");
+    try {
+      const response = await api.get(`/exams/${examId}/grade-sheet`, {
+        params: {
+          bulk: true,
+          class_id: classId,
+          section_id: sectionId,
+        },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `Bulk_Results_Exam_${examId}_${classId}.pdf`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.dismiss(t);
+      toast.success("Bulk Grade Sheets downloaded successfully!");
+    } catch (error) {
+      toast.dismiss(t);
+      toast.error("Failed to generate bulk reports");
+      console.error(error);
+    }
+  };
 
   // Handlers
   const handleFilterChange = (key, value) => {
@@ -1045,6 +1218,32 @@ export default function ReportDetailPage() {
       setExporting(false);
     }
   };
+
+  const displayRecords = useMemo(() => {
+    const raw = reportData?.data?.records || [];
+    if (!filters.search) return raw;
+
+    const searchTerm = filters.search.toLowerCase();
+    return raw.filter((r) => {
+      const student = r.student || r.Student || {};
+      const fullName =
+        `${student.first_name || ""} ${student.last_name || ""}`.toLowerCase();
+      const rollNo = String(
+        r.roll_no ||
+          r.roll_number ||
+          student.roll_no ||
+          student.roll_number ||
+          "",
+      ).toLowerCase();
+      const studentName = String(r.student_name || "").toLowerCase();
+
+      return (
+        fullName.includes(searchTerm) ||
+        rollNo.includes(searchTerm) ||
+        studentName.includes(searchTerm)
+      );
+    });
+  }, [reportData, filters.search]);
 
   // Build Columns
   const columns = useMemo(() => {
@@ -1218,6 +1417,7 @@ export default function ReportDetailPage() {
             exams={examList}
             onExport={() => {
               if (reportType === "student") handleBulkProfileDownload();
+              else if (reportType === "exam") handleBulkGradeSheetDownload();
               else setExporting(true);
             }}
             isExporting={hydratingBulk}
@@ -1254,7 +1454,7 @@ export default function ReportDetailPage() {
               <div className="p-0 pb-6 compact-table border-none">
                 <DataTable
                   columns={columns}
-                  data={reportData?.data?.records || []}
+                  data={displayRecords || []}
                   loading={reportLoading}
                   pagination={{
                     page: filters.page,
