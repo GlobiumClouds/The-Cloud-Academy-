@@ -45,6 +45,7 @@ export default function DatePickerField({
   toYear = new Date().getFullYear() + 10,
   disablePastDates = false,
   disableFutureDates = false,
+  rules,
 }) {
   const content = (fieldValue, fieldChange) => {
     let dateValue = null;
@@ -104,6 +105,7 @@ export default function DatePickerField({
         <Controller
           name={name}
           control={control}
+          rules={rules}
           render={({ field }) => content(field.value, field.onChange)}
         />
       ) : (
