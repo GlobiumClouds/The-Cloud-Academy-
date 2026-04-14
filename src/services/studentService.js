@@ -25,6 +25,9 @@ function normalizeFilters(filters = {}, type = "school") {
   const base = {
     page: filters.page ?? 1,
     limit: filters.limit ?? 20,
+    search: filters.search,
+    status: filters.is_active,
+    branch_id: filters.branch_id,
   };
 
   // Only add search and is_active if they're explicitly set (not undefined)
