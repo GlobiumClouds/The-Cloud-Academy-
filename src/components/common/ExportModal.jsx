@@ -638,11 +638,29 @@ export default function ExportModal({
     const student = data.student || {};
     const exam = data.exam || {};
     const result = data.result || {};
+    const status = (result?.status || 'ABSENT').toUpperCase();
+    const isPass = status === 'PASS';
 
     // A4 Border
     doc.setDrawColor(26, 41, 66); // Dark Navy
     doc.setLineWidth(0.5);
     doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+
+    // ─── Background Status Watermark (Ghost Light) ───
+    doc.saveGraphicsState();
+    doc.setFontSize(100);
+    doc.setFont('helvetica', 'bold');
+    // Ultra light colors (barely visible to prevent obscuring text)
+    if (status === 'PASS') {
+      doc.setTextColor(250, 253, 251); 
+    } else {
+      doc.setTextColor(253, 250, 250); 
+    }
+    doc.text(status, pageWidth / 2, pageHeight / 2 + 20, {
+      align: 'center',
+      angle: 45,
+    });
+    doc.restoreGraphicsState();
 
     // 1. Official Header
     if (pdfSettings.showLogo && instituteInfo.logo) {
@@ -671,9 +689,6 @@ export default function ExportModal({
     doc.text(`${instituteInfo.address}, ${instituteInfo.city}`, 42, yPos + 16);
     doc.text(`Website: ${instituteInfo.website} | Email: ${instituteInfo.email}`, 42, yPos + 21);
 
-    // Status Badge
-    const status = (result?.status || 'ABSENT').toUpperCase();
-    const isPass = status === 'PASS';
     doc.setFillColor(isPass ? 230 : 253, isPass ? 247 : 236, isPass ? 238 : 234);
     // Use standard rect if roundedRect is not available
     if (typeof doc.roundedRect === 'function') {
@@ -729,15 +744,15 @@ export default function ExportModal({
       { label: "ROLL NUMBER", value: student?.roll_number || student?.roll_no || '—' },
       { label: "REGISTRATION ID", value: student?.registration_no || '—' },
       { label: "CLASS / SECTION", value: `${exam?.class_name || '—'} (${exam?.section_name || '—'})` },
-      { label: "EXAMINATION", value: exam?.name || '—' },
+      { label: "EXAMINATION", value: exam?.name || exam?.title || '—' },
       { label: "DATE GENERATED", value: new Date().toLocaleDateString() },
     ];
     drawGrid(info);
 
-    // 4. Stats Summary Cards
+    // 5. Stats Summary Cards
     const cardWidth = (pageWidth - (margin * 2) - 10) / 3;
     const cards = [
-      { label: "TOTAL MARKS", value: exam?.total_marks || '0', color: [45, 106, 159] },
+      { label: "TOTAL MARKS", value: exam?.total_marks || result?.total_marks || '0', color: [45, 106, 159] },
       { label: "MARKS OBTAINED", value: result?.total_marks_obtained || '0', color: [26, 122, 74] },
       { label: "PERCENTAGE", value: `${parseFloat(result?.percentage || 0).toFixed(1)}%`, color: [179, 106, 0] },
     ];
@@ -772,7 +787,16 @@ export default function ExportModal({
     yPos += 4;
 
     const subjectMarks = Array.isArray(result?.subject_marks) ? result.subject_marks : [];
-    const examSubjects = Array.isArray(exam?.subject_schedules) ? exam.subject_schedules : [];
+    let examSubjects = Array.isArray(exam?.subject_schedules) ? exam.subject_schedules : [];
+
+    // Fallback: If exam schedule is not found, use subjects directly from the results
+    if (examSubjects.length === 0 && subjectMarks.length > 0) {
+      examSubjects = subjectMarks.map(m => ({
+        subject_id: m.subject_id || m.id,
+        subject_name: m.subject_name || m.subject?.name || "Subject",
+        total_marks: m.total_marks || 100
+      }));
+    }
 
     const tableRows = examSubjects.map((subj, idx) => {
       const mark = subjectMarks.find(m => m.subject_id === subj.subject_id) || {};

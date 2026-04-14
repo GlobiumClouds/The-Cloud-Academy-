@@ -248,7 +248,11 @@ const EXAM_REPORT_COLUMNS = [
     header: "Student Name",
     accessorFn: (r) => {
       const s = r.student || r.Student || r;
-      return `${s.first_name || ""} ${s.last_name || ""}`.trim() || r.student_name || "—";
+      return (
+        `${s.first_name || ""} ${s.last_name || ""}`.trim() ||
+        r.student_name ||
+        "—"
+      );
     },
   },
   {
@@ -274,7 +278,8 @@ const EXAM_REPORT_COLUMNS = [
   {
     id: "percentage",
     header: "Percentage",
-    accessorFn: (r) => (r.percentage ? `${parseFloat(r.percentage).toFixed(1)}%` : "—"),
+    accessorFn: (r) =>
+      r.percentage ? `${parseFloat(r.percentage).toFixed(1)}%` : "—",
   },
   {
     id: "grade",
@@ -343,13 +348,21 @@ const REPORT_CONFIGS = {
         id: "guardian_contact",
         header: "Guardian / Phone",
         accessorFn: (s) => {
+          const guardians =
+            s.guardians || s.Student?.guardians || s.student?.guardians || [];
           const g =
-            (s.guardians && Array.isArray(s.guardians) ? s.guardians : []).find(
+            (Array.isArray(guardians) ? guardians : []).find(
               (x) => x.type === "father" || x.type === "guardian",
             ) ||
-            (s.guardians && s.guardians[0]);
-          const name = g?.name || s.father_name || s.guardian_name || "—";
-          const phone = g?.phone || s.phone || "—";
+            (guardians && guardians[0]);
+          const name =
+            g?.name ||
+            s.father_name ||
+            s.guardian_name ||
+            s.details?.studentDetails?.father_name ||
+            s.details?.studentDetails?.guardian_name ||
+            "—";
+          const phone = g?.phone || s.phone || s.guardian_phone || "—";
           return `${name} | ${phone}`;
         },
       },
@@ -515,8 +528,12 @@ const REPORT_CONFIGS = {
           const reg = s.registration_no || s.student?.registration_no || "—";
           return (
             <div className="flex flex-col py-1">
-              <span className="text-amber-700 font-bold text-[11px] mb-1">{roll}</span>
-              <span className="text-amber-400 text-[10px] uppercase">{reg}</span>
+              <span className="text-amber-700 font-bold text-[11px] mb-1">
+                {roll}
+              </span>
+              <span className="text-amber-400 text-[10px] uppercase">
+                {reg}
+              </span>
             </div>
           );
         },
@@ -971,8 +988,15 @@ function ReportFilters({
               label="From"
               placeholder="From Date"
               value={filters.from_date}
-              onChange={(val) => onFilterChange("from_date", val)}
+              onChange={(val) => {
+                onFilterChange("from_date", val);
+                // Reset 'To' date if it's before the new 'From' date
+                if (filters.to_date && val && val > filters.to_date) {
+                  onFilterChange("to_date", "");
+                }
+              }}
               className="w-full"
+              disableFutureDates
             />
             <DatePickerField
               label="To"
@@ -980,6 +1004,8 @@ function ReportFilters({
               value={filters.to_date}
               onChange={(val) => onFilterChange("to_date", val)}
               className="w-full"
+              minDate={filters.from_date}
+              disableFutureDates
             />
           </div>
         )}
@@ -1014,6 +1040,10 @@ export default function ReportDetailPage() {
     status: "",
     academic_year_id: "",
   });
+
+  const onFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
   const [exporting, setExporting] = useState(false);
   const [hasHydrated, setHasHydrated] = useState(false);
@@ -1134,50 +1164,112 @@ export default function ReportDetailPage() {
     return [];
   })();
 
+  const options = {
+    years: yearsData?.data || [],
+    classes: classList,
+    sections: sectionList,
+  };
+
   // FETCH: Report data
   const { data: reportData, isLoading: reportLoading } = useQuery({
     queryKey: ["report", reportType, filters],
     queryFn: async () => {
       let res;
-      if (reportType === "student")
-        res = await reportService.getStudentReport(filters);
+      const apiParams = {
+        ...filters,
+        institute_id: currentInstitute?.id,
+        institute_type: currentInstitute?.type,
+        limit: filters.limit || 500,
+      };
+
+      // SIMPLE DIRECT INTEGRATION: Student Report
+      if (reportType === "student") {
+        const apiRes = await studentService.getAll({
+          ...filters, // Pass all selected filters (class_id, section_id, status, academic_year_id)
+          institute_id: currentInstitute?.id,
+          limit: filters.limit || 500,
+          page: filters.page || 1,
+        }, currentInstitute?.type || "school");
+
+        const rawArray = Array.isArray(apiRes?.data) ? apiRes.data : 
+                        (Array.isArray(apiRes) ? apiRes : []);
+
+        res = {
+          success: true,
+          data: {
+            records: rawArray.map(s => {
+              const sd = s.details?.studentDetails || s.details || {};
+              return {
+                ...s,
+                ...sd,
+                display_name: `${s.first_name || ""} ${s.last_name || ""}`.trim() || sd.first_name || "—",
+                class_name: sd.class_name || s.class_name || "—",
+                section_name: sd.section_name || s.section_name || "—",
+                roll_no: sd.roll_no || s.roll_no || s.registration_no || "—"
+              };
+            }),
+            pagination: apiRes?.pagination || {
+              total: rawArray.length,
+              page: filters.page,
+              limit: filters.limit,
+              totalPages: Math.ceil(rawArray.length / filters.limit)
+            }
+          }
+        };
+      }
       else if (reportType === "attendance")
-        res = await reportService.getAttendanceReport(filters);
+        res = await reportService.getAttendanceReport(apiParams);
       else if (reportType === "fee")
-        res = await reportService.getFeeReport(filters);
+        res = await reportService.getFeeReport(apiParams);
       else if (reportType === "exam")
-        res = await reportService.getExamReport(filters);
+        res = await reportService.getExamReport(apiParams);
       else return null;
 
-      // ─── Flatten data for student reports ───
-      if (reportType === "student" && res?.data?.records) {
-        res.data.records = res.data.records.map((s) => {
-          const details = s.details?.studentDetails || {};
-          return { ...s, ...details };
-        });
-      }
-
       // ─── Inject Mapping and Metadata for Exam Reports ───
-      if (reportType === "exam" && res?.data?.records && filters.exam_id) {
+      if (reportType === "exam" && res?.data?.records) {
+        const records = res?.data?.records || [];
         const selectedExam = examList.find(
           (ex) => String(ex.id) === String(filters.exam_id),
         );
-        if (selectedExam) {
-          res.data.records = res.data.records.map((r) => ({
+
+        res.data.records = records.map((r) => {
+          const student = r.student || r.Student || {};
+          const sDetails = student.details?.studentDetails || {};
+          const guardians = sDetails.guardians || student.guardians || [];
+          const primaryG = Array.isArray(guardians)
+            ? guardians.find(
+                (g) => g.type === "father" || g.type === "guardian",
+              ) || guardians[0]
+            : null;
+
+          return {
             ...r,
-            _injectedExamTitle: selectedExam.title || selectedExam.name,
-            // Ensure student details are flattened for the ExportModal (just like student report)
-            ...(r.student || r.Student || {}),
-          }));
-        }
+            ...student,
+            ...sDetails,
+            _injectedExamTitle:
+              selectedExam?.title || selectedExam?.name || "Exam Result",
+            // Explicit extraction for the columns
+            roll_no: sDetails.roll_no || student.roll_no || r.roll_no,
+            class_name: sDetails.class_name || student.class_name,
+            section_name: sDetails.section_name || student.section_name,
+            father_name:
+              sDetails.father_name ||
+              student.father_name ||
+              primaryG?.name ||
+              "—",
+            phone: student.phone || sDetails.phone || primaryG?.phone || "—",
+            display_name:
+              `${student.first_name || ""} ${student.last_name || ""}`.trim() ||
+              student.email ||
+              "—",
+          };
+        });
       }
 
       return res;
     },
     enabled:
       !!currentInstitute?.id &&
-      reportType !== "fee" &&
-      reportType !== "payroll" &&
       (reportType !== "exam" || (!!filters.exam_id && !!filters.class_id)),
   });
 
@@ -1243,38 +1335,71 @@ export default function ReportDetailPage() {
         });
         data = res?.data || res;
       } catch (apiError) {
-        console.warn("Grade sheet API failed, using table record fallback", apiError);
+        console.warn(
+          "Grade sheet API failed, using table record fallback",
+          apiError,
+        );
         data = {
           student: record.student || record.Student || record,
           result: record,
           exam: currentExamDetails?.data || currentExamDetails || {},
         };
       }
-      
+
       if (!data || (!data.student && !data.id)) {
         throw new Error("Could not prepare report data");
       }
 
-      const student = data.student || data || {};
+      const student = data.student || record.student || record.Student || {};
       const result = data.result || record || {};
-      const exam = data.exam || currentExamDetails?.data || currentExamDetails || {};
+      const exam =
+        data.exam || currentExamDetails?.data || currentExamDetails || {};
 
       const flattened = {
-        ...(student || {}),
-        ...(result || {}),
-        ...(exam || {}),
-        _isGradeSheet: true, 
-        student,
-        exam,
-        result,
-        first_name: student.first_name || student.name || "Student",
+        ...student,
+        ...result,
+        ...exam,
+        _isGradeSheet: true,
+        student: {
+          ...student,
+          // Ensure these are directly on student for the PDF
+          roll_number: student.roll_number || student.roll_no || result.roll_no,
+          registration_no: student.registration_no || result.registration_no,
+        },
+        exam: {
+          ...exam,
+          name:
+            exam.name ||
+            exam.title ||
+            record._injectedExamTitle ||
+            record.exam_title ||
+            "Examination Result",
+          title:
+            exam.title ||
+            exam.name ||
+            record._injectedExamTitle ||
+            record.exam_title ||
+            "Examination Result",
+          class_name:
+            student.class_name || result.class_name || exam.class_name,
+          section_name:
+            student.section_name || result.section_name || exam.section_name,
+        },
+        result: {
+          ...result,
+          subject_marks: result.subject_marks || [],
+        },
+        first_name: student.first_name || "Student",
+        last_name: student.last_name || "",
       };
 
       setIndividualExportData([flattened]);
       toast.dismiss(loadingToast);
     } catch (error) {
       console.error("Grade sheet prep error:", error);
-      toast.error(error.message || "Failed to prepare report", { id: loadingToast });
+      toast.error(error.message || "Failed to prepare report", {
+        id: loadingToast,
+      });
     }
   };
 
@@ -1283,7 +1408,9 @@ export default function ReportDetailPage() {
     if (!rawRecords.length) return;
 
     setHydratingBulk(true);
-    const loadingToast = toast.loading(`Preparing ${rawRecords.length} grade sheets for class export...`);
+    const loadingToast = toast.loading(
+      `Preparing ${rawRecords.length} grade sheets for class export...`,
+    );
 
     try {
       const allGradeSheets = await Promise.all(
@@ -1291,14 +1418,17 @@ export default function ReportDetailPage() {
           try {
             const studentId = r?.student_id || r?.student?.id || r?.id;
             if (!studentId) return null;
-            
+
             let data = null;
             try {
-              const res = await examService.generateGradeSheet(filters.exam_id, {
-                student_id: studentId,
-                class_id: filters.class_id,
-                section_id: filters.section_id,
-              });
+              const res = await examService.generateGradeSheet(
+                filters.exam_id,
+                {
+                  student_id: studentId,
+                  class_id: filters.class_id,
+                  section_id: filters.section_id,
+                },
+              );
               data = res?.data || res;
             } catch (apiError) {
               data = {
@@ -1310,7 +1440,8 @@ export default function ReportDetailPage() {
 
             const student = data.student || data || {};
             const result = data.result || r || {};
-            const exam = data.exam || currentExamDetails?.data || currentExamDetails || {};
+            const exam =
+              data.exam || currentExamDetails?.data || currentExamDetails || {};
 
             return {
               ...student,
@@ -1326,7 +1457,7 @@ export default function ReportDetailPage() {
             console.warn("Failed to prepare grade sheet for record", r, e);
             return null;
           }
-        })
+        }),
       );
 
       const filtered = allGradeSheets.filter(Boolean);
@@ -1518,8 +1649,18 @@ export default function ReportDetailPage() {
     );
   }
 
-  const totalRecords = reportData?.data?.pagination?.total || 0;
-  const totalPages = Math.ceil(totalRecords / filters.limit);
+  // Derived Pagination Info
+  const totalRecords =
+    reportData?.data?.pagination?.total ||
+    reportData?.pagination?.total ||
+    reportData?.data?.records?.length ||
+    0;
+
+  const totalPages =
+    reportData?.data?.pagination?.totalPages ||
+    reportData?.pagination?.totalPages ||
+    Math.ceil(totalRecords / (filters.limit || 50)) ||
+    1;
   const theme = THEMES[config.theme] || THEMES.indigo;
   const Icon = config.icon;
 
@@ -1585,36 +1726,31 @@ export default function ReportDetailPage() {
             </div>
           )}
 
+          {/* Filters Bar */}
           <ReportFilters
-            reportType={reportType}
             filters={filters}
-            onFilterChange={handleFilterChange}
-            options={{
-              classes: classList,
-              years: yearsData?.data || [],
-            }}
+            onFilterChange={onFilterChange}
+            reportType={reportType}
+            options={options}
+            sections={options.sections}
             loading={reportLoading}
-            sections={sectionList}
             exams={examList}
-            onExport={() => {
-              if (reportType === "student") handleBulkProfileDownload();
-              else if (reportType === "exam") handleBulkGradeSheetDownload();
-              else setExporting(true);
-            }}
-            isExporting={hydratingBulk}
-            canExport={
-              !!reportData?.data?.records?.length && !!filters.class_id
+            onExport={
+              reportType === "exam"
+                ? () =>
+                    handleBulkGradeSheetDownload(
+                      reportData?.data?.records || [],
+                    )
+                : () => setExporting(true)
             }
+            isExporting={exporting || hydratingBulk}
+            canExport={!!reportData?.data?.records?.length}
           />
 
           {/* TABLE OVERHAUL */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden relative">
-            {((reportType === "exam" &&
-              (!filters.exam_id || !filters.class_id)) ||
-              (!filters.class_id && 
-                reportType !== "exam" && 
-                reportType !== "payroll" && 
-                reportType !== "analytics")) ? (
+            {reportType === "exam" &&
+            (!filters.exam_id || !filters.class_id) ? (
               <div className="flex flex-col items-center justify-center p-20 text-center space-y-4 min-h-[300px]">
                 <div className="h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 border border-slate-100">
                   <Filter size={32} />
@@ -1638,6 +1774,11 @@ export default function ReportDetailPage() {
                   columns={columns}
                   data={displayRecords || []}
                   loading={reportLoading}
+                  emptyMessage={
+                    reportLoading
+                      ? "Loading data..."
+                      : `No records found (${yearsData?.data?.find((y) => String(y.id || y.value) === String(filters.academic_year_id))?.label || "Selected Year"})`
+                  }
                   pagination={{
                     page: filters.page,
                     totalPages: totalPages,
@@ -1658,15 +1799,19 @@ export default function ReportDetailPage() {
               setExporting(false);
               setHydratedBulkData([]); // Clear after use
             }}
-            columns={reportType === "exam" ? EXAM_REPORT_COLUMNS : STUDENT_REPORT_COLUMNS}
+            columns={
+              reportType === "exam"
+                ? EXAM_REPORT_COLUMNS
+                : STUDENT_REPORT_COLUMNS
+            }
             rows={
               hydratedBulkData.length > 0
                 ? hydratedBulkData
                 : reportData?.data?.records || []
             }
             fileName={
-              reportType === "exam" 
-                ? `${config.title}-GradeSheets-Class` 
+              reportType === "exam"
+                ? `${config.title}-GradeSheets-Class`
                 : `${config.title}-Profiles-Class`
             }
           />
@@ -1674,7 +1819,11 @@ export default function ReportDetailPage() {
           <ExportModal
             open={!!individualExportData}
             onClose={() => setIndividualExportData(null)}
-            columns={reportType === "exam" ? EXAM_REPORT_COLUMNS : STUDENT_REPORT_COLUMNS}
+            columns={
+              reportType === "exam"
+                ? EXAM_REPORT_COLUMNS
+                : STUDENT_REPORT_COLUMNS
+            }
             rows={individualExportData || []}
             fileName={
               reportType === "exam"
