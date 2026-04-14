@@ -1,6 +1,6 @@
 'use client';
 /**
- * FeesPage — Student fee records with payment status
+ * FeesPage — Student fee records with payment status + Bulk Voucher Generation
  */
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, DollarSign, AlertCircle, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign, AlertCircle, Download, FileText } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
@@ -18,8 +18,10 @@ import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
 import DatePickerField from '@/components/common/DatePickerField';
 import StatsCard from '@/components/common/StatsCard';
+import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
 import { cn } from '@/lib/utils';
 import { DUMMY_FEES } from '@/data/dummyData';
+import { feeVoucherService } from '@/services';
 
 const STATUS_OPTS = [{ value:'paid', label:'Paid' }, { value:'pending', label:'Pending' }, { value:'overdue', label:'Overdue' }, { value:'partial', label:'Partial' }];
 const STATUS_COLORS = { paid:'bg-emerald-100 text-emerald-700', pending:'bg-amber-100 text-amber-700', overdue:'bg-red-100 text-red-700', partial:'bg-blue-100 text-blue-700' };
@@ -49,11 +51,13 @@ export default function FeesPage({ type }) {
   const [page,   setPage]   = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [modal,   setModal]   = useState(false);
+  const [voucharGeneratorModal, setVoucherGeneratorModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting,setDeleting]= useState(null);
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm({ resolver: zodResolver(schema), defaultValues: { status:'pending' } });
 
+  // Fetch Fee Records
   const { data, isLoading } = useQuery({
     queryKey: ['fees', type, page, pageSize, search, status],
     queryFn: async () => {
@@ -67,9 +71,34 @@ export default function FeesPage({ type }) {
     placeholderData: (p) => p,
   });
 
+  // Fetch Fee Vouchers (Real-time)
+  const { data: vouchersData, isLoading: vouchersLoading, refetch: refetchVouchers } = useQuery({
+    queryKey: ['fee-vouchers', currentInstitute?.id],
+    queryFn: async () => {
+      try {
+        const response = await feeVoucherService.getAll({ }, { limit: 50, offset: 0 });
+        return response?.data?.rows || response?.rows || [];
+      } catch (error) {
+        console.error('Failed to fetch vouchers:', error);
+        return [];
+      }
+    },
+    enabled: !!currentInstitute?.id,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
   const rows = data?.data?.rows ?? DUMMY_FEES;
   const total = data?.data?.total ?? rows.length;
   const totalPages = data?.data?.totalPages ?? 1;
+  const vouchers = vouchersData || [];
+
+  // Calculate voucher statistics
+  const voucherStats = useMemo(() => ({
+    total: vouchers.length,
+    pending: vouchers.filter(v => v.status === 'pending').length,
+    paid: vouchers.filter(v => v.status === 'paid').length,
+    totalAmount: vouchers.reduce((sum, v) => sum + (v.netAmount || v.net_amount || 0), 0),
+  }), [vouchers]);
 
   const save = useMutation({
     mutationFn: async (vals) => {
@@ -373,16 +402,36 @@ export default function FeesPage({ type }) {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Fee Records" description={`${total} records`} />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatsCard label="Total Collected" value={`PKR ${totalCollected.toLocaleString()}`} icon={<DollarSign size={18} />} />
-        <StatsCard label="Total Due"        value={`PKR ${(totalDue - totalCollected).toLocaleString()}`} icon={<DollarSign size={18} />} />
-        <StatsCard label="Overdue"          value={totalOverdue} icon={<AlertCircle size={18} />} />
+      <PageHeader title="Fee Records & Vouchers" description={`${total} records • ${voucherStats.total} vouchers`} />
+      
+      {/* Fee Statistics */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground">Fee Status</h3>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatsCard label="Total Collected" value={`PKR ${totalCollected.toLocaleString()}`} icon={<DollarSign size={18} />} />
+          <StatsCard label="Total Due"        value={`PKR ${(totalDue - totalCollected).toLocaleString()}`} icon={<DollarSign size={18} />} />
+          <StatsCard label="Overdue"          value={totalOverdue} icon={<AlertCircle size={18} />} />
+        </div>
+      </div>
+
+      {/* Voucher Statistics */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground">Generated Vouchers</h3>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatsCard label="Total Vouchers" value={voucherStats.total} icon={<FileText size={18} />} />
+          <StatsCard label="Pending Collection" value={voucherStats.pending} icon={<AlertCircle size={18} />} />
+          <StatsCard label="Collected" value={`PKR ${voucherStats.totalAmount.toLocaleString()}`} icon={<DollarSign size={18} />} />
+        </div>
       </div>
       <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No fee records found"
         search={search} onSearch={(v) => { setSearch(v); setPage(1); }} searchPlaceholder={`Search ${terms.students.toLowerCase()}…`}
         filters={[{ name:'status', label:'Status', value:status, onChange:(v) => { setStatus(v); setPage(1); }, options:STATUS_OPTS }]}
-        action={canDo('fees.create') ? <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add Fee</button> : null}
+        action={
+          <div className="flex items-center gap-2">
+            {canDo('fees.create') && <button onClick={openAdd} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"><Plus size={14} /> Add Fee</button>}
+            {canDo('fees.create') && <button onClick={() => setVoucherGeneratorModal(true)} className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"><FileText size={14} /> Generate Vouchers</button>}
+          </div>
+        }
         enableColumnVisibility
         exportConfig={{ fileName: 'fee-records' }}
         pagination={{ page, totalPages, onPageChange: setPage, total, pageSize, onPageSizeChange: (s) => { setPageSize(s); setPage(1); } }} />
@@ -418,6 +467,24 @@ export default function FeesPage({ type }) {
           </>
         }>
         <p className="text-sm text-muted-foreground">Delete fee record for <strong>{deleting?.student_name}</strong>? This cannot be undone.</p>
+      </AppModal>
+
+      {/* Bulk Voucher Generator Modal */}
+      <AppModal 
+        open={voucharGeneratorModal} 
+        onClose={() => setVoucherGeneratorModal(false)} 
+        title="Generate Fee Vouchers" 
+        size="lg"
+      >
+        <BulkVoucherGenerator 
+          instituteId={currentInstitute?.id} 
+          onSuccess={() => {
+            setVoucherGeneratorModal(false);
+            refetchVouchers();
+            qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+            toast.success('Vouchers generated successfully!');
+          }} 
+        />
       </AppModal>
     </div>
   );
