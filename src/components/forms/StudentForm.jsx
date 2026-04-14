@@ -373,6 +373,9 @@ export default function StudentForm({
       'fee_plan_id',
       'monthly_fee',
       'admission_fee',
+      'discount_type',
+      'lab_charges',
+      'annual_charges',
       'concession_type',
       'concession_percentage',
       'concession_reason',
@@ -1016,7 +1019,7 @@ export default function StudentForm({
 
                 {/* Status */}
                 <div className="flex items-center justify-between rounded-lg border p-4">
-                  
+
                   <SwitchField
                     label="Active"
                     name="is_active"
