@@ -28,6 +28,7 @@ import StudentForm from '@/components/forms/StudentForm';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import { generateAndDownloadIdCard } from '@/lib/idCardGenerator';
+import { Badge } from '@/components/ui/badge';
 
 // Status badge color map
 const STATUS_COLORS = {
@@ -48,6 +49,15 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEd
 
   // Actions column
   cols.push({
+      accessorKey: 'is_active',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.is_active ? 'success' : 'secondary'} className="capitalize">
+          {row.original.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
+    {
     id: 'actions',
     header: '',
     cell: ({ row }) => {
@@ -119,7 +129,7 @@ export default function StudentsPage({ type }) {
   const { terms, studentColumns } = useInstituteConfig();
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('active');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleting, setDeleting] = useState(null);
@@ -220,8 +230,9 @@ export default function StudentsPage({ type }) {
   );
 
   const statusOptions = [
-    { value: 'true', label: 'Active' },
-    { value: 'false', label: 'Inactive' },
+    { value: 'all', label: 'All Statuses' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
   ];
 
   const handleAddStudent = (formData) => {
