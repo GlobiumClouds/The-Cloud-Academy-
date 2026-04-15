@@ -903,7 +903,7 @@ function ReportFilters({
         </div>
         <div className="flex items-center gap-3">
           {loading && (
-            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider hidden sm:flex">
+            <div className="hidden sm:flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
               <Loader2 size={12} className="animate-spin" /> Fetching...
             </div>
           )}
@@ -1049,6 +1049,49 @@ function ReportFilters({
             />
           </div>
         )}
+
+        {showFilter("search") && reportType === "fee" && (
+          <SelectField
+            label="Month"
+            placeholder="Select Month"
+            value={filters.month}
+            onChange={(v) => onFilterChange("month", v)}
+            options={[
+              { value: "", label: "All Months" },
+              { value: "1", label: "January" },
+              { value: "2", label: "February" },
+              { value: "3", label: "March" },
+              { value: "4", label: "April" },
+              { value: "5", label: "May" },
+              { value: "6", label: "June" },
+              { value: "7", label: "July" },
+              { value: "8", label: "August" },
+              { value: "9", label: "September" },
+              { value: "10", label: "October" },
+              { value: "11", label: "November" },
+              { value: "12", label: "December" },
+            ]}
+            className="w-full"
+          />
+        )}
+
+        {showFilter("status") && (
+          <SelectField
+            label="Status"
+            placeholder="All Status"
+            value={filters.status}
+            onChange={(v) => onFilterChange("status", v)}
+            options={[
+              { value: "", label: "All Status" },
+              { value: "pending", label: "Pending" },
+              { value: "paid", label: "Paid" },
+              { value: "partial", label: "Partial" },
+              { value: "overdue", label: "Overdue" },
+              { value: "cancelled", label: "Cancelled" },
+            ]}
+            className="w-full"
+          />
+        )}
       </div>
     </div>
   );
@@ -1079,6 +1122,8 @@ export default function ReportDetailPage() {
     exam_id: "",
     status: "",
     academic_year_id: "",
+    month: "",
+    year: new Date().getFullYear().toString(),
   });
 
   const onFilterChange = (key, value) => {
@@ -1707,7 +1752,7 @@ export default function ReportDetailPage() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-700 max-w-[1600px] mx-auto pb-10 px-2 sm:px-0">
       {/* HEADER OVERHAUL */}
-      {reportType !== "fee" && reportType !== "payroll" && (
+      {reportType !== "payroll" && (
         <div className="relative rounded-2xl p-7 flex flex-col sm:flex-row items-center justify-between gap-6 bg-white border border-slate-200 shadow-xl shadow-slate-200/40">
           <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-slate-50/50 pointer-events-none" />
           <div className="flex items-center gap-5 relative z-10 w-full sm:w-auto">
@@ -1733,35 +1778,65 @@ export default function ReportDetailPage() {
         <>
           {/* STATS OVERHAUL */}
           {reportData?.data?.summary && (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {Object.entries(reportData.data.summary).map(
-                ([key, value], i) => (
-                  <div
-                    key={key}
-                    className={cn(
-                      "rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-slate-200",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500",
-                        theme.grad,
-                      )}
-                    />
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">
-                      {key.replace(/_/g, " ")}
-                    </p>
-                    <h3 className="text-2xl font-bold text-slate-900 tabular-nums relative z-10 mt-1">
-                      {value}
-                    </h3>
-                    <div
-                      className={cn(
-                        "absolute bottom-4 right-4 h-1 w-8 rounded-full opacity-50 transition-all group-hover:w-12",
-                        theme.bg.replace("bg-", "bg-").split("/")[0],
-                      )}
-                    />
-                  </div>
-                ),
+            <div className="space-y-5">
+              {/* Main totals */}
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                {reportType === "fee" ? (
+                  <>
+                    <div className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-slate-200")}>
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", theme.grad)} />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Total Records</p>
+                      <h3 className="text-2xl font-bold text-slate-900 tabular-nums relative z-10 mt-1">{reportData.data.summary.total_records}</h3>
+                    </div>
+                    <div className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-slate-200")}>
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", theme.grad)} />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Total Amount</p>
+                      <h3 className="text-2xl font-bold text-slate-900 tabular-nums relative z-10 mt-1">{reportData.data.summary.total_amount}</h3>
+                    </div>
+                    <div className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-emerald-200")}>
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", "from-emerald-50 to-emerald-100")} />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Net Amount</p>
+                      <h3 className="text-2xl font-bold text-emerald-700 tabular-nums relative z-10 mt-1">{reportData.data.summary.total_net_amount}</h3>
+                    </div>
+                    <div className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-rose-200")}>
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", "from-rose-50 to-rose-100")} />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">Total Discount</p>
+                      <h3 className="text-2xl font-bold text-rose-700 tabular-nums relative z-10 mt-1">{reportData.data.summary.total_discount}</h3>
+                    </div>
+                  </>
+                ) : (
+                  Object.entries(reportData.data.summary)
+                    .filter(([key]) => !key.startsWith("status_") && !key.includes("breakdown"))
+                    .slice(0, 4)
+                    .map(([key, value]) => (
+                      <div key={key} className={cn("rounded-2xl border bg-white p-5 transition-all hover:shadow-xl relative overflow-hidden group border-slate-200")}>
+                        <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", theme.grad)} />
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">{key.replace(/_/g, " ")}</p>
+                        <h3 className="text-2xl font-bold text-slate-900 tabular-nums relative z-10 mt-1">{value}</h3>
+                      </div>
+                    ))
+                )}
+              </div>
+
+              {/* Status breakdown for fee report */}
+              {reportType === "fee" && reportData.data.summary.status_breakdown && (
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+                  {Object.entries(reportData.data.summary.status_breakdown).map(([status, count]) => {
+                    const statusColor = {
+                      pending: "text-amber-700 bg-amber-50 border-amber-200",
+                      paid: "text-emerald-700 bg-emerald-50 border-emerald-200",
+                      partial: "text-blue-700 bg-blue-50 border-blue-200",
+                      overdue: "text-rose-700 bg-rose-50 border-rose-200",
+                      cancelled: "text-slate-700 bg-slate-50 border-slate-200",
+                    };
+                    return (
+                      <div key={status} className={cn("rounded-xl border p-4 transition-all", statusColor[status] || "border-slate-200")}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-75">{status}</p>
+                        <p className="text-xl font-bold mt-2">{count}</p>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}
@@ -1842,7 +1917,9 @@ export default function ReportDetailPage() {
             columns={
               reportType === "exam"
                 ? EXAM_REPORT_COLUMNS
-                : STUDENT_REPORT_COLUMNS
+                : reportType === "fee"
+                  ? config.columns
+                  : STUDENT_REPORT_COLUMNS
             }
             rows={
               hydratedBulkData.length > 0
@@ -1851,8 +1928,10 @@ export default function ReportDetailPage() {
             }
             fileName={
               reportType === "exam"
-                ? `${config.title}-GradeSheets-Class`
-                : `${config.title}-Profiles-Class`
+                ? `${config.title}-GradeSheets`
+                : reportType === "fee"
+                  ? `${config.title}-${new Date().toISOString().split('T')[0]}`
+                  : `${config.title}-Profiles-Class`
             }
           />
 

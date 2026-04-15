@@ -246,8 +246,8 @@ export const reportService = {
   /**
    * Fee Report
    * Fetches: /api/v1/reports/fee
-   * Filters: class_id, section_id, status, from_date, to_date, institute_id
-   * Returns: Complete fee report with all FeeVoucher fields & summary statistics
+   * Filters: class_id, section_id, status, from_date, to_date, institute_id, month, year, search
+   * Returns: Complete fee report with status-wise & month-wise breakdown
    */
   getFeeReport: async (filters = {}) => {
     try {
@@ -258,8 +258,12 @@ export const reportService = {
         class_id: filters.class_id,
         section_id: filters.section_id,
         status: filters.status,
+        month: filters.month,
+        year: filters.year,
         from_date: filters.from_date,
         to_date: filters.to_date,
+        search: filters.search,
+        student_id: filters.student_id,
         page: filters.page || 1,
         limit: filters.limit || 50,
       };
@@ -281,7 +285,7 @@ export const reportService = {
         timeout: 15000,
       });
 
-      // Response structure from backend: { type, summary, records, timestamp }
+      // Response structure from backend: { type, summary, records, pagination }
       const reportData = response.data?.data || response.data || {};
       const records = reportData.records || [];
       const pagination = reportData.pagination || {
@@ -290,13 +294,15 @@ export const reportService = {
         limit: filters.limit || 50,
       };
 
-      // Summary already calculated on backend, but we can enhance if needed
+      // Summary with status-wise and month-wise breakdown
       const summary = reportData.summary || {
         total_records: records.length,
-        total_amount: 0,
-        total_paid: 0,
-        total_outstanding: 0,
-        collection_percentage: 0,
+        total_amount: "0.00",
+        total_discount: "0.00",
+        total_fine: "0.00",
+        total_net_amount: "0.00",
+        status_breakdown: {},
+        month_wise_breakdown: {}
       };
 
       return {

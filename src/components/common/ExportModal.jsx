@@ -283,143 +283,259 @@ export default function ExportModal({
     const doc = new jsPDF({ 
       orientation, 
       unit: 'mm',
-      format: pdfSettings.paperSize 
+      format: pdfSettings.paperSize,
+      compress: true
     });
     
     const pageWidth = doc.internal.pageSize.getWidth();
-    let yPos = 20;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 12;
+    let yPos = margin;
     
-    // Header with Logo and Institute Info
+    // ============ HEADER SECTION ============
+    
+    // Logo and Institute Header
+    const logoWidth = 25;
+    const logoHeight = 18;
+    let headerYPos = yPos;
+    let headerHeight = 0;
+    
+    // Try to load and display logo
     if (pdfSettings.showLogo && instituteInfo.logo) {
       try {
         const img = new Image();
+        img.crossOrigin = "anonymous";
         img.src = instituteInfo.logo;
-        await new Promise((resolve) => {
-          img.onload = () => {
-            const maxWidth = 40;
-            const maxHeight = 20;
-            let width = img.width;
-            let height = img.height;
-            
-            if (width > maxWidth) {
-              height = (height * maxWidth) / width;
-              width = maxWidth;
-            }
-            if (height > maxHeight) {
-              width = (width * maxHeight) / height;
-              height = maxHeight;
-            }
-            
-            doc.addImage(img, 'PNG', pageWidth / 2 - width / 2, yPos, width, height);
-            yPos += height + 5;
-            resolve();
-          };
-          img.onerror = resolve;
-          if (img.complete) img.onload();
-        });
-      } catch (err) {}
+        
+        await Promise.race([
+          new Promise((resolve) => {
+            img.onload = () => {
+              try {
+                doc.addImage(img, 'PNG', margin, headerYPos + 3, logoWidth, logoHeight);
+                headerHeight = Math.max(headerHeight, logoHeight + 6);
+              } catch (e) {
+                console.error('Error adding image:', e);
+              }
+              resolve();
+            };
+            img.onerror = resolve;
+          }),
+          new Promise((resolve) => setTimeout(resolve, 2000)) // Timeout after 2 seconds
+        ]);
+      } catch (err) {
+        console.error('Logo loading error:', err);
+      }
     }
     
-    // Institute Name
-    doc.setFontSize(18);
+    // Institute Info - Always display prominently
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(99, 102, 241);
-    doc.text(instituteInfo.name, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 8;
-    
-    // Address Line
-    if (instituteInfo.address) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      const addressText = `${instituteInfo.address}, ${instituteInfo.city}`;
-      doc.text(addressText, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 5;
-    }
-    
-    // Contact Info
-    if (instituteInfo.phone || instituteInfo.email) {
-      const contact = [instituteInfo.phone, instituteInfo.email].filter(Boolean).join(' | ');
-      doc.text(contact, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 5;
-    }
-    
-    // Divider Line
-    doc.setDrawColor(99, 102, 241);
-    doc.setLineWidth(0.5);
-    doc.line(20, yPos, pageWidth - 20, yPos);
-    yPos += 8;
-    
-    // Report Title
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text(fileName, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 6;
+    doc.setTextColor(30, 41, 59);
+    const logoOffsetX = pdfSettings.showLogo ? (logoWidth + 12) : 0;
+    const instituteNameText = instituteInfo.name || 'The Clouds Academy';
+    doc.text(instituteNameText, margin + logoOffsetX, headerYPos + 5);
+    headerHeight = Math.max(headerHeight, 10);
     
-    // Date Range Info
-    if (dateRange.from || dateRange.to) {
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'italic');
-      doc.setTextColor(100, 100, 100);
-      let dateText = 'Date Range: ';
-      if (dateRange.from) dateText += `${formatDate(dateRange.from)} `;
-      if (dateRange.to) dateText += `to ${formatDate(dateRange.to)}`;
-      doc.text(dateText, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(107, 114, 128);
+    
+    let infoYPos = headerYPos + 12;
+    if (instituteInfo.address) {
+      const addressText = instituteInfo.address + (instituteInfo.city ? ', ' + instituteInfo.city : '');
+      doc.text(addressText, margin + logoOffsetX, infoYPos);
+      infoYPos += 4;
+      headerHeight = Math.max(headerHeight, 18);
+    }
+    if (instituteInfo.phone && instituteInfo.email) {
+      doc.text(`${instituteInfo.phone} | ${instituteInfo.email}`, margin + logoOffsetX, infoYPos);
+      headerHeight = Math.max(headerHeight, 22);
+    } else if (instituteInfo.phone) {
+      doc.text(`Phone: ${instituteInfo.phone}`, margin + logoOffsetX, infoYPos);
+      headerHeight = Math.max(headerHeight, 22);
+    } else if (instituteInfo.email) {
+      doc.text(`Email: ${instituteInfo.email}`, margin + logoOffsetX, infoYPos);
+      headerHeight = Math.max(headerHeight, 22);
     }
     
-    // Export Info
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(150, 150, 150);
-    const exportInfo = `Generated on: ${formatDate(new Date())} | Total Records: ${data.length}`;
-    doc.text(exportInfo, pageWidth / 2, yPos, { align: 'center' });
+    yPos = headerYPos + headerHeight + 8;
+    
+    // Solid Divider Line
+    doc.setDrawColor(51, 65, 85);
+    doc.setLineWidth(1.2);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 8;
     
-    // Main Table
+    // ============ REPORT TITLE & INFO ============
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text(fileName, margin, yPos);
+    yPos += 5;
+    
+    // Report metadata - Two columns
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    
+    // Left column
+    let leftInfo = [];
+    if (dateRange.from || dateRange.to) {
+      let dateText = 'Period: ';
+      if (dateRange.from) dateText += dateRange.from;
+      if (dateRange.to) dateText += ` to ${dateRange.to}`;
+      leftInfo.push(dateText);
+    }
+    leftInfo.forEach((text, i) => {
+      doc.text(text, margin, yPos + (i * 3.5));
+    });
+    
+    // Right column - Total Records
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(51, 65, 85);
+    const recordsText = `Total Records: ${data.length}`;
+    const recordsWidth = doc.getTextWidth(recordsText);
+    doc.text(recordsText, pageWidth - margin - recordsWidth, yPos);
+    
+    // Generated timestamp
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 175);
+    const generatedDate = new Date().toLocaleDateString('en-PK', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    doc.text(`Generated: ${generatedDate}`, margin, yPos + 8);
+    
+    yPos += 12;
+    
+    // ============ DATA TABLE ============
+    
     const tableHeaders = orderedCols.map(key => {
       const col = colDefs.find(c => c.key === key);
-      return col?.label || key;
+      const label = col?.label || key;
+      return label.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     });
     
     const tableBody = data.map(row => 
-      orderedCols.map(key => String(row[key] ?? ''))
+      orderedCols.map(key => {
+        const val = row[key];
+        if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+        if (typeof val === 'object' && val !== null) return JSON.stringify(val).substring(0, 20) + '...';
+        return String(val ?? '').substring(0, 50);
+      })
     );
     
-    const headerColor = pdfSettings.colorTheme === 'primary' ? [99, 102, 241] : [52, 211, 153];
+    // Calculate available width for table
+    const availableWidth = pageWidth - (margin * 2);
+    const numColumns = orderedCols.length;
     
+    // Smart column width distribution
+    const columnWidths = orderedCols.map(key => {
+      // Smaller width for IDs, status, dates
+      if (key.includes('id') || key === 'status' || key.includes('date')) {
+        return 12;
+      }
+      // Medium width for amounts
+      if (key.includes('amount') || key.includes('total') || key.includes('sum') || key.includes('fine')) {
+        return 16;
+      }
+      // Larger width for names and descriptions
+      if (key.includes('name') || key.includes('desc') || key.includes('title')) {
+        return 28;
+      }
+      // Default width for other columns
+      return 15;
+    });
+    
+    // Adjust column widths to fit page if needed
+    const totalWidth = columnWidths.reduce((a, b) => a + b, 0);
+    const scaleFactor = availableWidth / totalWidth;
+    const scaledWidths = columnWidths.map(w => w * scaleFactor);
+
     autoTable(doc, {
       head: [tableHeaders],
       body: tableBody,
-      startY: yPos + 2,
-      styles: { 
+      startY: yPos,
+      margin: { top: margin, left: margin, right: margin, bottom: margin + 8 },
+      theme: 'grid',
+      styles: {
+        font: 'helvetica',
         fontSize: pdfSettings.fontSize,
-        cellPadding: pdfSettings.tableStriped ? 4 : 3,
+        cellPadding: 2.5,
         valign: 'middle',
-        lineColor: [200, 200, 200],
-        lineWidth: 0.1,
+        halign: 'left',
+        lineColor: [226, 232, 240],
+        lineWidth: 0.2,
+        textColor: [51, 65, 85],
+        overflow: 'linebreak',
       },
-      headStyles: { 
-        fillColor: headerColor, 
-        textColor: [255, 255, 255], 
+      columnStyles: Object.fromEntries(
+        orderedCols.map((key, index) => {
+          let halign = 'left';
+          
+          if (key.includes('amount') || key.includes('total') || key.includes('sum')) {
+            halign = 'right';
+          }
+          if (key === 'status' || key.includes('status')) {
+            halign = 'center';
+          }
+          if (key.includes('voucher') || key.includes('number') || key.includes('id')) {
+            halign = 'center';
+          }
+          if (key.includes('date')) {
+            halign = 'center';
+          }
+          
+          return [index, { halign, cellWidth: scaledWidths[index] }];
+        })
+      ),
+      headStyles: {
         fontStyle: 'bold',
+        fontSize: pdfSettings.fontSize + 0.5,
+        fillColor: [51, 65, 85],
+        textColor: [255, 255, 255],
         halign: 'center',
+        valign: 'middle',
+        cellPadding: 4,
+        lineColor: [51, 65, 85],
+        lineWidth: 0.3,
       },
-      alternateRowStyles: pdfSettings.tableStriped ? { fillColor: [245, 246, 250] } : {},
-      margin: { left: 15, right: 15 },
+      alternateRowStyles: pdfSettings.tableStriped ? {
+        fillColor: [248, 250, 252],
+      } : {},
+      bodyStyles: {
+        lineColor: [226, 232, 240],
+        lineWidth: 0.2,
+      },
       didDrawPage: (data) => {
+        const pageSize = doc.internal.pageSize;
+        const pageHeight = pageSize.getHeight();
+        const pageWidth = pageSize.getWidth();
+        
+        // Footer divider
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.3);
+        doc.line(margin, pageHeight - margin - 8, pageWidth - margin, pageHeight - margin - 8);
+        
+        // Page numbers
         if (pdfSettings.showPageNumbers) {
           const pageCount = doc.internal.getNumberOfPages();
-          const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
-          doc.setFontSize(8);
-          doc.setTextColor(150, 150, 150);
-          doc.text(`Page ${pageNumber} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+          const pageNum = doc.internal.getPageInfo(doc.internal.getCurrentPageInfo().pageNumber).pageNumber;
+          doc.setFontSize(7);
+          doc.setTextColor(148, 163, 175);
+          doc.text(`Page ${pageNum} of ${pageCount}`, pageWidth / 2, pageHeight - 4, { align: 'center' });
         }
+        
+        // Website footer
         if (pdfSettings.showFooter) {
           doc.setFontSize(7);
-          doc.setTextColor(150, 150, 150);
-          doc.text(instituteInfo.website || 'www.thecloudsacademy.com', pageWidth / 2, doc.internal.pageSize.getHeight() - 5, { align: 'center' });
+          doc.setTextColor(148, 163, 175);
+          doc.text(instituteInfo.website || 'www.thecloudsacademy.com', pageWidth / 2, pageHeight - margin - 1, { align: 'center' });
         }
       },
     });
