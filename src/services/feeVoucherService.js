@@ -47,6 +47,9 @@ const buildVoucherFilters = (filters = {}) => {
   if (filters.class_id) {
     base.class_id = filters.class_id;
   }
+  if (filters.academic_year_id) {
+    base.academic_year_id = filters.academic_year_id;
+  }
   
   return base;
 };
@@ -88,10 +91,10 @@ const transformVoucherResponse = (data) => {
 const transformVouchersList = (response) => {
   return {
     vouchers: (response.data?.vouchers || response.data || []).map(transformVoucherResponse),
-    pagination: response.pagination || {
-      total: response.data?.length || 0,
+    pagination: response.data?.pagination || response.pagination || {
+      total: response.data?.vouchers?.length || response.data?.length || 0,
       page: 1,
-      limit: response.data?.length || 20,
+      limit: response.data?.vouchers?.length || response.data?.length || 20,
       totalPages: 1
     }
   };
@@ -103,9 +106,10 @@ export const feeVoucherService = {
    * @param {string} studentId - Student UUID
    * @param {number} month - Month (1-12)
    * @param {number} year - Year (e.g., 2026)
+   * @param {object} options - Optional parameters {dueDate, academicYearId}
    * @returns {Promise<object>} Generated voucher
    */
-  generateSingle: async (studentId, month, year) => {
+  generateSingle: async (studentId, month, year, options = {}) => {
     try {
       if (!studentId) throw new Error('Student ID is required');
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
@@ -114,7 +118,9 @@ export const feeVoucherService = {
       const response = await api.post('/fee-vouchers/generate-single', {
         studentId,
         month: parseInt(month),
-        year: parseInt(year)
+        year: parseInt(year),
+        dueDate: options.dueDate || undefined,
+        academicYearId: options.academicYearId || undefined,
       }, {
         timeout: 10000 // 10 second timeout
       });
@@ -135,9 +141,10 @@ export const feeVoucherService = {
    * @param {string} classId - Class UUID
    * @param {number} month - Month (1-12)
    * @param {number} year - Year
+   * @param {object} options - Optional parameters {dueDate, academicYearId}
    * @returns {Promise<object>} Summary with generated vouchers count
    */
-  generateClass: async (classId, month, year) => {
+  generateClass: async (classId, month, year, options = {}) => {
     try {
       if (!classId) throw new Error('Class ID is required');
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
@@ -146,7 +153,9 @@ export const feeVoucherService = {
       const response = await api.post('/fee-vouchers/generate-class', {
         classId,
         month: parseInt(month),
-        year: parseInt(year)
+        year: parseInt(year),
+        dueDate: options.dueDate || undefined,
+        academicYearId: options.academicYearId || undefined,
       }, {
         timeout: 30000 // 30 second timeout for bulk operation
       });
@@ -173,16 +182,19 @@ export const feeVoucherService = {
    * Generate vouchers for entire institute
    * @param {number} month - Month (1-12)
    * @param {number} year - Year
+   * @param {object} options - Optional parameters {dueDate, academicYearId}
    * @returns {Promise<object>} Summary with generated vouchers
    */
-  generateInstitute: async (month, year) => {
+  generateInstitute: async (month, year, options = {}) => {
     try {
       if (!month || month < 1 || month > 12) throw new Error('Valid month (1-12) is required');
       if (!year || year < 2000) throw new Error('Valid year is required');
 
       const response = await api.post('/fee-vouchers/generate-institute', {
         month: parseInt(month),
-        year: parseInt(year)
+        year: parseInt(year),
+        dueDate: options.dueDate || undefined,
+        academicYearId: options.academicYearId || undefined,
       }, {
         timeout: 60000 // 60 second timeout for full institute
       });
@@ -289,6 +301,34 @@ export const feeVoucherService = {
       }
       throw {
         message: error.response?.data?.message || error.message || 'Failed to delete voucher',
+        status: error.response?.status,
+        error
+      };
+    }
+  },
+
+  /**
+   * Update voucher status (mark as paid, pending, etc)
+   * @param {string} voucherId - Voucher ID
+   * @param {string} status - New status (paid, pending, cancelled, etc)
+   * @returns {Promise<object>} Updated voucher
+   */
+  updateStatus: async (voucherId, status) => {
+    try {
+      if (!voucherId) throw new Error('Voucher ID is required');
+      if (!status) throw new Error('Status is required');
+
+      const response = await api.patch(`/fee-vouchers/${voucherId}/status`, {
+        status
+      }, {
+        timeout: 5000
+      });
+
+      return transformVoucherResponse(response.data?.data || response.data);
+    } catch (error) {
+      console.error('❌ Failed to update voucher status:', error);
+      throw {
+        message: error.response?.data?.message || error.message || 'Failed to update voucher status',
         status: error.response?.status,
         error
       };

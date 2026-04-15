@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   SelectField,
   InputField,
-  FormSubmitButton
+  FormSubmitButton,
+  DatePickerField,
+  ConfirmDialog
 } from '@/components/common';
 import { classService, academicYearService, studentService } from '@/services';
 import { feeVoucherService } from '@/services';
@@ -50,6 +52,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       classId: '',
       academicYearId: '',
       month: String(new Date().getMonth() + 1),
+      dueDate: '', // Today's date as default
     }
   });
 
@@ -58,7 +61,11 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     queryKey: ['academic-years', instituteId],
     queryFn: async () => {
       try {
-        const response = await academicYearService.getAll({ institute_id: instituteId, is_active: true });
+        const response = await academicYearService.getAll({ 
+          institute_id: instituteId, 
+          is_active: true,
+          limit: 1000  // Fetch all for dropdown
+        });
         return response.data?.rows || response.data || [];
       } catch (error) {
         console.error('Failed to fetch academic years:', error);
@@ -68,18 +75,25 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
     enabled: !!instituteId
   });
 
-  // Auto-select current academic year
-  const currentAcademicYear = academicYears.find(ay => ay.is_current) || academicYears[0];
-  if (currentAcademicYear && !watch('academicYearId')) {
-    setValue('academicYearId', currentAcademicYear.id);
-  }
+  // Auto-select current academic year using useEffect (NOT during render)
+  useEffect(() => {
+    if (academicYears.length > 0 && !watch('academicYearId')) {
+      const currentAcademicYear = academicYears.find(ay => ay.is_current) || academicYears[0];
+      if (currentAcademicYear) {
+        setValue('academicYearId', currentAcademicYear.id);
+      }
+    }
+  }, [academicYears, setValue, watch]);
 
   // Fetch classes
   const { data: classes = [] } = useQuery({
     queryKey: ['classes-voucher', instituteId],
     queryFn: async () => {
       try {
-        const response = await classService.getAll({ institute_id: instituteId });
+        const response = await classService.getAll({ 
+          institute_id: instituteId,
+          limit: 1000  // Fetch all for dropdown
+        });
         return response.data?.rows || response.data || [];
       } catch (error) {
         console.error('Failed to fetch classes:', error);
@@ -105,7 +119,8 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
         const response = await studentService.getAll({ 
           class_id: selectedClassId,
           institute_id: instituteId,
-          is_active: true
+          is_active: true,
+          limit: 1000  // Fetch all for dropdown
         });
         const students = response.data?.rows || response.data || [];
         console.log('Fetched students:', students);
@@ -153,6 +168,11 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       return;
     }
 
+    if (!confirmData.dueDate) {
+      toast.error('Please select a due date');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const academicYear = academicYears.find(ay => ay.id === confirmData.academicYearId);
@@ -162,6 +182,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
 
       const month = parseInt(confirmData.month, 10);
       const year = academicYear.end_year || new Date().getFullYear();
+      const dueDate = confirmData.dueDate; // Use the selected due date from DatePickerField
 
       let response;
 
@@ -170,20 +191,20 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
           confirmData.studentId, 
           month, 
           year,
-          { academicYearId: confirmData.academicYearId }
+          { academicYearId: confirmData.academicYearId, dueDate }
         );
       } else if (confirmData.mode === 'class') {
         response = await feeVoucherService.generateClass(
           confirmData.classId, 
           month, 
           year,
-          { academicYearId: confirmData.academicYearId }
+          { academicYearId: confirmData.academicYearId, dueDate }
         );
       } else if (confirmData.mode === 'institute') {
         response = await feeVoucherService.generateInstitute(
           month, 
           year,
-          { academicYearId: confirmData.academicYearId }
+          { academicYearId: confirmData.academicYearId, dueDate }
         );
       }
 
@@ -339,8 +360,8 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
             </TabsContent>
           </Tabs>
 
-          {/* Academic Year and Month Selection */}
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Academic Year, Month and Due Date Selection */}
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
             <Controller
               name="academicYearId"
               control={control}
@@ -369,12 +390,28 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
                 />
               )}
             />
+            <Controller
+              name="dueDate"
+              control={control}
+              render={({ field }) => (
+                <DatePickerField
+                  label="Due Date"
+                  name="dueDate"
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Select due date"
+                  error={errors.dueDate}
+                  disablePastDates={true}
+                  required={true}
+                />
+              )}
+            />
           </div>
 
           {/* Submit Button */}
           <Button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700"
+            className="w-full"
             disabled={submitting}
           >
             {submitting ? (
@@ -390,75 +427,15 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
       </CardContent>
 
       {/* Confirmation Dialog */}
-      {showConfirm && confirmData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md">
-              <CardHeader>
-                <CardTitle>Confirm Voucher Generation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <strong>Mode:</strong> {
-                      confirmData.mode === 'single' ? 'Single Student' :
-                      confirmData.mode === 'class' ? 'Class' :
-                      'Entire Institute'
-                    }
-                  </p>
-                  {confirmData.mode === 'single' && (
-                    <p>
-                      <strong>Student:</strong> {
-                        classStudents.find(s => s.id === confirmData.studentId)?.first_name
-                      } {
-                        classStudents.find(s => s.id === confirmData.studentId)?.last_name
-                      }
-                    </p>
-                  )}
-                  {(confirmData.mode === 'single' || confirmData.mode === 'class') && (
-                    <p>
-                      <strong>Class:</strong> {
-                        classes.find(c => c.id === confirmData.classId)?.name
-                      }
-                    </p>
-                  )}
-                  <p>
-                    <strong>Academic Year:</strong> {academicYears.find(ay => ay.id === confirmData.academicYearId)?.name}
-                  </p>
-                  <p>
-                    <strong>Month:</strong> {MONTH_OPTIONS.find(m => m.value === confirmData.month)?.label}
-                  </p>
-                  <p className="text-amber-700 bg-amber-50 p-2 rounded">
-                    This will generate vouchers with concession amounts and notes based on student fee details.
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowConfirm(false)}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleConfirmGenerate}
-                    disabled={submitting}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      'Confirm & Generate'
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-      )}
+      <ConfirmDialog
+        open={showConfirm && !!confirmData}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleConfirmGenerate}
+        loading={submitting}
+        title="Confirm Voucher Generation"
+        description={`Generate vouchers for ${confirmData?.mode === 'single' ? 'single student' : confirmData?.mode === 'class' ? 'all students in class' : 'entire institute'} in ${MONTH_OPTIONS.find(m => m.value === parseInt(confirmData?.month))?.label}?`}
+        confirmLabel="Generate"
+      />
     </Card>
   );
 }
