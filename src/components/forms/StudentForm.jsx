@@ -132,8 +132,10 @@ export default function StudentForm({
           institute_id: instituteId,
           is_active: true
         });
-        const years = response.data || [];
-        return years.map(y => ({
+        const data = response.data || response || [];
+        const finalYears = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
+        
+        return finalYears.map(y => ({
           value: y.id,
           label: y.name
         }));
@@ -154,14 +156,14 @@ export default function StudentForm({
       if (!selectedAcademicYear) return [];
 
       try {
-        // Yeh wahi ClassForm wala endpoint hai jo sections bhi return karta hai
         const response = await classService.getAll({
           academic_year_id: selectedAcademicYear,
           include_sections: true
         });
 
-        // Response structure: { data: rows }
-        const classList = response.data?.rows || response.data || [];
+        // Ensure we always return an array
+        const data = response.data || response || [];
+        const classList = Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
 
         console.log('📚 Classes with sections:', classList);
         return classList;
@@ -178,12 +180,16 @@ export default function StudentForm({
   const watchClass = watch('class_id');
   const watchSection = watch('section_id');
 
+  const selectedClassData = useMemo(() => {
+    if (!Array.isArray(classes)) return null;
+    return classes.find((c) => String(c?.id) === String(watchClass)) || null;
+  }, [classes, watchClass]);
+
   // Sections are embedded inside selected class payload.
   const sections = useMemo(() => {
-    if (!watchClass || !classes.length) return [];
+    if (!watchClass || !selectedClassData) return [];
 
-    const selectedClass = classes.find((c) => String(c?.id) === String(watchClass));
-    const rawSections = Array.isArray(selectedClass?.sections) ? selectedClass.sections : [];
+    const rawSections = Array.isArray(selectedClassData?.sections) ? selectedClassData.sections : [];
 
     return rawSections
       .map((section) => ({
@@ -193,13 +199,10 @@ export default function StudentForm({
       }))
       .filter((section) => section.id)
       .filter((section) => section.is_active);
-  }, [watchClass, classes]);
-
-  const selectedClassData = useMemo(() => {
-    return classes.find((c) => String(c?.id) === String(watchClass)) || null;
-  }, [classes, watchClass]);
+  }, [watchClass, selectedClassData]);
 
   const selectedSectionData = useMemo(() => {
+    if (!Array.isArray(sections)) return null;
     return sections.find((s) => String(s?.id) === String(watchSection)) || null;
   }, [sections, watchSection]);
 
