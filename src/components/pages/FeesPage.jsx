@@ -133,6 +133,12 @@ export default function FeesPage() {
     };
   }, [vouchers]);
 
+  // Only paid vouchers amount
+  const collectedAmount = useMemo(() => {
+    return vouchers.filter((v) => v.status === 'paid')
+      .reduce((sum, v) => sum + (parseFloat(v.netAmount) || parseFloat(v.amount) || 0), 0);
+  }, [vouchers]);
+
   // Single voucher generation mutation
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(singleVoucherSchema),
@@ -192,9 +198,11 @@ export default function FeesPage() {
 
   const voucherColumns = useMemo(
     () => [
-      { accessorKey: 'voucherNumber', 
-        header: 'Voucher #', 
-        cell: ({ row: { original: r } }) => <span className="font-mono font-semibold">{r.voucherNumber || 'N/A'}</span> },
+      {
+        accessorKey: 'voucherNumber',
+        header: 'Voucher #',
+        cell: ({ row: { original: r } }) => <span className="font-mono font-semibold">{r.voucherNumber || 'N/A'}</span>
+      },
       {
         accessorKey: 'student_id',
         header: `${terms.student}`,
@@ -206,8 +214,9 @@ export default function FeesPage() {
         ),
       },
       { accessorKey: 'month', header: 'Month', cell: ({ getValue }) => MONTH_OPTS.find(m => m.value === String(getValue()))?.label || getValue() },
-      { accessorKey: 'amount', 
-        header: 'Amount', 
+      {
+        accessorKey: 'amount',
+        header: 'Amount',
         cell: ({ row: { original: r } }) => (
           <div>
             <p className="font-medium">{r.amount || 'N/A'}</p>
@@ -231,10 +240,10 @@ export default function FeesPage() {
           <div className="flex items-center gap-1">
             <button onClick={() => setViewingVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="View Details" size={14}><FileText size={14} /></button>
             {row.original.status !== 'paid' && canDo('fees.update') && (
-              <button 
-                onClick={() => setMarkingAsPaid(row.original.id)} 
+              <button
+                onClick={() => setMarkingAsPaid(row.original.id)}
                 disabled={markingAsPaid === row.original.id}
-                className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50" 
+                className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50"
                 title="Mark as Paid"
               >
                 {markingAsPaid === row.original.id ? '⏳' : '✓'}
@@ -271,7 +280,7 @@ export default function FeesPage() {
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-4">
         <StatsCard label="Total Vouchers" value={voucherStats.total} icon={<FileText size={18} />} />
-        <StatsCard label="Collected (Paid)" value={`PKR ${voucherStats.totalAmount.toLocaleString('en-PK')}`} icon={<DollarSign size={18} />} />
+        <StatsCard label="Collected (Paid)" value={`PKR ${collectedAmount.toLocaleString('en-PK')}`} icon={<DollarSign size={18} />} />
         <StatsCard label="Pending Collection" value={voucherStats.pending} icon={<AlertCircle size={18} />} />
         <StatsCard label="Pending Amount" value={`PKR ${voucherStats.pendingAmount.toLocaleString('en-PK')}`} icon={<DollarSign size={18} />} />
       </div>
@@ -286,7 +295,7 @@ export default function FeesPage() {
         exportConfig={{ fileName: `fee-vouchers-${voucherMonth}` }}
         pagination={{
           page: voucherPagination.page,
-          pageSize: voucherPagination.limit,
+          pageSize: voucherPageSize,
           total: voucherPagination.total,
           totalPages: voucherPagination.totalPages,
           onPageChange: setVoucherPage,
@@ -449,12 +458,3 @@ export default function FeesPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

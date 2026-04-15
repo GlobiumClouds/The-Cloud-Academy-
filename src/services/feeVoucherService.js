@@ -47,6 +47,9 @@ const buildVoucherFilters = (filters = {}) => {
   if (filters.class_id) {
     base.class_id = filters.class_id;
   }
+  if (filters.academic_year_id) {
+    base.academic_year_id = filters.academic_year_id;
+  }
   
   return base;
 };
@@ -88,10 +91,10 @@ const transformVoucherResponse = (data) => {
 const transformVouchersList = (response) => {
   return {
     vouchers: (response.data?.vouchers || response.data || []).map(transformVoucherResponse),
-    pagination: response.pagination || {
-      total: response.data?.length || 0,
+    pagination: response.data?.pagination || response.pagination || {
+      total: response.data?.vouchers?.length || response.data?.length || 0,
       page: 1,
-      limit: response.data?.length || 20,
+      limit: response.data?.vouchers?.length || response.data?.length || 20,
       totalPages: 1
     }
   };
