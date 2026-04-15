@@ -251,7 +251,6 @@ export default function StudentsPage({ type }) {
   );
 
   const statusOptions = [
-    { value: 'all', label: 'All Statuses' },
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
   ];

@@ -511,52 +511,92 @@ const REPORT_CONFIGS = {
     filters: ["search", "class", "section", "status", "dateRange"],
     columns: [
       {
-        id: "name",
-        header: "Student",
-        accessorFn: (s) =>
-          `${s.student?.first_name || ""} ${s.student?.last_name || ""}`.trim() ||
-          s.student_name ||
-          s.name ||
-          "—",
+        id: "voucher_number",
+        header: "Voucher #",
+        accessorFn: (s) => s.voucher_number || "—",
       },
       {
-        id: "ids",
+        id: "student_name",
+        header: "Student Name",
+        accessorFn: (s) => s.student?.name || s.student_name || s.name || "—",
+      },
+      {
+        id: "roll_reg",
         header: "Roll / Reg No",
-        cell: ({ row }) => {
-          const s = row.original;
-          const roll = s.roll_no || s.student?.roll_no || "—";
-          const reg = s.registration_no || s.student?.registration_no || "—";
-          return (
-            <div className="flex flex-col py-1">
-              <span className="text-amber-700 font-bold text-[11px] mb-1">
-                {roll}
-              </span>
-              <span className="text-amber-400 text-[10px] uppercase">
-                {reg}
-              </span>
-            </div>
-          );
+        accessorFn: (s) => {
+          const roll = s.student?.roll_number || s.student?.roll_no || s.roll_no || "—";
+          const reg = s.student?.registration_no || s.registration_no || "—";
+          return `${roll} / ${reg}`;
         },
       },
       {
-        id: "amount",
-        header: "Total Amount",
-        accessorFn: (s) => (s.amount ? `$${s.amount}` : "—"),
+        id: "month",
+        header: "Month",
+        accessorFn: (s) => s.month || "—",
       },
       {
-        id: "paid",
-        header: "Paid Amount",
-        accessorFn: (s) => (s.paid_amount ? `$${s.paid_amount}` : "—"),
+        id: "year",
+        header: "Year",
+        accessorFn: (s) => s.year || "—",
+      },
+      {
+        id: "issued_date",
+        header: "Issued Date",
+        accessorFn: (s) => s.issued_date || "—",
+      },
+      {
+        id: "due_date",
+        header: "Due Date",
+        accessorFn: (s) => s.due_date || "—",
+      },
+      {
+        id: "amount",
+        header: "Amount",
+        accessorFn: (s) => s.amount || "—",
+      },
+      {
+        id: "discount",
+        header: "Discount",
+        accessorFn: (s) => s.discount || "—",
+      },
+      {
+        id: "fine",
+        header: "Fine",
+        accessorFn: (s) => s.fine || "—",
+      },
+      {
+        id: "net_amount",
+        header: "Net Amount",
+        accessorFn: (s) => s.net_amount || "—",
       },
       {
         id: "status",
         header: "Status",
         accessorFn: (s) => (s.status || "—").toUpperCase(),
       },
+      // {
+      //   id: "fee_breakdown",
+      //   header: "Fee Breakdown",
+      //   accessorFn: (s) => {
+      //     if (!s.fee_breakdown) return "—";
+      //     try {
+      //       return Object.entries(s.fee_breakdown)
+      //         .map(([k, v]) => `${k}: ${v}`)
+      //         .join(", ");
+      //     } catch {
+      //       return "—";
+      //     }
+      //   },
+      // },
+      // {
+      //   id: "notes",
+      //   header: "Notes",
+      //   accessorFn: (s) => s.notes || "—",
+      // },
       {
-        id: "date",
-        header: "Due Date",
-        accessorFn: (s) => s.due_date || s.date || "—",
+        id: "archived",
+        header: "Archived",
+        accessorFn: (s) => s.archived ? "Yes" : "No",
       },
     ],
     permission: "reports.fee",

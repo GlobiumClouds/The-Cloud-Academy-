@@ -46,13 +46,6 @@ const MONTH_OPTS = Array.from({ length: 12 }, (_, i) => ({
   label: new Date(2026, i).toLocaleString('default', { month: 'long' }),
 }));
 
-// Schema for single voucher generation
-const singleVoucherSchema = z.object({
-  student_id: z.string().min(1, 'Student ID is required'),
-  month: z.string().min(1, 'Month required'),
-  year: z.coerce.number().min(2000, 'Valid year required'),
-});
-
 export default function FeesPage() {
   const qc = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
@@ -138,24 +131,6 @@ export default function FeesPage() {
     return vouchers.filter((v) => v.status === 'paid')
       .reduce((sum, v) => sum + (parseFloat(v.netAmount) || parseFloat(v.amount) || 0), 0);
   }, [vouchers]);
-
-  // Single voucher generation mutation
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
-    resolver: zodResolver(singleVoucherSchema),
-    defaultValues: { month: currentMonth, year: new Date().getFullYear() },
-  });
-
-  const generateSingle = useMutation({
-    mutationFn: (data) => feeVoucherService.generateSingle(data.student_id, parseInt(data.month), data.year),
-    onSuccess: () => {
-      toast.success('Voucher generated successfully');
-      setSingleVoucherModal(false);
-      reset();
-      refetchVouchers();
-      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
-    },
-    onError: (err) => toast.error(err.message || 'Failed to generate voucher'),
-  });
 
   // Delete (archive) voucher
   const deleteVoucher = useMutation({

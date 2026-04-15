@@ -19,9 +19,9 @@ import { studentService } from "./studentService";
 import { studentAttendanceService } from "./studentAttendanceService";
 import { examService } from "./examService";
 import { classService } from "./classService";
-import { feeService } from "./feeService";
 import api from "@/lib/api";
 import { buildQuery } from "@/lib/utils";
+import feeVoucherService from "./feeVoucherService";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPER FUNCTIONS
@@ -245,14 +245,15 @@ export const reportService = {
 
   /**
    * Fee Report
-   * Fetches: feeService.getVouchers()
-   * Filters: class_id, section_id, status, from_date, to_date
-   * Returns: Fee collection with outstanding calculation & percentages
+   * Fetches: /api/v1/reports/fee
+   * Filters: class_id, section_id, status, from_date, to_date, institute_id
+   * Returns: Complete fee report with all FeeVoucher fields & summary statistics
    */
   getFeeReport: async (filters = {}) => {
     try {
-      // Fetch fee vouchers
-      const feeParams = {
+      // Build query parameters from filters
+      const queryParams = {
+        institute_id: filters.institute_id,
         academic_year_id: filters.academic_year_id,
         class_id: filters.class_id,
         section_id: filters.section_id,
@@ -263,46 +264,46 @@ export const reportService = {
         limit: filters.limit || 50,
       };
 
-      Object.keys(feeParams).forEach((key) => {
+      // Remove undefined/null/empty values
+      Object.keys(queryParams).forEach((key) => {
         if (
-          feeParams[key] === undefined ||
-          feeParams[key] === null ||
-          feeParams[key] === ""
+          queryParams[key] === undefined ||
+          queryParams[key] === null ||
+          queryParams[key] === ""
         ) {
-          delete feeParams[key];
+          delete queryParams[key];
         }
       });
 
-      const feeData = await feeService.getVouchers(feeParams);
+      // Make API call to backend fee report endpoint
+      const queryString = buildQuery(queryParams);
+      const response = await api.get(`/reports/fee${queryString}`, {
+        timeout: 15000,
+      });
 
-      // Calculate summary statistics
-      const records = Array.isArray(feeData) ? feeData : feeData?.data || [];
-      const pagination = feeData?.pagination || {
+      // Response structure from backend: { type, summary, records, timestamp }
+      const reportData = response.data?.data || response.data || {};
+      const records = reportData.records || [];
+      const pagination = reportData.pagination || {
         total: records.length,
         page: filters.page || 1,
+        limit: filters.limit || 50,
       };
 
-      const totalAmount = records.reduce(
-        (sum, r) => sum + (parseFloat(r.amount) || 0),
-        0,
-      );
-      const paidAmount = records.reduce(
-        (sum, r) => sum + (parseFloat(r.paid_amount) || 0),
-        0,
-      );
-      const outstandingAmount = totalAmount - paidAmount;
+      // Summary already calculated on backend, but we can enhance if needed
+      const summary = reportData.summary || {
+        total_records: records.length,
+        total_amount: 0,
+        total_paid: 0,
+        total_outstanding: 0,
+        collection_percentage: 0,
+      };
 
       return {
         status: 200,
         message: "Fee report retrieved successfully",
         data: {
-          summary: {
-            total_records: records.length,
-            total_amount: totalAmount,
-            paid_amount: paidAmount,
-            outstanding_amount: outstandingAmount,
-            collection_percentage: calculatePercentage(paidAmount, totalAmount),
-          },
+          summary,
           records,
           pagination,
         },
