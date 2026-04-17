@@ -9,7 +9,7 @@ import {
   Filter, ChevronDown, Download, Eye, Star, 
   BarChart3, PieChart, Activity, Target, Trophy,
   TrendingDown, TrendingUp as TrendingUpIcon, Minus,
-  X, FileText, Clock, CheckCircle, AlertCircle
+  X, FileText, Clock, CheckCircle, AlertCircle, Printer
 } from 'lucide-react';
 import usePortalStore from '@/store/portalStore';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { PageHeader, SelectField, AppModal } from '@/components/common';
 import { Badge } from '@/components/ui/badge';
 import PageLoader from '@/components/common/PageLoader';
+import PrintableResultCard from '@/components/cards/ResultCard'; // Import the printable card component
 
 const GRADE_COLORS = {
   'A+': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -35,6 +36,64 @@ const EXAM_TYPES = {
   half_yearly: { label: 'Half Yearly', icon: BookOpen },
   annual: { label: 'Annual Exam', icon: Award },
   weekly: { label: 'Weekly Test', icon: Clock },
+};
+
+// Helper function to transform API result data to PrintableResultCard format
+const transformForPrintableCard = (result, child, institute) => {
+  // Build student object
+  const nameParts = child.name?.split(' ') || [];
+  const student = {
+    first_name: nameParts[0] || child.name || '',
+    last_name: nameParts.slice(1).join(' ') || '',
+    registration_no: child.registration_no || '',
+    roll_number: child.roll_number || child.roll_no || '',
+  };
+
+  // Build exam object
+  const exam = {
+    name: result.exam_name,
+    total_marks: result.total_marks,
+    subject_schedules: result.subjects?.map(subj => ({
+      subject_id: subj.subject_id || subj.id || Math.random(),
+      subject_name: subj.subject_name,
+      total_marks: subj.total_marks,
+    })) || [],
+  };
+
+  // Build result object for the card
+  const cardResult = {
+    subject_marks: result.subjects?.map(subj => ({
+      subject_id: subj.subject_id || subj.id,
+      subject_name: subj.subject_name,
+      marks_obtained: subj.marks_obtained || subj.marks,
+      total_marks: subj.total_marks,
+    })) || [],
+    total_marks_obtained: result.obtained_marks,
+    percentage: result.percentage,
+    grade: result.grade,
+    status: determineStatus(result),
+  };
+
+  return { student, exam, result: cardResult, institute };
+};
+
+// Determine pass/fail status based on grade or percentage
+const determineStatus = (result) => {
+  // If grade is 'F', it's a fail
+  if (result.grade === 'F') return 'fail';
+  
+  // Check if any subject has 'F' grade
+  const hasFailedSubject = result.subjects?.some(s => s.grade === 'F');
+  if (hasFailedSubject) return 'fail';
+  
+  // Check percentage against passing threshold (e.g., 40%)
+  const passingPercentage = 40;
+  if (result.percentage >= passingPercentage) return 'pass';
+  
+  // Check if student is absent (you can add logic based on your data)
+  if (result.status === 'absent') return 'absent';
+  
+  return result.percentage >= passingPercentage ? 'pass' : 'fail';
 };
 
 // Result Details Modal
@@ -206,8 +265,8 @@ const ResultDetailsModal = ({ result, isOpen, onClose }) => {
   );
 };
 
-// Result Card Component
-const ResultCard = ({ result, childName, onViewDetails }) => {
+// Updated Result Card Component with "Result Card" button
+const ResultCard = ({ result, childName, onViewDetails, onPrintCard }) => {
   const percentage = result.percentage;
   const arcColor = percentage >= 80 ? '#10b981' : percentage >= 60 ? '#f59e0b' : '#ef4444';
   const examType = EXAM_TYPES[result.exam_type] || EXAM_TYPES.monthly;
@@ -255,22 +314,31 @@ const ResultCard = ({ result, childName, onViewDetails }) => {
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
             Subject-wise Performance
           </p>
-          <button
-            onClick={() => onViewDetails(result)}
-            className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
-          >
-            <Eye className="w-3 h-3" />
-            View Details
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onViewDetails(result)}
+              className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+            >
+              <Eye className="w-3 h-3" />
+              View Details
+            </button>
+            <button
+              onClick={() => onPrintCard(result)}
+              className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+            >
+              <Printer className="w-3 h-3" />
+              Result Card
+            </button>
+          </div>
         </div>
         <div className="space-y-2.5">
           {result.subjects?.map((s, idx) => {
-            const pct = (s.marks / s.total) * 100;
+            const pct = (s.marks_obtained / s.total_marks) * 100;
             const gradeCls = GRADE_COLORS[s.grade] || 'text-slate-600 bg-slate-50';
             return (
               <div key={idx} className="flex items-center gap-3">
                 <span className="text-sm text-slate-700 w-24 flex-shrink-0 font-medium truncate">
-                  {s.name}
+                  {s.subject_name}
                 </span>
                 <div className="flex-1 bg-slate-100 rounded-full h-2">
                   <div
@@ -280,7 +348,7 @@ const ResultCard = ({ result, childName, onViewDetails }) => {
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <span className="text-sm font-bold text-slate-700 w-10 text-right">{s.marks}</span>
+                <span className="text-sm font-bold text-slate-700 w-10 text-right">{s.marks_obtained}</span>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${gradeCls}`}>
                   {s.grade}
                 </span>
@@ -467,6 +535,33 @@ const UpcomingExams = ({ exams }) => {
   );
 };
 
+// Result Card Modal Component
+const ResultCardModal = ({ isOpen, onClose, result, child, institute }) => {
+  if (!result || !child) return null;
+
+  const { student, exam, result: cardResult } = transformForPrintableCard(result, child, institute);
+
+  return (
+    <AppModal
+      open={isOpen}
+      onClose={onClose}
+      title="Printable Result Card"
+      description="You can print this card directly from the print button below"
+      size="lg"
+      className="max-w-4xl"
+    >
+      <div className="max-h-[80vh] overflow-y-auto p-2">
+        <PrintableResultCard
+          student={student}
+          exam={exam}
+          result={cardResult}
+          institute={institute}
+        />
+      </div>
+    </AppModal>
+  );
+};
+
 // Main Results Page Component
 export default function ParentResultsPage() {
   const { portalUser } = usePortalStore();
@@ -479,6 +574,8 @@ export default function ParentResultsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
   const [showResultModal, setShowResultModal] = useState(false);
+  const [selectedResultForCard, setSelectedResultForCard] = useState(null);
+  const [showResultCardModal, setShowResultCardModal] = useState(false);
 
   const child = children[selectedChild];
   
@@ -491,6 +588,14 @@ export default function ParentResultsPage() {
   const results = resultsData?.data?.results || [];
   const statistics = statisticsData?.data;
   const upcomingExams = resultsData?.data?.upcoming_exams || [];
+
+  // Get institute data from portalStore or authStore
+  const institute = {
+    name: parent?.institute_name || 'School Name',
+    code: parent?.institute_code || 'INST-CODE',
+    logo_url: parent?.logo_url || null,
+    institute_type: parent?.institute_type || 'school',
+  };
 
   // Extract unique exam types from backend results for dynamic filter
   const uniqueExamTypes = [...new Set(results?.map(r => r.exam_type))].filter(Boolean);
@@ -505,6 +610,11 @@ export default function ParentResultsPage() {
   const handleViewDetails = (result) => {
     setSelectedResult(result);
     setShowResultModal(true);
+  };
+
+  const handlePrintCard = (result) => {
+    setSelectedResultForCard(result);
+    setShowResultCardModal(true);
   };
 
   const handleExport = () => {
@@ -639,6 +749,7 @@ export default function ParentResultsPage() {
                 result={result}
                 childName={child?.name}
                 onViewDetails={handleViewDetails}
+                onPrintCard={handlePrintCard}
               />
             ))}
           </div>
@@ -662,6 +773,18 @@ export default function ParentResultsPage() {
           setShowResultModal(false);
           setSelectedResult(null);
         }}
+      />
+
+      {/* Printable Result Card Modal */}
+      <ResultCardModal
+        isOpen={showResultCardModal}
+        onClose={() => {
+          setShowResultCardModal(false);
+          setSelectedResultForCard(null);
+        }}
+        result={selectedResultForCard}
+        child={child}
+        institute={institute}
       />
     </div>
   );
