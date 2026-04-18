@@ -1,32 +1,37 @@
 'use client';
 
-const Field = ({ label, value, theme }) => (
-  <div className="grid grid-cols-[120px_1fr] border-b px-2 py-1 last:border-b-0" style={{ borderColor: theme.colors.border }}>
-    <span className="font-semibold" style={{ fontSize: theme.fontSize.small }}>{label}</span>
-    <span style={{ fontSize: theme.fontSize.body }}>{value || 'N/A'}</span>
-  </div>
+import { fmtDate } from '@/lib/formatters';
+
+const Cell = ({ label, value, borderedRight = false, labelWidth = '66px' }) => (
+  <td className={`p-0 text-[10px] ${borderedRight ? 'border-r' : ''}`} style={{ borderColor: '#bcbcbc' }}>
+    <div className="grid h-full" style={{ gridTemplateColumns: `${labelWidth} 1fr` }}>
+      <span className="border-r px-1 py-[2px] font-semibold" style={{ borderColor: '#bcbcbc', backgroundColor: '#f6f6f6' }}>
+        {label}
+      </span>
+      <span className="px-1 py-[2px]">{value || 'N/A'}</span>
+    </div>
+  </td>
 );
 
-export default function StudentInfoSection({ studentData = {}, voucherMeta = {}, theme }) {
+export default function StudentInfoSection({ studentData = {}, voucherMeta = {} }) {
   return (
-    <section className="border" style={{ borderColor: theme.colors.border }}>
-      <div className="border-b px-2 py-1 text-center font-bold uppercase" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.tableHeader, fontSize: theme.fontSize.body }}>
-        Student Information
-      </div>
-      <div className="grid grid-cols-2">
-        <div>
-          <Field label="Student Name" value={studentData.studentName} theme={theme} />
-          <Field label="Father Name" value={studentData.fatherName} theme={theme} />
-          <Field label="Student ID" value={studentData.studentId} theme={theme} />
-          <Field label="Roll Number" value={studentData.rollNumber} theme={theme} />
-        </div>
-        <div className="border-l" style={{ borderColor: theme.colors.border }}>
-          <Field label="Class" value={studentData.className} theme={theme} />
-          <Field label="Section" value={studentData.section} theme={theme} />
-          <Field label="Month" value={voucherMeta.month} theme={theme} />
-          {/* <Field label="Fee Status" value={voucherMeta.feeStatus} theme={theme} /> */}
-        </div>
-      </div>
+    <section className="border" style={{ borderColor: '#bcbcbc' }}>
+      <table className="w-full border-collapse">
+        <tbody>
+          <tr className="border-b" style={{ borderColor: '#bcbcbc' }}>
+            <Cell label="Student" value={studentData.studentName} borderedRight />
+            <Cell label="Reg #" value={studentData.studentId || studentData.rollNumber} />
+          </tr>
+          <tr className="border-b" style={{ borderColor: '#bcbcbc' }}>
+            <Cell label="Generate Date" value={fmtDate(voucherMeta.issueDate)} borderedRight />
+            <Cell label="Due Date" value={fmtDate(voucherMeta.dueDate)} />
+          </tr>
+          <tr>
+            <Cell label="Month" value={voucherMeta.month} borderedRight />
+            <Cell label="Year" value={voucherMeta.year} />
+          </tr>
+        </tbody>
+      </table>
     </section>
   );
 }

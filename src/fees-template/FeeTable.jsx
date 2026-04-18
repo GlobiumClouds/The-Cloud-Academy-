@@ -13,6 +13,12 @@ const isDiscount = (label) => normalizeLabel(label).includes('discount');
 const isPaid = (label) => normalizeLabel(label).includes('paid amount');
 const isRemaining = (label) => normalizeLabel(label).includes('remaining amount');
 const isTotal = (label) => normalizeLabel(label).includes('total amount');
+const isPercent = (label) => /percent|percentage/.test(normalizeLabel(label));
+
+const formatValue = (label, amount) => {
+  if (isPercent(label)) return `${fmtAmount(amount)}%`;
+  return `PKR ${fmtAmount(amount)}`;
+};
 
 export default function FeeTable({ feeStructure = [], theme }) {
   const normalizedRows = (feeStructure || []).map((row) => ({
@@ -20,11 +26,13 @@ export default function FeeTable({ feeStructure = [], theme }) {
     amount: toNumber(row.amount),
   }));
 
-  const chargeTotal = normalizedRows
-    .filter((row) => !isPaid(row.feeType) && !isRemaining(row.feeType) && !isTotal(row.feeType) && !isDiscount(row.feeType))
+  const baseRows = normalizedRows.filter((row) => !isPaid(row.feeType) && !isRemaining(row.feeType) && !isTotal(row.feeType));
+
+  const chargeTotal = baseRows
+    .filter((row) => !isDiscount(row.feeType))
     .reduce((sum, row) => sum + row.amount, 0);
 
-  const discount = normalizedRows
+  const discount = baseRows
     .filter((row) => isDiscount(row.feeType))
     .reduce((sum, row) => sum + row.amount, 0);
 
@@ -36,42 +44,56 @@ export default function FeeTable({ feeStructure = [], theme }) {
   const remainingAmount = Math.max(totalAmount - paidAmount, 0);
 
   const displayRows = [
-    ...normalizedRows.filter((row) => !isTotal(row.feeType) && !isRemaining(row.feeType)),
+    ...baseRows,
     { feeType: 'Total Amount', amount: totalAmount },
     { feeType: 'Paid Amount', amount: paidAmount },
     { feeType: 'Remaining Amount', amount: remainingAmount },
   ];
 
-  return (
-    <section className="border" style={{ borderColor: theme.colors.border }}>
-      <div className="border-b px-2 py-1 text-center font-bold uppercase" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.tableHeader, fontSize: theme.fontSize.body }}>
-        Fee Structure
-      </div>
+  const rowsToRender = displayRows.length
+    ? displayRows
+    : [{ feeType: 'No fee lines', amount: 0 }];
 
-      <table className="w-full border-collapse" style={{ fontSize: theme.fontSize.body }}>
+  return (
+    <section className="mt-1 border" style={{ borderColor: '#bcbcbc' }}>
+      <table className="w-full border-collapse text-[10px]">
         <thead>
           <tr>
-            <th className="border px-2 py-1 text-left font-semibold" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.tableHeader }}>
+            <th className="border px-2 py-[2px] text-left font-semibold text-white" style={{ borderColor: '#bcbcbc', backgroundColor: '#0f7138' }}>
               Fee Type
             </th>
-            <th className="border px-2 py-1 text-right font-semibold" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.tableHeader }}>
+            <th className="border px-2 py-[2px] text-center font-semibold text-white" style={{ borderColor: '#bcbcbc', backgroundColor: '#0f7138' }}>
               Amount
             </th>
           </tr>
         </thead>
 
         <tbody>
-          {displayRows.map((row, index) => {
+          {rowsToRender.map((row, index) => {
             const lower = normalizeLabel(row.feeType);
             const isSummary = lower.includes('total amount') || lower.includes('remaining amount') || lower.includes('paid amount');
 
             return (
               <tr key={`${row.feeType}-${index}`}>
-                <td className="border px-2 py-1" style={{ borderColor: theme.colors.border, fontWeight: isSummary ? 700 : 500 }}>
+                <td
+                  className="border px-2 py-[2px]"
+                  style={{
+                    borderColor: '#bcbcbc',
+                    fontWeight: isSummary ? 600 : 400,
+                    backgroundColor: '#ffffff',
+                  }}
+                >
                   {row.feeType}
                 </td>
-                <td className="border px-2 py-1 text-right" style={{ borderColor: theme.colors.border, fontWeight: isSummary ? 700 : 500 }}>
-                  {fmtAmount(row.amount)}
+                <td
+                  className="border px-2 py-[2px] text-right"
+                  style={{
+                    borderColor: '#bcbcbc',
+                    fontWeight: isSummary ? 600 : 400,
+                    backgroundColor: '#ffffff',
+                  }}
+                >
+                  {formatValue(row.feeType, row.amount)}
                 </td>
               </tr>
             );

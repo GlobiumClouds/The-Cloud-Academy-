@@ -150,6 +150,7 @@ export default function useFeeVoucherData({ voucherId, studentId } = {}) {
       issueDate: voucher?.issuedDate || voucher?.issued_date || voucher?.createdAt || new Date().toISOString(),
       dueDate: voucher?.dueDate || voucher?.due_date || new Date().toISOString(),
       month: MONTH_NAMES[monthIndex - 1] || voucher?.month || 'N/A',
+      year: voucher?.year || new Date(voucher?.issuedDate || voucher?.issued_date || voucher?.createdAt || Date.now()).getFullYear(),
       feeStatus: voucher?.status || 'pending',
     };
 
