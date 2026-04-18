@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   DollarSign, CheckCircle, AlertCircle, Clock, Download, 
   Eye, FileText, CreditCard, Calendar, ChevronDown, 
@@ -11,15 +11,24 @@ import {
   Search, ExternalLink, MessageCircle, Phone, Mail,
   Building, User, FileCheck, Wallet, ArrowRight
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import usePortalStore from '@/store/portalStore';
 import { getPortalTerms } from '@/constants/portalInstituteConfig';
 import { useChildFees, usePayFee, useFeeSummary } from '@/hooks/useParentPortal';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import {
   PageHeader, SelectField, StatusBadge, PageLoader, 
   AppModal, StatsCard
 } from '@/components/common';
+import FeeVoucher from '@/fees-template/FeeVoucher';
+import { getFeeTheme } from '@/fees-template/styles/feeTheme';
+
 
 const STATUS_CONFIG = {
   paid: { 
@@ -52,106 +61,238 @@ const STATUS_CONFIG = {
   },
 };
 
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const toNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const captureVoucherCanvas = async (sourceNode) => {
+  const exportHost = document.createElement('div');
+  exportHost.style.position = 'fixed';
+  exportHost.style.left = '-100000px';
+  exportHost.style.top = '0';
+  exportHost.style.background = '#ffffff';
+  exportHost.style.padding = '0';
+  exportHost.style.zIndex = '-1';
+
+  const exportNode = sourceNode.cloneNode(true);
+  exportNode.style.transform = 'none';
+  exportNode.style.width = '210mm';
+  exportNode.style.minHeight = '297mm';
+  exportNode.style.margin = '0';
+
+  exportHost.appendChild(exportNode);
+  document.body.appendChild(exportHost);
+
+  try {
+    return await html2canvas(exportNode, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowWidth: exportNode.scrollWidth,
+      windowHeight: exportNode.scrollHeight,
+    });
+  } finally {
+    document.body.removeChild(exportHost);
+  }
+};
+
+const saveCanvasAsA4Pdf = (canvas, fileName) => {
+  const imageData = canvas.toDataURL('image/png');
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imageWidth = pageWidth;
+  const imageHeight = (canvas.height * imageWidth) / canvas.width;
+
+  let heightLeft = imageHeight;
+  let position = 0;
+
+  pdf.addImage(imageData, 'PNG', 0, position, imageWidth, imageHeight, undefined, 'FAST');
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position = heightLeft - imageHeight;
+    pdf.addPage();
+    pdf.addImage(imageData, 'PNG', 0, position, imageWidth, imageHeight, undefined, 'FAST');
+    heightLeft -= pageHeight;
+  }
+
+  pdf.save(fileName);
+};
+
+// Helper function to map parent voucher data for FeeVoucher component
+function mapParentVoucherViewData(voucher, child, institute) {
+  const amount = toNumber(voucher?.amount);
+  const discount = toNumber(voucher?.discount);
+  const fine = toNumber(voucher?.fine);
+  const netAmount = toNumber(voucher?.net_amount || amount - discount + fine);
+  const paidAmount = toNumber(voucher?.paid_amount);
+
+  const monthIndex = Number(voucher?.month);
+  const monthLabel = MONTHS[monthIndex - 1] || voucher?.month || '-';
+
+  return {
+    studentData: {
+      studentName: child?.name || voucher?.student?.name || 'Student Name',
+      fatherName: child?.father_name || voucher?.student?.father_name || 'N/A',
+      className: child?.class_name || child?.class || voucher?.student?.class || 'N/A',
+      section: child?.section_name || child?.section || voucher?.student?.section || 'N/A',
+      rollNumber: child?.roll_no || voucher?.student?.roll_no || 'N/A',
+      studentId: child?.registration_no || voucher?.student?.registration_no || child?.id || 'N/A',
+    },
+    voucherMeta: {
+      title: 'School Fee Voucher',
+      voucherNumber: voucher?.voucher_number || voucher?.id || 'N/A',
+      issueDate: voucher?.issued_date,
+      dueDate: voucher?.due_date,
+      month: monthLabel,
+      year: voucher?.year || new Date(voucher?.issued_date || Date.now()).getFullYear(),
+      feeStatus: voucher?.status || 'pending',
+      copyLabel: 'Parent Copy',
+    },
+    instituteData: {
+      name: institute?.name || institute?.title || 'Institute Name',
+      logo: institute?.logo_url || institute?.logo || null,
+      address: institute?.address || institute?.campus_address || 'Campus address not available',
+      phone: institute?.phone || institute?.phone_number || institute?.contact_number || 'N/A',
+      email: institute?.email || institute?.contact_email || 'N/A',
+    },
+    feeStructure: [
+      { feeType: 'Fee Amount', amount },
+      { feeType: 'Discount', amount: discount },
+      { feeType: 'Fine', amount: fine },
+      { feeType: 'Paid Amount', amount: paidAmount },
+      { feeType: 'Total Amount', amount: netAmount },
+      { feeType: 'Remaining Amount', amount: Math.max(netAmount - paidAmount, 0) },
+    ],
+  };
+}
+
+
+
 // Voucher Details Modal
-const VoucherDetailsModal = ({ voucher, isOpen, onClose, onPay }) => {
-  const [showFullDetails, setShowFullDetails] = useState(false);
+const VoucherDetailsModal = ({ voucher, child, institute, isOpen, onClose }) => {
+  const { resolvedTheme } = useTheme();
+  const [copyMode, setCopyMode] = useState('double');
+  const [isDownloading, setIsDownloading] = useState(false);
+  const voucherRef = useRef(null);
+  const theme = useMemo(() => getFeeTheme(resolvedTheme), [resolvedTheme]);
 
   if (!voucher) return null;
 
-  const statusConfig = STATUS_CONFIG[voucher.status] || STATUS_CONFIG.pending;
-  const StatusIcon = statusConfig.icon;
+  const voucherViewData = mapParentVoucherViewData(voucher, child, institute);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!voucherRef.current) return;
+
+    try {
+      setIsDownloading(true);
+      const canvas = await captureVoucherCanvas(voucherRef.current);
+      saveCanvasAsA4Pdf(canvas, `fee-voucher-${voucher?.voucher_number || 'download'}.pdf`);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
-    <AppModal
-      open={isOpen}
-      onClose={onClose}
-      title="Fee Voucher Details"
-      description={voucher?.voucher_number}
-      size="lg"
-      footer={
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50 flex items-center gap-2"
-        >
-          <Printer className="w-4 h-4" />
-          Print
-        </button>
-      }
-    >
-      <div className="space-y-5">
-          {/* Status Banner */}
-          <div className={`${statusConfig.bg} rounded-xl p-4 border ${statusConfig.cls}`}>
-            <div className="flex items-center gap-3">
-              <StatusIcon className={`w-6 h-6 ${statusConfig.ic}`} />
-              <div>
-                <p className="font-semibold text-slate-800">Status: {statusConfig.label}</p>
-                <p className="text-sm text-slate-600">
-                  Due Date: {format(new Date(voucher.due_date), 'dd MMM yyyy')}
-                </p>
+    <>
+      <Dialog open={isOpen} onOpenChange={(next) => !next && onClose?.()}>
+        <DialogContent className="fee-voucher-modal-shell !max-w-[96vw] border p-0 sm:!max-w-[96vw]">
+          <DialogHeader className="border-b px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DialogTitle className="text-base font-semibold">Fee Voucher Preview</DialogTitle>
+
+                <div className="fee-voucher-modal-actions flex flex-wrap items-center gap-2">
+                  <label className="mr-1 inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
+                    <span>Double Copy</span>
+                    <Switch checked={copyMode === 'double'} onCheckedChange={(checked) => setCopyMode(checked ? 'double' : 'single')} />
+                  </label>
+
+                  <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={isDownloading}>
+                    <Download className="h-4 w-4" />
+                    {isDownloading ? 'Downloading...' : 'Download PDF'}
+                  </Button>
+
+                  <Button variant="outline" size="sm" onClick={onClose}>
+                    <X className="h-4 w-4" />
+                    Close
+                  </Button>
+                </div>
+            </div>
+          </DialogHeader>
+
+          <div className="max-h-[80vh] overflow-auto bg-slate-100 p-4">
+            <div className="mx-auto w-fit origin-top scale-[0.62] sm:scale-75 md:scale-90 lg:scale-100">
+              <div ref={voucherRef} className="fee-voucher-print-target">
+                <FeeVoucher
+                  studentData={voucherViewData.studentData}
+                  feeStructure={voucherViewData.feeStructure}
+                  instituteData={voucherViewData.instituteData}
+                  voucherMeta={voucherViewData.voucherMeta}
+                  copyMode={copyMode}
+                  theme={theme}
+                />
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Student Info */}
-          {voucher.student && (
-            <div className="bg-slate-50 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Student Information
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-slate-500">Name</p>
-                  <p className="font-medium text-slate-800">{voucher.student.name}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Registration No</p>
-                  <p className="font-medium text-slate-800">{voucher.student.registration_no}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Class</p>
-                  <p className="font-medium text-slate-800">{voucher.student.class} - {voucher.student.section}</p>
-                </div>
-              </div>
-            </div>
-          )}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
 
-          {/* Summary */}
-          <div className="bg-slate-50 rounded-xl p-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Amount</span>
-                <span className="font-medium">PKR {voucher.amount?.toLocaleString() || 0}</span>
-              </div>
-              {voucher.discount > 0 && (
-                <div className="flex justify-between text-sm text-emerald-600">
-                  <span>Discount</span>
-                  <span>- PKR {voucher.discount?.toLocaleString() || 0}</span>
-                </div>
-              )}
-              {voucher.fine > 0 && (
-                <div className="flex justify-between text-sm text-red-600">
-                  <span>Fine</span>
-                  <span>+ PKR {voucher.fine?.toLocaleString() || 0}</span>
-                </div>
-              )}
-              <div className="flex justify-between pt-2 border-t border-slate-200">
-                <span className="font-semibold text-slate-800">Net Amount</span>
-                <span className="font-bold text-slate-900 text-lg">
-                  PKR {voucher.net_amount?.toLocaleString() || 0}
-                </span>
-              </div>
-              {voucher.notes && (
-                <div className="mt-3 pt-3 border-t border-slate-200">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Notes</p>
-                  <p className="text-sm text-slate-700">{voucher.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
+          .fee-voucher-print-target,
+          .fee-voucher-print-target * {
+            visibility: visible !important;
+          }
 
-      </div>
-    </AppModal>
+          .fee-voucher-print-target {
+            position: absolute !important;
+            inset: 0 !important;
+            width: 210mm !important;
+            min-height: 297mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            background: #fff !important;
+          }
+
+          .fee-voucher-modal-actions,
+          .fee-voucher-modal-shell,
+          [data-radix-dialog-overlay] {
+            display: none !important;
+          }
+
+          @page {
+            size: A4;
+            margin: 0;
+          }
+        }
+      `}</style>
+    </>
   );
 };
 
@@ -277,24 +418,7 @@ const VoucherCard = ({ voucher, onView, onPay }) => {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => onView(voucher)}
-          className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50 flex items-center justify-center gap-1"
-        >
-          <Eye className="w-3 h-3" />
-          View
-        </button>
-        {/* {voucher.status !== 'paid' && (
-          <button
-            onClick={() => onPay(voucher)}
-            className="flex-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 flex items-center justify-center gap-1"
-          >
-            <CreditCard className="w-3 h-3" />
-            Pay
-          </button>
-        )} */}
-      </div>
+
     </div>
   );
 };
@@ -316,6 +440,7 @@ export default function ParentFeesPage() {
   const [payingVoucher, setPayingVoucher] = useState(null);
 
   const child = children[selectedChild];
+  const selectedInstitute = parent?.institute || parent?.school || {};
   
   // Generate available years based on admission_date
   const getAvailableYears = (admissionDate) => {
@@ -652,14 +777,12 @@ export default function ParentFeesPage() {
       {/* Modals */}
       <VoucherDetailsModal
         voucher={selectedVoucher}
+        child={child}
+        institute={selectedInstitute}
         isOpen={showVoucherModal}
         onClose={() => {
           setShowVoucherModal(false);
           setSelectedVoucher(null);
-        }}
-        onPay={(voucher) => {
-          setShowVoucherModal(false);
-          handlePayVoucher(voucher);
         }}
       />
 

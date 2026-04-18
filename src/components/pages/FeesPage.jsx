@@ -8,11 +8,8 @@
  */
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2 } from 'lucide-react';
+import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2, Loader2, Eye } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
@@ -24,22 +21,20 @@ import SelectField from '@/components/common/SelectField';
 import DatePickerField from '@/components/common/DatePickerField';
 import StatsCard from '@/components/common/StatsCard';
 import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
-import { cn } from '@/lib/utils';
 import { feeVoucherService, academicYearService } from '@/services';
 
-const STATUS_OPTS = [
-  { value: 'paid', label: 'Paid' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'overdue', label: 'Overdue' },
-  { value: 'partial', label: 'Partial' },
-];
+// const STATUS_OPTS = [
+//   { value: 'paid', label: 'Paid' },
+//   { value: 'overdue', label: 'Overdue' },
+//   { value: 'partial', label: 'Partial' },
+// ];
 
-const STATUS_COLORS = {
-  paid: 'bg-emerald-100 text-emerald-700',
-  pending: 'bg-amber-100 text-amber-700',
-  overdue: 'bg-red-100 text-red-700',
-  partial: 'bg-blue-100 text-blue-700',
-};
+// const STATUS_COLORS = {
+//   paid: 'bg-emerald-100 text-emerald-700',
+//   pending: 'bg-amber-100 text-amber-700',
+//   overdue: 'bg-red-100 text-red-700',
+//   partial: 'bg-blue-100 text-blue-700',
+// };
 
 const MONTH_OPTS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1),
@@ -57,15 +52,13 @@ export default function FeesPage() {
   const [deletingVoucher, setDeletingVoucher] = useState(null);
   const [voucherPage, setVoucherPage] = useState(1);
   const [voucherPageSize, setVoucherPageSize] = useState(20);
-  const [markingAsPaid, setMarkingAsPaid] = useState(null);
-  const [recordingPayment, setRecordingPayment] = useState(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
+  const [isGeneratingVouchers, setIsGeneratingVouchers] = useState(false);
+  const [downloadingVoucherId, setDownloadingVoucherId] = useState(null);
 
   // Filters
   const currentMonth = String(new Date().getMonth() + 1);
   const [voucherMonth, setVoucherMonth] = useState(currentMonth);
   const [voucherAcademicYearId, setVoucherAcademicYearId] = useState('');
-  const [voucherStatus, setVoucherStatus] = useState('');
   const [viewingVoucher, setViewingVoucher] = useState(null);
 
   // Academic years
@@ -98,12 +91,11 @@ export default function FeesPage() {
     isLoading: vouchersLoading,
     refetch: refetchVouchers,
   } = useQuery({
-    queryKey: ['fee-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId, voucherStatus, voucherPage, voucherPageSize],
+    queryKey: ['fee-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId, voucherPage, voucherPageSize],
     queryFn: async () => {
       const filters = {
         month: voucherMonth ? parseInt(voucherMonth) : undefined,
         academic_year_id: voucherAcademicYearId || undefined,
-        status: voucherStatus || undefined,
       };
       const response = await feeVoucherService.getAll(filters, { page: voucherPage, limit: voucherPageSize });
       console.log('Fetched vouchers with pagination:', response);
@@ -145,60 +137,190 @@ export default function FeesPage() {
     onError: () => toast.error('Failed to delete voucher'),
   });
 
-  // Mark voucher as paid
-  const markAsPaidMutation = useMutation({
-    mutationFn: (voucherId) => feeVoucherService.updateStatus(voucherId, 'paid'),
-    onSuccess: () => {
-      toast.success('Voucher marked as paid');
-      setMarkingAsPaid(null);
-      refetchVouchers();
-      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
-    },
-    onError: (err) => {
-      if (err.status === 404 || err.code === 'NOT_FOUND') {
-        toast.error('Backend endpoint not yet implemented. Please contact administrator.');
-      } else {
-        toast.error(err.message || 'Failed to mark as paid');
-      }
-      setMarkingAsPaid(null);
-    },
-  });
-
-  // Record partial payment
-  const recordPaymentMutation = useMutation({
-    mutationFn: (paymentData) => feeVoucherService.recordPayment(paymentData.voucherId, {
-      amount: parseFloat(paymentData.amount),
-      paymentMethod: paymentData.method,
-      referenceNo: paymentData.referenceNo || null,
-      remarks: paymentData.remarks || null
-    }),
-    onSuccess: (result) => {
-      toast.success('Payment recorded successfully');
-      setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
-      setRecordingPayment(null);
-      refetchVouchers();
-      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
-    },
-    onError: (err) => {
-      toast.error(err.message || 'Failed to record payment');
-    },
-  });
-
-  const handleRecordPayment = async (voucherId) => {
-    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
-      toast.error('Please enter a valid payment amount');
-      return;
-    }
-    recordPaymentMutation.mutate({ voucherId, ...paymentForm });
-  };
-
-  // Download voucher PDF (reuse from original, but simplified)
+  // Download voucher PDF
   const handleDownloadVoucher = async (voucher) => {
-    // You can re‑use the full PDF generation logic from the original component
-    // For brevity, I'm showing a placeholder that calls a helper.
-    // In practice, copy the entire jspdf logic from the original `handleDownloadVoucher`.
-    toast.info(`Downloading voucher ${voucher.voucher_number}`);
-    // … full implementation here (same as original, using voucher data)
+    const currentVoucherId = voucher?.id || voucher?.voucherNumber || voucher?.voucher_number || 'unknown';
+    setDownloadingVoucherId(currentVoucherId);
+    try {
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ]);
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 7;
+      const marginTop = 6;
+      const gap = 3;
+      const sectionHeight = (pageHeight - marginTop * 2 - gap * 2) / 3;
+      const instituteName = currentInstitute?.name || 'School Management System';
+      const instituteLogoUrl = currentInstitute?.logo_url || currentInstitute?.logo || currentInstitute?.institute_logo || null;
+      const voucherNumber = voucher?.voucherNumber || voucher?.voucher_number || 'N/A';
+      const monthLabel = MONTH_OPTS.find((m) => m.value === String(voucher?.month))?.label || String(voucher?.month || 'N/A');
+      const issueDate = voucher?.issuedDate ? new Date(voucher.issuedDate).toLocaleDateString('en-PK') : 'N/A';
+      const dueDate = voucher?.dueDate ? new Date(voucher.dueDate).toLocaleDateString('en-PK') : 'N/A';
+
+      const loadImageAsDataUrl = async (url) => {
+        if (!url) return null;
+        try {
+          const response = await fetch(url, { mode: 'cors' });
+          if (!response.ok) return null;
+          const blob = await response.blob();
+          return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          return null;
+        }
+      };
+
+      const logoDataUrl = await loadImageAsDataUrl(instituteLogoUrl);
+
+      const toAmount = (value) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
+      const isPercentageField = (label = '') => {
+        const normalized = String(label).toLowerCase();
+        return normalized.includes('percentage') || normalized.includes('percent');
+      };
+
+      const formatRowValue = (label, numericValue) => {
+        if (isPercentageField(label)) {
+          return `${numericValue}%`;
+        }
+        return `PKR ${numericValue.toLocaleString('en-PK')}`;
+      };
+
+      const breakdown = voucher?.feeBreakdown;
+      const feeRows = [];
+
+      if (Array.isArray(breakdown)) {
+        breakdown.forEach((item) => {
+          const amount = toAmount(item?.amount || item?.value);
+          const label = item?.feeType || item?.label || item?.type || 'Fee Item';
+          const isPercent = isPercentageField(label) || item?.unit === 'percentage' || item?.value_type === 'percentage';
+          if (amount > 0) {
+            feeRows.push([
+              label,
+              isPercent ? `${amount}%` : formatRowValue(label, amount),
+            ]);
+          }
+        });
+      } else if (breakdown && typeof breakdown === 'object') {
+        Object.entries(breakdown).forEach(([key, value]) => {
+          const amount = toAmount(value);
+          const label = key.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+          if (amount > 0) {
+            feeRows.push([
+              label,
+              formatRowValue(label, amount),
+            ]);
+          }
+        });
+      }
+
+      const amount = toAmount(voucher?.amount);
+      const discount = toAmount(voucher?.discount);
+      const netAmount = toAmount(voucher?.netAmount || voucher?.net_amount || voucher?.amount);
+      const paidAmount = String(voucher?.status || '').toLowerCase() === 'paid' ? netAmount : toAmount(voucher?.paidAmount || voucher?.paid_amount);
+      const remainingAmount = Math.max(netAmount - paidAmount, 0);
+
+      if (!feeRows.length && amount > 0) feeRows.push(['Tuition Fee', `PKR ${amount.toLocaleString('en-PK')}`]);
+      if (discount > 0) feeRows.push(['Discount', `PKR ${discount.toLocaleString('en-PK')}`]);
+      if (netAmount > 0) feeRows.push(['Total Amount', `PKR ${netAmount.toLocaleString('en-PK')}`]);
+      if (paidAmount > 0) feeRows.push(['Paid Amount', `PKR ${paidAmount.toLocaleString('en-PK')}`]);
+      if (remainingAmount > 0) feeRows.push(['Remaining Amount', `PKR ${remainingAmount.toLocaleString('en-PK')}`]);
+
+      const copyLabels = ['BANK COPY', 'SCHOOL COPY', 'PARENT COPY'];
+
+      copyLabels.forEach((copyLabel, index) => {
+        const y = marginTop + index * (sectionHeight + gap);
+
+        doc.setDrawColor(130, 130, 130);
+        doc.rect(marginX, y, pageWidth - marginX * 2, sectionHeight);
+
+        if (logoDataUrl) {
+          try {
+            const imageFormat = String(logoDataUrl).includes('image/png') ? 'PNG' : 'JPEG';
+            doc.addImage(logoDataUrl, imageFormat, marginX + 2, y + 1.5, 8, 8);
+          } catch {
+            // Keep voucher generation resilient if logo rendering fails
+          }
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(copyLabel, marginX + 12, y + 5);
+        doc.setFontSize(10);
+        doc.text(instituteName, pageWidth / 2, y + 5, { align: 'center' });
+        doc.setFontSize(8);
+        doc.text('Fee Voucher', pageWidth / 2, y + 10, { align: 'center' });
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.text(`Voucher #: ${voucherNumber}`, marginX + 2, y + 15);
+        doc.text(`Generate Date: ${issueDate}`, pageWidth - marginX - 2, y + 15, { align: 'right' });
+
+        autoTable(doc, {
+          startY: y + 17,
+          margin: { left: marginX + 1, right: marginX + 1 },
+          theme: 'grid',
+          body: [
+            ['Student', voucher?.studentName || 'N/A', 'Reg #', voucher?.registrationNo || 'N/A'],
+            ['Generate Date', issueDate, 'Due Date', dueDate],
+            ['Month', monthLabel, 'Year', String(voucher?.year || 'N/A')],
+          ],
+          styles: { fontSize: 7, cellPadding: 1.2 },
+          columnStyles: {
+            0: { fontStyle: 'bold', cellWidth: 18 },
+            1: { cellWidth: 60 },
+            2: { fontStyle: 'bold', cellWidth: 18 },
+            3: { cellWidth: 60 },
+          },
+        });
+
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 1,
+          margin: { left: marginX + 1, right: marginX + 1 },
+          head: [['Fee Type', 'Amount']],
+          body: feeRows.length ? feeRows : [['No fee lines', '—']],
+          theme: 'grid',
+          headStyles: { fillColor: [22, 101, 52], textColor: [255, 255, 255] },
+          styles: { fontSize: 7, cellPadding: 1.2 },
+          columnStyles: {
+            0: { cellWidth: 120 },
+            1: { halign: 'right' },
+          },
+        });
+
+        const footerY = y + sectionHeight - 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.8);
+        doc.text('Late fee policy applies after due date.', marginX + 2, footerY);
+        doc.text('Authorized Signature: ____________________', pageWidth - marginX - 2, footerY, { align: 'right' });
+
+        if (index < copyLabels.length - 1) {
+          doc.setLineDashPattern([1.2, 1.2], 0);
+          doc.line(marginX, y + sectionHeight + gap / 2, pageWidth - marginX, y + sectionHeight + gap / 2);
+          doc.setLineDashPattern([], 0);
+        }
+      });
+
+      const safeVoucherNo = String(voucherNumber).replace(/[^a-zA-Z0-9_-]/g, '-');
+      doc.save(`fee-voucher-${safeVoucherNo}.pdf`);
+      toast.success(`Voucher ${voucherNumber} downloaded`);
+    } catch (error) {
+      console.error('Failed to download voucher PDF:', error);
+      toast.error('Failed to download voucher PDF');
+    } finally {
+      setDownloadingVoucherId(null);
+    }
   };
 
   const voucherColumns = useMemo(
@@ -229,42 +351,37 @@ export default function FeesPage() {
           </div>
         ),
       },
-      {
-        accessorKey: 'status',
-        header: 'Status',
-        cell: ({ getValue }) => {
-          const s = getValue();
-          return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_COLORS[s] || 'bg-gray-100')}>{s}</span>;
-        },
-      },
+      // {
+      //   accessorKey: 'status',
+      //   header: 'Status',
+      //   cell: ({ getValue }) => {
+      //     const s = getValue();
+      //     return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_COLORS[s] || 'bg-gray-100')}>{s}</span>;
+      //   },
+      // },
       { accessorKey: 'issuedDate', header: 'Issued', cell: ({ getValue }) => getValue() ? new Date(getValue()).toLocaleDateString('en-PK') : '—' },
       {
         id: 'actions',
         header: 'Actions',
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <button onClick={() => setViewingVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="View Details" size={14}><FileText size={14} /></button>
-            {row.original.status !== 'paid' && canDo('fees.update') && (
-              <>
-                <button
-                  onClick={() => { setRecordingPayment(row.original); setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' }); }}
-                  disabled={recordingPayment?.id === row.original.id}
-                  className="rounded p-1 hover:bg-blue-100 text-blue-700 hover:text-blue-800 disabled:opacity-50"
-                  title="Record Payment"
-                >
-                  {recordingPayment?.id === row.original.id ? '⏳' : '💰'}
-                </button>
-                <button
-                  onClick={() => setMarkingAsPaid(row.original.id)}
-                  disabled={markingAsPaid === row.original.id}
-                  className="rounded p-1 hover:bg-green-100 text-green-700 hover:text-green-800 disabled:opacity-50"
-                  title="Mark as Paid"
-                >
-                  {markingAsPaid === row.original.id ? '⏳' : '✓'}
-                </button>
-              </>
-            )}
-            <button onClick={() => handleDownloadVoucher(row.original)} className="rounded p-1 hover:bg-accent" title="Download"><Download size={14} /></button>
+            <button
+              onClick={() => setViewingVoucher(row.original)}
+              className="rounded p-1 hover:bg-accent"
+              title="View Details"
+            >
+              <Eye size={14} />
+            </button>
+            <button
+              onClick={() => handleDownloadVoucher(row.original)}
+              disabled={downloadingVoucherId === (row.original?.id || row.original?.voucherNumber || row.original?.voucher_number)}
+              className="rounded p-1 hover:bg-accent disabled:opacity-50"
+              title="Download"
+            >
+              {downloadingVoucherId === (row.original?.id || row.original?.voucherNumber || row.original?.voucher_number)
+                ? <Loader2 size={14} className="animate-spin" />
+                : <Download size={14} />}
+            </button>
             {canDo('fees.delete') && (
               <button onClick={() => setDeletingVoucher(row.original)} className="rounded p-1 text-destructive hover:bg-destructive/10" title="Delete"><Trash2 size={14} /></button>
             )}
@@ -272,7 +389,7 @@ export default function FeesPage() {
         ),
       },
     ],
-    [terms.student, canDo, setViewingVoucher, setDeletingVoucher, handleDownloadVoucher, markingAsPaid, recordingPayment, setRecordingPayment, setPaymentForm]
+    [terms.student, canDo, setViewingVoucher, setDeletingVoucher, downloadingVoucherId]
   );
 
   return (
@@ -285,10 +402,9 @@ export default function FeesPage() {
           <h3 className="text-sm font-semibold text-muted-foreground">Filter Vouchers</h3>
           <Filter size={16} className="text-muted-foreground" />
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <SelectField label="Month" options={MONTH_OPTS} value={voucherMonth} onChange={setVoucherMonth} />
           <SelectField label="Academic Year" options={academicYearsData.map(ay => ({ value: ay.id, label: ay.name }))} value={voucherAcademicYearId} onChange={setVoucherAcademicYearId} />
-          <SelectField label="Status" options={[{ value: '', label: 'All Statuses' }, ...STATUS_OPTS]} value={voucherStatus} onChange={setVoucherStatus} />
         </div>
       </div>
 
@@ -322,8 +438,22 @@ export default function FeesPage() {
         action={
           <div className="flex items-center gap-2">
             {canDo('fees.create') && (
-              <button onClick={() => setVoucherGeneratorModal(true)} className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
-                <FileText size={14} /> Generate Vouchers
+              <button
+                onClick={() => {
+                  setVoucherGeneratorModal(true);
+                }}
+                disabled={isGeneratingVouchers}
+                className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+              >
+                {isGeneratingVouchers ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Generating...
+                  </>
+                ) : (
+                  <>
+                    <FileText size={14} /> Generate Vouchers
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -334,6 +464,7 @@ export default function FeesPage() {
       <AppModal open={voucherGeneratorModal} onClose={() => setVoucherGeneratorModal(false)} title="Generate Bulk Vouchers" size="xl">
         <BulkVoucherGenerator
           instituteId={currentInstitute?.id}
+          onGeneratingChange={setIsGeneratingVouchers}
           onSuccess={() => {
             setVoucherGeneratorModal(false);
             refetchVouchers();
@@ -342,17 +473,6 @@ export default function FeesPage() {
           }}
         />
       </AppModal>
-
-      {/* Mark as Paid Confirmation */}
-      <ConfirmDialog
-        open={!!markingAsPaid}
-        onClose={() => setMarkingAsPaid(null)}
-        onConfirm={() => markAsPaidMutation.mutate(markingAsPaid)}
-        loading={markAsPaidMutation.isPending}
-        title="Mark Voucher as Paid"
-        description="This will update the voucher status to paid."
-        confirmLabel="Mark as Paid"
-      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
@@ -366,94 +486,6 @@ export default function FeesPage() {
         variant="destructive"
       />
 
-      {/* Record Payment Modal */}
-      <AppModal open={!!recordingPayment} onClose={() => setRecordingPayment(null)} title={`Record Payment - ${recordingPayment?.voucherNumber}`} size="md">
-        {recordingPayment && (
-          <div className="space-y-4">
-            {/* Amount Info */}
-            <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg">
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold">Total Amount</p>
-                <p className="font-bold text-lg text-blue-600">PKR {(recordingPayment.netAmount || recordingPayment.amount || 0).toLocaleString('en-PK')}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold">Outstanding</p>
-                <p className="font-bold text-lg text-orange-600">PKR {(recordingPayment.netAmount || recordingPayment.amount || 0).toLocaleString('en-PK')}</p>
-              </div>
-            </div>
-
-            {/* Payment Form */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-semibold">Payment Amount *</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={paymentForm.amount}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                  placeholder="Enter payment amount"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold">Payment Method *</label>
-                <select
-                  value={paymentForm.method}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="jazzcash">JazzCash</option>
-                  <option value="easypaisa">Easypaisa</option>
-                  <option value="stripe">Card (Stripe)</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold">Reference No. (Optional)</label>
-                <input
-                  type="text"
-                  value={paymentForm.referenceNo}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, referenceNo: e.target.value })}
-                  placeholder="e.g., Check #, Transaction ID"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold">Remarks (Optional)</label>
-                <textarea
-                  value={paymentForm.remarks}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
-                  placeholder="Additional notes..."
-                  rows="2"
-                  className="w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 justify-end pt-4 border-t">
-              <button onClick={() => setRecordingPayment(null)} className="rounded-md border px-4 py-2 text-sm">
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRecordPayment(recordingPayment.id)}
-                disabled={recordPaymentMutation.isPending}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {recordPaymentMutation.isPending ? '⏳ Recording...' : '💾 Record Payment'}
-              </button>
-            </div>
-          </div>
-        )}
-      </AppModal>
-
       {/* Voucher Detail View Modal */}
       <AppModal open={!!viewingVoucher} onClose={() => setViewingVoucher(null)} title="Voucher Details" size="lg">
         {viewingVoucher && (
@@ -465,12 +497,12 @@ export default function FeesPage() {
                 <p className="text-lg font-bold font-mono">{viewingVoucher.voucherNumber || viewingVoucher.voucher_number}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">STATUS</p>
-                <p className={cn('inline-block px-2 py-1 rounded-full text-xs font-semibold capitalize', STATUS_COLORS[viewingVoucher.status])}>{viewingVoucher.status}</p>
-              </div>
-              <div className="space-y-1">
                 <p className="text-xs font-semibold text-muted-foreground">ISSUED DATE</p>
                 <p className="text-sm">{viewingVoucher.issuedDate ? new Date(viewingVoucher.issuedDate).toLocaleDateString('en-PK') : '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">DUE DATE</p>
+                <p className="text-sm">{viewingVoucher.dueDate ? new Date(viewingVoucher.dueDate).toLocaleDateString('en-PK') : '—'}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-muted-foreground">MONTH/YEAR</p>
@@ -551,8 +583,20 @@ export default function FeesPage() {
             {/* Action Buttons */}
             <div className="flex gap-2 justify-end pt-4">
               <button onClick={() => setViewingVoucher(null)} className="rounded-md border px-4 py-2 text-sm">Close</button>
-              <button onClick={() => { handleDownloadVoucher(viewingVoucher); setViewingVoucher(null); }} className="rounded-md bg-primary px-4 py-2 text-sm text-white flex items-center gap-1.5">
-                <Download size={14} /> Download PDF
+              <button
+                onClick={() => { handleDownloadVoucher(viewingVoucher); }}
+                disabled={downloadingVoucherId === (viewingVoucher?.id || viewingVoucher?.voucherNumber || viewingVoucher?.voucher_number)}
+                className="rounded-md bg-primary px-4 py-2 text-sm text-white flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {downloadingVoucherId === (viewingVoucher?.id || viewingVoucher?.voucherNumber || viewingVoucher?.voucher_number) ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Downloading...
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} /> Download PDF
+                  </>
+                )}
               </button>
             </div>
           </div>
