@@ -41,6 +41,7 @@ const FEE_TYPE_OPTIONS = [
   { value: 'annual', label: 'Annual Fee' },
   { value: 'lab', label: 'Lab Charges' },
   { value: 'admission', label: 'Admission Fee' },
+  { value: 'fee_template', label: 'Fee Template' },
 ];
 
 export default function BulkVoucherGenerator({ instituteId: propInstituteId, onSuccess }) {
@@ -85,7 +86,20 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
   });
 
   const selectedTemplateId = watch('feeTemplateId');
+  const selectedFeeType = watch('feeType');
   const selectedTemplate = feeTemplates.find(t => t.value === selectedTemplateId);
+
+  // Auto-lock fee type to fee_template whenever a fee template is selected.
+  useEffect(() => {
+    if (selectedTemplateId) {
+      setValue('feeType', 'fee_template', { shouldDirty: true });
+      return;
+    }
+
+    if (selectedFeeType === 'fee_template') {
+      setValue('feeType', 'monthly', { shouldDirty: true });
+    }
+  }, [selectedTemplateId, selectedFeeType, setValue]);
 
   // Fetch academic years
   const { data: academicYears = [] } = useQuery({
@@ -552,6 +566,7 @@ export default function BulkVoucherGenerator({ instituteId: propInstituteId, onS
                   onChange={field.onChange}
                   error={errors.feeType}
                   placeholder="Select fee type..."
+                  disabled={!!selectedTemplateId}
                 />
               )}
             />

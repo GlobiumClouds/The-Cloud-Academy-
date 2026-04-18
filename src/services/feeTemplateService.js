@@ -69,6 +69,7 @@ export const feeTemplateService = {
           code: t.code,
           total_amount: t.total_amount,
           fee_basis: t.fee_basis,
+          fee_type: t.fee_type,
           is_default: t.is_default
         }))
       };
