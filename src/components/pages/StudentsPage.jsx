@@ -57,73 +57,73 @@ function buildColumns(studentColumns, type, terms, canDo, router, onDelete, onEd
 
   // Actions column
   cols.push({
-      accessorKey: 'is_active',
-      header: 'Status',
-      cell: ({ row }) => (
-        <Badge variant={row.original.is_active ? 'success' : 'secondary'} className="capitalize">
-          {row.original.is_active ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
-    },
+    accessorKey: 'is_active',
+    header: 'Status',
+    cell: ({ row }) => (
+      <Badge variant={row.original.is_active ? 'success' : 'secondary'} className="capitalize">
+        {row.original.is_active ? 'Active' : 'Inactive'}
+      </Badge>
+    ),
+  },
     {
-    id: 'actions',
-    header: '',
-    cell: ({ row }) => {
-      const stu = row.original;
-      return (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            onClick={() => router.push(`/${type}/students/${stu.id}`)}
-            className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
-            title="View"
-          >
-            <Eye size={13} />
-          </button>
-          {canDo('students.update') && (
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => {
+        const stu = row.original;
+        return (
+          <div className="flex items-center justify-end gap-1">
             <button
-              onClick={() => onEdit(stu)} // Call the callback
+              onClick={() => router.push(`/${type}/students/${stu.id}`)}
               className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
-              title="Edit"
+              title="View"
             >
-              <Pencil size={13} />
+              <Eye size={13} />
             </button>
-          )}
-          {canDo('students.delete') && (
-            <button
-              onClick={() => onDelete(stu)}
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
-              title="Delete"
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
-          {canDo('students.read') && (
-            <button
-              onClick={() => onGenerateIdCard(stu)}
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
-              title="Generate ID Card"
-            >
-              <IdCard size={13} />
-            </button>
-          )}
-          {canDo('students.update') && (
-            <button
-              onClick={() => onToggleStatus(stu.id, !stu.is_active)}
-              className={cn(
-                "flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent",
-                stu.is_active ? "text-amber-600" : "text-emerald-600"
-              )}
-              title={stu.is_active ? "Deactivate" : "Activate"}
-            >
-              <Power size={13} />
-            </button>
-          )}
-        </div>
-      );
-    },
-    enableSorting: false,
-    enableHiding: false,
-  });
+            {canDo('students.update') && (
+              <button
+                onClick={() => onEdit(stu)} // Call the callback
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
+                title="Edit"
+              >
+                <Pencil size={13} />
+              </button>
+            )}
+            {canDo('students.delete') && (
+              <button
+                onClick={() => onDelete(stu)}
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+                title="Delete"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+            {canDo('students.read') && (
+              <button
+                onClick={() => onGenerateIdCard(stu)}
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent"
+                title="Generate ID Card"
+              >
+                <IdCard size={13} />
+              </button>
+            )}
+            {canDo('students.update') && (
+              <button
+                onClick={() => onToggleStatus(stu.id, !stu.is_active)}
+                className={cn(
+                  "flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-accent",
+                  stu.is_active ? "text-amber-600" : "text-emerald-600"
+                )}
+                title={stu.is_active ? "Deactivate" : "Activate"}
+              >
+                <Power size={13} />
+              </button>
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+    });
 
   return cols;
 }
@@ -170,9 +170,9 @@ export default function StudentsPage({ type }) {
   // Fetch academic years and set current as default
   const { data: academicYearsData } = useQuery({
     queryKey: ['academic-years', currentInstitute?.id],
-    queryFn: () => academicYearService.getAll({ 
+    queryFn: () => academicYearService.getAll({
       institute_id: currentInstitute?.id,
-      is_active: true 
+      is_active: true
     }),
     enabled: !!currentInstitute?.id,
   });
@@ -192,9 +192,9 @@ export default function StudentsPage({ type }) {
   // Fetch classes for selected academic year
   const { data: classesData } = useQuery({
     queryKey: ['classes', academicYearId],
-    queryFn: () => classService.getAll({ 
+    queryFn: () => classService.getAll({
       academic_year_id: academicYearId,
-      is_active: true 
+      is_active: true
     }),
     enabled: !!academicYearId,
   });
@@ -279,9 +279,9 @@ export default function StudentsPage({ type }) {
 
   const filters = useMemo(() => {
     const f = {
-      page, 
-      limit: pageSize, 
-      search, 
+      page,
+      limit: pageSize,
+      search,
     };
 
     // Handle student status filter
@@ -330,9 +330,61 @@ export default function StudentsPage({ type }) {
   const total = data?.pagination?.total ?? 0;
   const totalPages = data?.pagination?.totalPages ?? 1;
 
-  const handleGenerateIdCard = (student) => {
-    const institute = currentInstitute || user?.institute || user?.school || {};
-    generateAndDownloadIdCard({ role: 'student', person: student, institute });
+  // const handleGenerateIdCard = (student) => {
+  //   const institute = currentInstitute || user?.institute || user?.school || {};
+  //   generateAndDownloadIdCard({ role: 'student', person: student, institute });
+  // };
+
+  // const handleGenerateIdCard = async (student) => {
+  //   try {
+  //     // Get institute from auth store
+  //     const institute = currentInstitute || user?.institute || user?.school || {};
+
+  //     // Get latest ID card policy
+  //     const policy = useAuthStore.getState().getLatestPolicy('id_card');
+  //     const policyConfig = policy?.config || {};
+
+  //     toast.loading('Generating ID Card...', { id: 'id-card-generate' });
+
+  //     console.log('Generating ID Card with:', { student, institute, policyConfig });
+
+  //     await generateAndDownloadIdCard({
+  //       role: 'student',
+  //       person: student,
+  //       institute: institute,
+  //       policyConfig: policyConfig
+  //     });
+
+  //     toast.success('ID Card downloaded successfully!', { id: 'id-card-generate' });
+  //   } catch (error) {
+  //     console.error('ID Card generation failed:', error);
+  //     toast.error('Failed to generate ID Card: ' + (error.message || 'Unknown error'), { id: 'id-card-generate' });
+  //   }
+  // };
+
+  const handleGenerateIdCard = async (student) => {
+    try {
+      toast.loading("Generating ID Card...", { id: "id-card" });
+
+      // await generateAndDownloadIdCard({
+      //   person: student,
+      //   institute: currentInstitute,
+      //   policyConfig:
+      //     useAuthStore.getState().getLatestPolicy("id_card")?.config || {},
+      // });
+      const policy = useAuthStore.getState().getLatestPolicy('id_card');
+      const policyConfig = policy?.config || {};
+
+      await generateAndDownloadIdCard({
+        person: student,
+        institute: currentInstitute,
+        policyConfig,
+      });
+
+      toast.success("ID Card Ready", { id: "id-card" });
+    } catch (error) {
+      toast.error(error.message, { id: "id-card" });
+    }
   };
 
   const columns = useMemo(
@@ -438,25 +490,25 @@ export default function StudentsPage({ type }) {
       // Normalize data: map frontend field names to backend field names
       const normalizedData = importedData.map(row => {
         const normalized = { ...row };
-        
+
         // Map academy_program_name back to program_name for backend
         if (normalized.academy_program_name !== undefined) {
           normalized.program_name = normalized.academy_program_name;
           delete normalized.academy_program_name;
         }
-        
+
         // Ensure academic_year_name is used (some fields might still have old names)
         if (normalized.academic_year && !normalized.academic_year_name) {
           normalized.academic_year_name = normalized.academic_year;
         }
-        
+
         // Clean up empty values
         Object.keys(normalized).forEach(key => {
           if (normalized[key] === '' || normalized[key] === null || normalized[key] === undefined) {
             delete normalized[key];
           }
         });
-        
+
         return normalized;
       });
 
@@ -566,7 +618,7 @@ export default function StudentsPage({ type }) {
     { key: 'concession_type', label: 'Concession Type', required: false, validation: 'select', options: ['none', 'merit', 'need', 'staff', 'sibling'] },
     { key: 'concession_percentage', label: 'Concession Percentage', required: false, validation: 'number' },
     { key: 'concession_reason', label: 'Concession Reason', required: false, validation: 'text' },
-    { key: 'fee_status', label: 'Fee Status', required: false, validation: 'select', options: [ 'pending', 'overdue', 'partial'] },
+    { key: 'fee_status', label: 'Fee Status', required: false, validation: 'select', options: ['pending', 'overdue', 'partial'] },
 
     // Medical Information
     { key: 'medical_conditions', label: 'Medical Conditions', required: false, validation: 'text' },
@@ -876,11 +928,4 @@ function displayFeeStatus(status) {
     </span>
   );
 }
-
-
-
-
-
-
-
 
