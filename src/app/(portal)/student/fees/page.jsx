@@ -1,16 +1,14 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
-import { AlertCircle, Clock, DollarSign, Download, Eye, Printer, X } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+import { useMemo, useState } from 'react';
+import { AlertCircle, Clock, DollarSign, Download, Eye } from 'lucide-react';
+import { toast } from 'sonner';
 import { useStudentFees, useStudentProfile } from '@/hooks/useStudentPortal';
 import useInstituteStore from '@/store/instituteStore';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import FeeVoucher from '@/fees-template/FeeVoucher';
-import { getFeeTheme } from '@/fees-template/styles/feeTheme';
+import useAuthStore from '@/store/authStore';
+import { downloadBlob } from '@/lib/download';
+import { generateFeeVoucherPdfBlob } from '@/lib/pdf/feeVoucherPdf';
+import FeeVoucherPreviewModal from '@/fees-template/FeeVoucherPreviewModal';
 
 const MONTHS = [
   'January',
@@ -32,6 +30,15 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const isNonZeroValue = (value) => {
+  if (value === null || value === undefined || value === '') return false;
+  if (typeof value === 'string' && value.includes('%')) {
+    const parsed = Number(value.replace('%', '').trim());
+    return Number.isFinite(parsed) && parsed !== 0;
+  }
+  return toNumber(value) !== 0;
+};
+
 const formatDate = (value) => {
   if (!value) return '-';
   const date = new Date(value);
@@ -45,16 +52,62 @@ const getMonthLabel = (value) => {
   return MONTHS[monthIndex - 1] || String(value);
 };
 
-const normalizeInstitute = (storeInstitute = {}, profile = {}) => {
+const pickFirst = (...values) => values.find((value) => value !== undefined && value !== null && value !== '') || null;
+
+const normalizeInstitute = (storeInstitute = {}, authUser = {}, profile = {}) => {
   const institute = storeInstitute || {};
+  const authInstitute = authUser?.institute || authUser?.school || {};
   const studentProfile = profile || {};
 
   return {
-    name: institute.name || institute.title || studentProfile.institute_name || studentProfile.school_name || 'ABC School',
-    logo: institute.logo_url || institute.logo || studentProfile.logo_url || studentProfile.logo || null,
-    address: institute.campus_address || institute.address || studentProfile.address || studentProfile.campus_address || 'Campus address not available',
-    phone: institute.phone || institute.phone_number || institute.contact_number || studentProfile.phone || studentProfile.phone_number || 'N/A',
-    email: institute.email || institute.contact_email || studentProfile.email || 'N/A',
+    name: pickFirst(
+      institute.name,
+      institute.title,
+      authInstitute.name,
+      authInstitute.title,
+      studentProfile.institute_name,
+      studentProfile.school_name,
+      'ABC School'
+    ),
+    logo: pickFirst(
+      institute.logo_url,
+      institute.logo,
+      institute.institute_logo,
+      authInstitute.logo_url,
+      authInstitute.logo,
+      authInstitute.institute_logo,
+      studentProfile.logo_url,
+      studentProfile.logo,
+      studentProfile.institute_logo
+    ),
+    address: pickFirst(
+      institute.campus_address,
+      institute.address,
+      authInstitute.campus_address,
+      authInstitute.address,
+      studentProfile.address,
+      studentProfile.campus_address,
+      'Campus address not available'
+    ),
+    phone: pickFirst(
+      institute.phone,
+      institute.phone_number,
+      institute.contact_number,
+      authInstitute.phone,
+      authInstitute.phone_number,
+      authInstitute.contact_number,
+      studentProfile.phone,
+      studentProfile.phone_number,
+      'N/A'
+    ),
+    email: pickFirst(
+      institute.email,
+      institute.contact_email,
+      authInstitute.email,
+      authInstitute.contact_email,
+      studentProfile.email,
+      'N/A'
+    ),
   };
 };
 
@@ -70,7 +123,7 @@ const buildVoucherView = (voucher = {}, profile = {}, institute = {}) => {
 
   const feeStructure = [];
   const addRow = (label, value) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (isNonZeroValue(value)) {
       feeStructure.push({ feeType: label, amount: value });
     }
   };
@@ -113,77 +166,20 @@ const buildVoucherView = (voucher = {}, profile = {}, institute = {}) => {
   };
 };
 
-const captureVoucherCanvas = async (sourceNode) => {
-  const exportHost = document.createElement('div');
-  exportHost.style.position = 'fixed';
-  exportHost.style.left = '-100000px';
-  exportHost.style.top = '0';
-  exportHost.style.background = '#ffffff';
-  exportHost.style.padding = '0';
-  exportHost.style.zIndex = '-1';
-
-  const exportNode = sourceNode.cloneNode(true);
-  exportNode.style.transform = 'none';
-  exportNode.style.width = '210mm';
-  exportNode.style.minHeight = '297mm';
-  exportNode.style.margin = '0';
-
-  exportHost.appendChild(exportNode);
-  document.body.appendChild(exportHost);
-
-  try {
-    return await html2canvas(exportNode, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      windowWidth: exportNode.scrollWidth,
-      windowHeight: exportNode.scrollHeight,
-    });
-  } finally {
-    document.body.removeChild(exportHost);
-  }
-};
-
-const saveCanvasAsA4Pdf = (canvas, fileName) => {
-  const imageData = canvas.toDataURL('image/png');
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imageWidth = pageWidth;
-  const imageHeight = (canvas.height * imageWidth) / canvas.width;
-
-  let heightLeft = imageHeight;
-  let position = 0;
-
-  pdf.addImage(imageData, 'PNG', 0, position, imageWidth, imageHeight, undefined, 'FAST');
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imageHeight;
-    pdf.addPage();
-    pdf.addImage(imageData, 'PNG', 0, position, imageWidth, imageHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
-  }
-
-  pdf.save(fileName);
-};
-
 export default function StudentFeesPage() {
   const { data: feesRes, isLoading } = useStudentFees();
   const { data: profileRes } = useStudentProfile();
-  const { resolvedTheme } = useTheme();
   const currentInstitute = useInstituteStore((state) => state.currentInstitute);
+  const authUser = useAuthStore((state) => state.user);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [isVoucherOpen, setIsVoucherOpen] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const voucherRef = useRef(null);
+  const [quickDownloadVoucherId, setQuickDownloadVoucherId] = useState(null);
 
   const fees = feesRes?.data || feesRes || {};
   const summary = fees.summary || {};
   const vouchers = fees.vouchers || [];
   const profile = profileRes?.data || profileRes || {};
-  const institute = useMemo(() => normalizeInstitute(currentInstitute, profile), [currentInstitute, profile]);
-  const theme = useMemo(() => getFeeTheme(resolvedTheme), [resolvedTheme]);
+  const institute = useMemo(() => normalizeInstitute(currentInstitute, authUser, profile), [currentInstitute, authUser, profile]);
 
   const activeVoucher = useMemo(() => {
     if (!vouchers.length) return null;
@@ -200,15 +196,34 @@ export default function StudentFeesPage() {
     setIsVoucherOpen(true);
   };
 
-  const handleDownloadPdf = async () => {
-    if (!voucherRef.current) return;
+  const handleQuickDownload = (voucher) => {
+    if (!voucher) {
+      toast.error('Voucher data not found');
+      return;
+    }
 
     try {
-      setIsDownloading(true);
-      const canvas = await captureVoucherCanvas(voucherRef.current);
-      saveCanvasAsA4Pdf(canvas, `fee-voucher-${selectedVoucher?.voucher_number || selectedVoucher?.id || 'download'}.pdf`);
+      setQuickDownloadVoucherId(voucher.id);
+      const voucherBlob = generateFeeVoucherPdfBlob({
+        voucher,
+        student: {
+          name: profile?.name,
+          registration_no: profile?.registration_no,
+          class: profile?.class_name,
+          section: profile?.section_name,
+          gender: profile?.gender
+        },
+        instituteName: institute?.name || 'ABC School'
+      });
+
+      const voucherRef = voucher?.voucher_number || voucher?.id || 'receipt';
+      downloadBlob(voucherBlob, `fee-voucher-${voucherRef}.pdf`);
+      toast.success('Voucher downloaded successfully');
+    } catch (error) {
+      console.error('Failed to download voucher PDF:', error);
+      toast.error('Failed to download voucher');
     } finally {
-      setIsDownloading(false);
+      setQuickDownloadVoucherId(null);
     }
   };
 
@@ -269,24 +284,33 @@ export default function StudentFeesPage() {
                 >
                   <Eye className="h-4 w-4" /> View
                 </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDownload(voucher)}
+                  disabled={quickDownloadVoucherId === voucher.id}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  <Download className="h-4 w-4" />
+                  {quickDownloadVoucherId === voucher.id ? 'Downloading...' : 'Download PDF'}
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <VoucherModal
+      <FeeVoucherPreviewModal
         open={isVoucherOpen}
-        onOpenChange={(next) => {
-          setIsVoucherOpen(next);
-          if (!next) setSelectedVoucher(null);
+        onClose={() => {
+          setIsVoucherOpen(false);
+          setSelectedVoucher(null);
         }}
-        voucherView={voucherView}
-        voucherRef={voucherRef}
-        theme={theme}
-        institute={institute}
-        isDownloading={isDownloading}
-        onDownload={handleDownloadPdf}
+        studentData={voucherView.studentData}
+        feeStructure={voucherView.feeStructure}
+        instituteData={voucherView.instituteData || institute}
+        voucherMeta={voucherView.voucherMeta}
+        initialCopyMode="triple"
+        allowCopyToggle
       />
     </div>
   );
@@ -306,44 +330,4 @@ function Status({ status }) {
   if (status === 'overdue') return <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Overdue</span>;
   if (status === 'partial') return <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">Partial</span>;
   return <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">Pending</span>;
-}
-
-function VoucherModal({ open, onOpenChange, voucherView, voucherRef, theme, institute, isDownloading, onDownload }) {
-  if (!open) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[96vw] p-0 sm:max-w-[96vw]">
-        <DialogHeader className="border-b px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <DialogTitle className="text-base font-semibold">Fee Voucher Details</DialogTitle>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={onDownload} disabled={isDownloading}>
-                <Download className="h-4 w-4" />
-                {isDownloading ? 'Downloading...' : 'Download PDF'}
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => onOpenChange(false)}>
-                <X className="h-4 w-4" /> Close
-              </Button>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="max-h-[80vh] overflow-auto bg-slate-100 p-4">
-          <div className="mx-auto w-fit origin-top scale-[0.62] sm:scale-75 md:scale-90 lg:scale-100">
-            <div ref={voucherRef} className="fee-voucher-print-target">
-              <FeeVoucher
-                studentData={voucherView.studentData}
-                feeStructure={voucherView.feeStructure}
-                instituteData={voucherView.instituteData || institute}
-                voucherMeta={voucherView.voucherMeta}
-                theme={theme}
-                copyMode="triple"
-              />
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
 }

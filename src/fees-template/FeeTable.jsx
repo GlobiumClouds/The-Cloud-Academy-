@@ -15,7 +15,17 @@ const isRemaining = (label) => normalizeLabel(label).includes('remaining amount'
 const isTotal = (label) => normalizeLabel(label).includes('total amount');
 const isPercent = (label) => /percent|percentage/.test(normalizeLabel(label));
 
+const hasNonZeroValue = (label, value) => {
+  if (value === null || value === undefined || value === '') return false;
+  if (isPercent(label) && typeof value === 'string' && value.includes('%')) {
+    const parsed = Number(String(value).replace('%', '').trim());
+    return Number.isFinite(parsed) && parsed !== 0;
+  }
+  return toNumber(value) !== 0;
+};
+
 const formatValue = (label, amount) => {
+  if (amount === '-') return '-';
   if (isPercent(label)) return `${fmtAmount(amount)}%`;
   return `PKR ${fmtAmount(amount)}`;
 };
@@ -23,36 +33,38 @@ const formatValue = (label, amount) => {
 export default function FeeTable({ feeStructure = [], theme }) {
   const normalizedRows = (feeStructure || []).map((row) => ({
     feeType: row.feeType || row.label || 'Unknown Fee',
-    amount: toNumber(row.amount),
+    amount: row.amount,
   }));
 
-  const baseRows = normalizedRows.filter((row) => !isPaid(row.feeType) && !isRemaining(row.feeType) && !isTotal(row.feeType));
+  const baseRows = normalizedRows.filter(
+    (row) => !isPaid(row.feeType) && !isRemaining(row.feeType) && !isTotal(row.feeType) && hasNonZeroValue(row.feeType, row.amount)
+  );
 
   const chargeTotal = baseRows
-    .filter((row) => !isDiscount(row.feeType))
-    .reduce((sum, row) => sum + row.amount, 0);
+    .filter((row) => !isDiscount(row.feeType) && !isPercent(row.feeType))
+    .reduce((sum, row) => sum + toNumber(row.amount), 0);
 
   const discount = baseRows
     .filter((row) => isDiscount(row.feeType))
-    .reduce((sum, row) => sum + row.amount, 0);
+    .reduce((sum, row) => sum + toNumber(row.amount), 0);
 
   const paidAmount = normalizedRows
-    .filter((row) => isPaid(row.feeType))
-    .reduce((sum, row) => sum + row.amount, 0);
+    .filter((row) => isPaid(row.feeType) && hasNonZeroValue(row.feeType, row.amount))
+    .reduce((sum, row) => sum + toNumber(row.amount), 0);
 
   const totalAmount = chargeTotal - discount;
   const remainingAmount = Math.max(totalAmount - paidAmount, 0);
 
-  const displayRows = [
-    ...baseRows,
-    { feeType: 'Total Amount', amount: totalAmount },
-    { feeType: 'Paid Amount', amount: paidAmount },
-    { feeType: 'Remaining Amount', amount: remainingAmount },
-  ];
+  const summaryRows = [];
+  if (totalAmount !== 0) summaryRows.push({ feeType: 'Total Amount', amount: totalAmount });
+  if (paidAmount !== 0) summaryRows.push({ feeType: 'Paid Amount', amount: paidAmount });
+  if (remainingAmount !== 0) summaryRows.push({ feeType: 'Remaining Amount', amount: remainingAmount });
+
+  const displayRows = [...baseRows, ...summaryRows];
 
   const rowsToRender = displayRows.length
     ? displayRows
-    : [{ feeType: 'No fee lines', amount: 0 }];
+    : [{ feeType: 'No fee lines', amount: '-' }];
 
   return (
     <section className="mt-1 border" style={{ borderColor: '#bcbcbc' }}>
