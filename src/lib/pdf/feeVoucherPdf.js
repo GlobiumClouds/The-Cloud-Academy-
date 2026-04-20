@@ -3,7 +3,6 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const CURRENCY = 'PKR';
-const COPIES = ['BANK COPY', 'SCHOOL COPY', 'PARENT COPY'];
 const PRIMARY_GREEN = [22, 101, 52];
 
 const toNumber = (value) => {
@@ -50,69 +49,60 @@ const formatMonth = (voucher) => {
   return '-';
 };
 
-const buildFeeRows = (voucher = {}) => {
-  const objectBreakdown = voucher?.fee_breakdown && !Array.isArray(voucher.fee_breakdown)
-    ? Object.entries(voucher.fee_breakdown).map(([label, amount]) => ({
-      label: String(label)
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (char) => char.toUpperCase()),
-      amount
-    }))
-    : [];
-
-  const arrayBreakdown = Array.isArray(voucher?.fee_breakdown)
-    ? voucher.fee_breakdown.map((item) => ({
-      label: item?.label || item?.title || 'Fee Item',
-      amount: item?.amount || 0
-    }))
-    : [];
-
-  const knownRows = [
-    { label: 'Lab Charges', amount: voucher.lab_charges },
-    { label: 'Monthly Fee', amount: voucher.monthly_fee ?? voucher.amount },
-    { label: 'Annual Charges', amount: voucher.annual_charges },
-    { label: 'Admission Charges', amount: voucher.admission_charges },
-    { label: 'Concession Percentage', amount: voucher.concession_percentage ? `${voucher.concession_percentage}%` : null },
-    { label: 'Discount', amount: voucher.discount },
-    { label: 'Total Amount', amount: voucher.amount ?? voucher.total_amount },
-    { label: 'Remaining Amount', amount: voucher.remaining_amount ?? voucher.balance_due ?? voucher.net_amount }
-  ].filter((row) => hasNonZeroAmount(row.amount));
-
-  const merged = [...arrayBreakdown, ...objectBreakdown, ...knownRows].filter((row) => hasNonZeroAmount(row.amount));
-
-  if (!merged.length && hasNonZeroAmount(voucher.net_amount ?? voucher.amount)) {
-    merged.push({ label: 'Monthly Fee', amount: voucher.net_amount ?? voucher.amount });
-  }
-
-  const rows = merged.map((row) => [
-    row.label,
-    typeof row.amount === 'string' && row.amount.includes('%') ? row.amount : formatAmount(row.amount)
-  ]);
-
-  return rows.length ? rows : [['No fee lines', '-']];
+const formatFeeType = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'Fee';
+  if (normalized === 'fee_template') return 'Fee Template';
+  return normalized
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-export const generateFeeVoucherPdfBlob = ({ voucher = {}, student = {}, instituteName = 'ABC School' }) => {
-  const doc = new jsPDF('p', 'pt', 'a4');
-
+const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC School', pageIndex = 0) => {
   const sectionX = 28;
   const sectionWidth = 540;
   const sectionHeight = 247;
   const sectionGap = 16;
   const tableStartX = sectionX + 8;
+  const copyLabels = ['BANK COPY', 'SCHOOL COPY', 'PARENT COPY'];
 
   const generatedOn = formatDate(new Date());
-  const studentName = student?.name || voucher?.student?.name || voucher?.student_name || '-';
-  const registrationNo = student?.registration_no || voucher?.student?.registration_no || voucher?.registration_no || '-';
-  const gender = student?.gender || voucher?.student?.gender || '-';
-  const dueDate = formatDate(voucher?.due_date);
+  const studentName =
+    student?.name ||
+    voucher?.studentName ||
+    voucher?.student?.name ||
+    voucher?.student_name ||
+    '-';
+  const registrationNo =
+    student?.registration_no ||
+    student?.registrationNo ||
+    voucher?.registrationNo ||
+    voucher?.student?.registration_no ||
+    voucher?.registration_no ||
+    '-';
+  const dueDate = formatDate(voucher?.due_date || voucher?.dueDate);
   const monthName = formatMonth(voucher);
   const yearValue = voucher?.year || (voucher?.due_date ? new Date(voucher.due_date).getFullYear() : '-');
+  const className =
+    student?.class ||
+    student?.className ||
+    voucher?.className ||
+    voucher?.class_name ||
+    voucher?.student?.class_name ||
+    '-';
+  const sectionName =
+    student?.section ||
+    student?.sectionName ||
+    voucher?.sectionName ||
+    voucher?.section_name ||
+    voucher?.student?.section_name ||
+    '-';
+  const feeRows = buildFeeRows(voucher);
 
-  COPIES.forEach((copyName, index) => {
+  copyLabels.forEach((copyLabel, index) => {
     const sectionY = 24 + index * (sectionHeight + sectionGap);
 
-    if (index > 0) {
+    if (index > 0 || pageIndex > 0) {
       doc.setDrawColor(90, 90, 90);
       doc.setLineDashPattern([4, 3], 0);
       doc.line(sectionX, sectionY - 8, sectionX + sectionWidth, sectionY - 8);
@@ -124,7 +114,7 @@ export const generateFeeVoucherPdfBlob = ({ voucher = {}, student = {}, institut
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.text(copyName, sectionX + 10, sectionY + 14);
+    doc.text(copyLabel, sectionX + 10, sectionY + 14);
 
     doc.setFontSize(11);
     doc.text(instituteName, sectionX + sectionWidth / 2, sectionY + 14, { align: 'center' });
@@ -140,9 +130,16 @@ export const generateFeeVoucherPdfBlob = ({ voucher = {}, student = {}, institut
     autoTable(doc, {
       startY: sectionY + 34,
       margin: { left: tableStartX, right: 28 },
+      theme: 'grid',
+      body: [
+        ['Voucher #', voucher?.voucher_number || voucher?.voucherNumber || '-', 'Due Date', dueDate],
+        ['Student Name', studentName, 'Reg #', registrationNo],
+        ['Class / Section', `${className} / ${sectionName}`, 'Issue Date', generatedOn],
+        ['Month', monthName, 'Year', String(yearValue)]
+      ],
       styles: {
         fontSize: 8,
-        cellPadding: 3,
+        cellPadding: 2.2,
         textColor: [20, 20, 20],
         lineColor: [190, 190, 190],
         lineWidth: 0.5
@@ -152,23 +149,15 @@ export const generateFeeVoucherPdfBlob = ({ voucher = {}, student = {}, institut
         1: { cellWidth: 192 },
         2: { cellWidth: 60, fontStyle: 'bold' },
         3: { cellWidth: 180 }
-      },
-      body: [
-        ['Voucher #', voucher?.voucher_number || voucher?.voucherNumber || '-', 'Reg #', registrationNo],
-        ['Student', studentName, 'Due Date', dueDate],
-        ['Gender', gender, 'Status', (voucher?.status || '-').toString().toUpperCase()],
-        ['Month', monthName, 'Year', String(yearValue)]
-      ]
+      }
     });
-
-    const feeRows = buildFeeRows(voucher);
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 4,
       margin: { left: tableStartX, right: 28 },
       styles: {
         fontSize: 8,
-        cellPadding: 3,
+        cellPadding: 2.2,
         textColor: [20, 20, 20],
         lineColor: [190, 190, 190],
         lineWidth: 0.5
@@ -189,12 +178,75 @@ export const generateFeeVoucherPdfBlob = ({ voucher = {}, student = {}, institut
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
     doc.text('Late fee policy applies after due date.', tableStartX, sectionY + sectionHeight - 8);
+    doc.text('Authorized Signature: ____________________', sectionX + sectionWidth - 10, sectionY + sectionHeight - 8, { align: 'right' });
+  });
+};
 
-    doc.text(
-      'Authorized Signature: ____________________',
-      sectionX + sectionWidth - 10,
-      sectionY + sectionHeight - 8,
-      { align: 'right' }
+const buildFeeRows = (voucher = {}) => {
+  const breakdownSource = voucher?.fee_breakdown ?? voucher?.feeBreakdown;
+
+  const objectBreakdown = breakdownSource && !Array.isArray(breakdownSource)
+    ? Object.entries(breakdownSource).map(([label, amount]) => ({
+      label: String(label)
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase()),
+      amount
+    }))
+    : [];
+
+  const arrayBreakdown = Array.isArray(breakdownSource)
+    ? breakdownSource.map((item) => ({
+      label: item?.feeType || item?.label || item?.title || item?.type || 'Fee Item',
+      amount: item?.amount ?? item?.value ?? 0
+    }))
+    : [];
+
+  const primaryFeeLabel = formatFeeType(voucher?.fee_type || voucher?.feeType);
+
+  const knownRows = [
+    { label: primaryFeeLabel, amount: voucher.net_amount ?? voucher.netAmount ?? voucher.amount },
+    { label: 'Concession Percentage', amount: voucher.concession_percentage ? `${voucher.concession_percentage}%` : null },
+    { label: 'Discount', amount: voucher.discount },
+    { label: 'Total Amount', amount: voucher.amount ?? voucher.total_amount },
+    { label: 'Remaining Amount', amount: voucher.remaining_amount ?? voucher.balance_due ?? voucher.net_amount }
+  ].filter((row) => hasNonZeroAmount(row.amount));
+
+  const merged = [...arrayBreakdown, ...objectBreakdown, ...knownRows].filter((row) => hasNonZeroAmount(row.amount));
+
+  if (!merged.length && hasNonZeroAmount(voucher.net_amount ?? voucher.netAmount ?? voucher.amount)) {
+    merged.push({ label: primaryFeeLabel, amount: voucher.net_amount ?? voucher.netAmount ?? voucher.amount });
+  }
+
+  const rows = merged.map((row) => [
+    row.label,
+    typeof row.amount === 'string' && row.amount.includes('%') ? row.amount : formatAmount(row.amount)
+  ]);
+
+  return rows.length ? rows : [['No fee lines', '-']];
+};
+
+export const generateFeeVoucherPdfBlob = ({ voucher = {}, student = {}, instituteName = 'ABC School' }) => {
+  const doc = new jsPDF('p', 'pt', 'a4');
+
+  renderVoucherPage(doc, voucher, student, instituteName, 0);
+
+  return doc.output('blob');
+};
+
+export const generateBulkFeeVouchersPdfBlob = ({ vouchers = [], studentsByVoucherId = {}, instituteName = 'ABC School' }) => {
+  const doc = new jsPDF('p', 'pt', 'a4');
+
+  vouchers.forEach((voucher, index) => {
+    if (index > 0) {
+      doc.addPage();
+    }
+
+    renderVoucherPage(
+      doc,
+      voucher,
+      studentsByVoucherId[voucher?.id] || studentsByVoucherId[voucher?.voucherNumber] || studentsByVoucherId[voucher?.voucher_number] || {},
+      instituteName,
+      index
     );
   });
 

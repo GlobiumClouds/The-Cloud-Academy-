@@ -21,7 +21,9 @@ import SelectField from '@/components/common/SelectField';
 import DatePickerField from '@/components/common/DatePickerField';
 import StatsCard from '@/components/common/StatsCard';
 import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
-import { feeVoucherService, academicYearService } from '@/services';
+import { feeVoucherService, academicYearService, classService, feeTemplateService } from '@/services';
+import { downloadBlob } from '@/lib/download';
+import { generateBulkFeeVouchersPdfBlob } from '@/lib/pdf/feeVoucherPdf';
 
 // const STATUS_OPTS = [
 //   { value: 'paid', label: 'Paid' },
@@ -41,6 +43,15 @@ const MONTH_OPTS = Array.from({ length: 12 }, (_, i) => ({
   label: new Date(2026, i).toLocaleString('default', { month: 'long' }),
 }));
 
+const FEE_TYPE_OPTS = [
+  { value: '', label: 'All Fee Types' },
+  { value: 'monthly', label: 'Monthly Fee' },
+  { value: 'annual', label: 'Annual Fee' },
+  { value: 'lab', label: 'Lab Charges' },
+  { value: 'admission', label: 'Admission Fee' },
+  { value: 'fee_template', label: 'Fee Template' },
+];
+
 export default function FeesPage() {
   const qc = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
@@ -54,12 +65,23 @@ export default function FeesPage() {
   const [voucherPageSize, setVoucherPageSize] = useState(20);
   const [isGeneratingVouchers, setIsGeneratingVouchers] = useState(false);
   const [downloadingVoucherId, setDownloadingVoucherId] = useState(null);
+  const [bulkDownloadOpen, setBulkDownloadOpen] = useState(false);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
 
   // Filters
   const currentMonth = String(new Date().getMonth() + 1);
   const [voucherMonth, setVoucherMonth] = useState(currentMonth);
   const [voucherAcademicYearId, setVoucherAcademicYearId] = useState('');
   const [viewingVoucher, setViewingVoucher] = useState(null);
+  const [bulkFilters, setBulkFilters] = useState({
+    academicYearId: '',
+    classId: '',
+    sectionId: '',
+    feeTemplateId: '',
+    feeType: '',
+    month: currentMonth,
+    dueDate: '',
+  });
 
   // Academic years
   const { data: academicYearsData = [] } = useQuery({
@@ -84,6 +106,79 @@ export default function FeesPage() {
       if (current) setVoucherAcademicYearId(current.id);
     }
   }, [academicYearsData, voucherAcademicYearId]);
+
+  useEffect(() => {
+    if (!bulkFilters.academicYearId && academicYearsData.length > 0) {
+      const current = academicYearsData.find((ay) => ay.is_current) || academicYearsData[0];
+      if (current) {
+        setBulkFilters((prev) => ({ ...prev, academicYearId: current.id }));
+      }
+    }
+  }, [academicYearsData, bulkFilters.academicYearId]);
+
+  const { data: bulkClasses = [] } = useQuery({
+    queryKey: ['fees-bulk-classes', currentInstitute?.id, bulkFilters.academicYearId],
+    queryFn: async () => {
+      if (!currentInstitute?.id || !bulkFilters.academicYearId) return [];
+      try {
+        const response = await classService.getAll({
+          institute_id: currentInstitute?.id,
+          academic_year_id: bulkFilters.academicYearId,
+          include_sections: true,
+          limit: 1000,
+        });
+        const data = response?.data || response || [];
+        return Array.isArray(data.rows) ? data.rows : (Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Failed to load bulk download classes:', error);
+        return [];
+      }
+    },
+    enabled: !!currentInstitute?.id && !!bulkFilters.academicYearId,
+  });
+
+  const { data: bulkFeeTemplates = [] } = useQuery({
+    queryKey: ['fees-bulk-templates', currentInstitute?.id],
+    queryFn: async () => {
+      try {
+        const response = await feeTemplateService.getOptions({
+          institute_id: currentInstitute?.id,
+          is_active: true,
+        });
+        return response?.data || [];
+      } catch (error) {
+        console.error('Failed to load bulk download fee templates:', error);
+        return [];
+      }
+    },
+    enabled: !!currentInstitute?.id,
+  });
+
+  const selectedBulkClass = useMemo(
+    () => bulkClasses.find((item) => String(item.id) === String(bulkFilters.classId)) || null,
+    [bulkClasses, bulkFilters.classId]
+  );
+
+  const bulkSectionOptions = useMemo(() => {
+    const sections = Array.isArray(selectedBulkClass?.sections) ? selectedBulkClass.sections : [];
+    return [
+      { value: '', label: 'All Sections' },
+      ...sections
+        .map((section) => ({
+          value: section?.id || section?.section_id,
+          label: section?.name || section?.section_name || 'Section',
+        }))
+        .filter((section) => section.value),
+    ];
+  }, [selectedBulkClass]);
+
+  useEffect(() => {
+    setBulkFilters((prev) => ({ ...prev, classId: '', sectionId: '' }));
+  }, [bulkFilters.academicYearId]);
+
+  useEffect(() => {
+    setBulkFilters((prev) => ({ ...prev, sectionId: '' }));
+  }, [bulkFilters.classId]);
 
   // Fetch vouchers with pagination
   const {
@@ -323,6 +418,140 @@ export default function FeesPage() {
     }
   };
 
+  const handleBulkDownload = async () => {
+    if (!currentInstitute?.id) {
+      toast.error('Institute is missing');
+      return;
+    }
+
+    if (!bulkFilters.academicYearId || !bulkFilters.classId) {
+      toast.error('Please select academic year and class');
+      return;
+    }
+
+    setBulkDownloading(true);
+    try {
+      const BULK_PAGE_SIZE = 50;
+      const BULK_REQUEST_TIMEOUT_MS = 45000;
+      const MAX_TIMEOUT_RETRIES = 3;
+
+      const filters = {
+        academic_year_id: bulkFilters.academicYearId,
+        class_id: bulkFilters.classId,
+        section_id: bulkFilters.sectionId || undefined,
+        fee_template_id: bulkFilters.feeTemplateId || undefined,
+        fee_type: bulkFilters.feeType || undefined,
+        month: bulkFilters.month ? parseInt(bulkFilters.month, 10) : undefined,
+      };
+
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const fetchPageWithRetry = async (page) => {
+        for (let attempt = 1; attempt <= MAX_TIMEOUT_RETRIES; attempt += 1) {
+          try {
+            return await feeVoucherService.getAll(
+              filters,
+              { page, limit: BULK_PAGE_SIZE },
+              { timeout: BULK_REQUEST_TIMEOUT_MS }
+            );
+          } catch (error) {
+            const isTimeout =
+              error?.error?.code === 'ECONNABORTED' ||
+              String(error?.message || '').toLowerCase().includes('timeout');
+
+            if (!isTimeout || attempt === MAX_TIMEOUT_RETRIES) {
+              throw error;
+            }
+
+            await wait(600 * attempt);
+          }
+        }
+
+        return { vouchers: [], pagination: { totalPages: 1 } };
+      };
+
+      const firstPage = await fetchPageWithRetry(1);
+      const totalPages = firstPage?.pagination?.totalPages || 1;
+      const vouchersList = [...(firstPage?.vouchers || [])];
+
+      for (let page = 2; page <= totalPages; page += 1) {
+        const response = await fetchPageWithRetry(page);
+        vouchersList.push(...(response?.vouchers || []));
+      }
+
+      if (!vouchersList.length) {
+        toast.error('No vouchers found for selected filters');
+        return;
+      }
+
+      const selectedClassName =
+        bulkClasses.find((item) => String(item.id) === String(bulkFilters.classId))?.name || '';
+      const selectedSectionLabel =
+        bulkSectionOptions.find((item) => String(item.value) === String(bulkFilters.sectionId))?.label || '';
+      const sectionNameById = new Map(
+        (selectedBulkClass?.sections || [])
+          .map((section) => [
+            String(section?.id || section?.section_id || ''),
+            section?.name || section?.section_name || '',
+          ])
+          .filter(([id, name]) => id && name)
+      );
+
+      const vouchersForPdf = vouchersList.map((voucher) => {
+        const sectionFromApi =
+          sectionNameById.get(String(voucher?.sectionId || voucher?.section_id || '')) || '';
+        const resolvedClassName =
+          selectedClassName ||
+          voucher?.className ||
+          voucher?.class_name ||
+          'N/A';
+        const resolvedSectionName =
+          (bulkFilters.sectionId ? selectedSectionLabel : '') ||
+          voucher?.sectionName ||
+          voucher?.section_name ||
+          sectionFromApi ||
+          'All Sections';
+
+        return {
+          ...voucher,
+          ...(bulkFilters.feeType
+            ? {
+              feeType: bulkFilters.feeType,
+              fee_type: bulkFilters.feeType,
+            }
+            : {}),
+          className: resolvedClassName,
+          class_name: resolvedClassName,
+          sectionName: resolvedSectionName,
+          section_name: resolvedSectionName,
+          ...(bulkFilters.dueDate
+            ? {
+              dueDate: bulkFilters.dueDate,
+              due_date: bulkFilters.dueDate,
+            }
+            : {}),
+        };
+      });
+
+      const blob = generateBulkFeeVouchersPdfBlob({
+        vouchers: vouchersForPdf,
+        instituteName: currentInstitute?.name || 'School Management System',
+      });
+
+      const className = selectedClassName || 'class';
+      const sectionName = selectedSectionLabel || 'all-sections';
+      const safeName = `bulk-fee-vouchers-${className}-${sectionName}-${bulkFilters.month}`.replace(/[^a-zA-Z0-9_-]+/g, '-');
+
+      downloadBlob(blob, `${safeName}.pdf`);
+      toast.success(`Downloaded ${vouchersList.length} vouchers in one PDF`);
+      setBulkDownloadOpen(false);
+    } catch (error) {
+      console.error('Bulk voucher download failed:', error);
+      toast.error(error?.message || 'Failed to download bulk vouchers');
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
   const voucherColumns = useMemo(
     () => [
       {
@@ -331,14 +560,19 @@ export default function FeesPage() {
         cell: ({ row: { original: r } }) => <span className="font-mono font-semibold">{r.voucherNumber || 'N/A'}</span>
       },
       {
-        accessorKey: 'student_id',
-        header: `${terms.student}`,
-        cell: ({ row: { original: r } }) => (
-          <div>
-            <p className="font-medium">{r.studentName || 'N/A'}</p>
-            <p className="text-xs text-muted-foreground">Reg: {r.registrationNo || 'N/A'}</p>
-          </div>
-        ),
+        accessorKey: 'studentName',
+        header: 'Student Name',
+        cell: ({ getValue }) => <span className="font-medium">{getValue() || 'N/A'}</span>,
+      },
+      {
+        accessorKey: 'registrationNo',
+        header: 'Reg #',
+        cell: ({ getValue }) => <span className="font-mono text-xs font-semibold">{getValue() || 'N/A'}</span>,
+      },
+      {
+        accessorKey: 'dueDate',
+        header: 'Due Date',
+        cell: ({ getValue }) => getValue() ? new Date(getValue()).toLocaleDateString('en-PK') : '—',
       },
       { accessorKey: 'month', header: 'Month', cell: ({ getValue }) => MONTH_OPTS.find(m => m.value === String(getValue()))?.label || getValue() },
       {
@@ -389,7 +623,7 @@ export default function FeesPage() {
         ),
       },
     ],
-    [terms.student, canDo, setViewingVoucher, setDeletingVoucher, downloadingVoucherId]
+    [canDo, setViewingVoucher, setDeletingVoucher, downloadingVoucherId]
   );
 
   return (
@@ -437,6 +671,13 @@ export default function FeesPage() {
         }}
         action={
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBulkDownloadOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <Download size={14} />
+              Bulk Download PDF
+            </button>
             {canDo('fees.create') && (
               <button
                 onClick={() => {
@@ -472,6 +713,72 @@ export default function FeesPage() {
             toast.success('Bulk vouchers generated!');
           }}
         />
+      </AppModal>
+
+      <AppModal open={bulkDownloadOpen} onClose={() => setBulkDownloadOpen(false)} title="Bulk Voucher Download" size="xl">
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <SelectField
+              label="Academic Year"
+              options={academicYearsData.map((ay) => ({ value: ay.id, label: ay.name }))}
+              value={bulkFilters.academicYearId}
+              onChange={(val) => setBulkFilters((prev) => ({ ...prev, academicYearId: val }))}
+            />
+            <SelectField
+              label="Class"
+              options={bulkClasses.map((item) => ({ value: item.id, label: item.name }))}
+              value={bulkFilters.classId}
+              onChange={(val) => setBulkFilters((prev) => ({ ...prev, classId: val }))}
+            />
+            <SelectField
+              label="Section"
+              options={bulkSectionOptions}
+              value={bulkFilters.sectionId}
+              onChange={(val) => setBulkFilters((prev) => ({ ...prev, sectionId: val }))}
+            />
+            <SelectField
+              label="Fee Template"
+              options={[{ value: '', label: 'All Templates' }, ...bulkFeeTemplates]}
+              value={bulkFilters.feeTemplateId}
+              onChange={(val) => setBulkFilters((prev) => ({ ...prev, feeTemplateId: val }))}
+            />
+            <SelectField
+              label="Fee Type"
+              options={FEE_TYPE_OPTS}
+              value={bulkFilters.feeType}
+              onChange={(val) => setBulkFilters((prev) => ({ ...prev, feeType: val }))}
+            />
+            <SelectField
+              label="Month"
+              options={MONTH_OPTS}
+              value={bulkFilters.month}
+              onChange={(val) => setBulkFilters((prev) => ({ ...prev, month: val }))}
+            />
+            <DatePickerField
+              label="Due Date"
+              value={bulkFilters.dueDate}
+              onChange={(val) => setBulkFilters((prev) => ({ ...prev, dueDate: val || '' }))}
+              placeholder="Select due date for downloaded PDF"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setBulkDownloadOpen(false)}
+              className="rounded-md border px-4 py-2 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDownload}
+              disabled={bulkDownloading}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {bulkDownloading ? 'Downloading...' : 'Download PDF'}
+            </button>
+          </div>
+        </div>
       </AppModal>
 
       {/* Delete Confirmation Dialog */}

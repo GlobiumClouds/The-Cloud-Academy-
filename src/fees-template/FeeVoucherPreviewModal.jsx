@@ -10,6 +10,19 @@ import FeeVoucher from '@/fees-template/FeeVoucher';
 import { getFeeTheme } from '@/fees-template/styles/feeTheme';
 import { downloadVoucherFromNode } from '@/fees-template/utils/voucherPdfExport';
 
+const toNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatBreakdownAmount = (feeType, amount) => {
+  const normalizedType = String(feeType || '').toLowerCase();
+  if (normalizedType.includes('percent') || normalizedType.includes('percentage')) {
+    return `${toNumber(amount).toLocaleString()}%`;
+  }
+  return `PKR ${toNumber(amount).toLocaleString()}`;
+};
+
 export default function FeeVoucherPreviewModal({
   open,
   onClose,
@@ -26,6 +39,14 @@ export default function FeeVoucherPreviewModal({
   const [isDownloading, setIsDownloading] = useState(false);
   const voucherRef = useRef(null);
   const theme = useMemo(() => getFeeTheme(resolvedTheme), [resolvedTheme]);
+  const breakdownRows = useMemo(
+    () =>
+      (feeStructure || []).map((row) => ({
+        feeType: row?.feeType || row?.label || 'Fee Item',
+        amount: row?.amount,
+      })),
+    [feeStructure]
+  );
 
   useEffect(() => {
     setCopyMode(initialCopyMode);
@@ -84,6 +105,24 @@ export default function FeeVoucherPreviewModal({
         </DialogHeader>
 
         <div className="max-h-[80vh] overflow-auto bg-slate-100 p-4">
+          <div className="mx-auto mb-4 w-full max-w-[210mm] rounded-lg border bg-white p-0 shadow-sm">
+            <div className="border-b bg-emerald-700 px-4 py-2 text-sm font-semibold text-white">
+              Fee Breakdown
+            </div>
+            {breakdownRows.length ? (
+              <div className="divide-y">
+                {breakdownRows.map((row, index) => (
+                  <div key={`${row.feeType}-${index}`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2 text-xs">
+                    <span className="font-medium text-slate-700">{row.feeType}</span>
+                    <span className="font-semibold text-slate-900">{formatBreakdownAmount(row.feeType, row.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">No fee breakdown available for this voucher.</p>
+            )}
+          </div>
+
           <div className="mx-auto w-fit">
             <div ref={voucherRef} className="fee-voucher-print-target">
               <FeeVoucher

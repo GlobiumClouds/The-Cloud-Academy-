@@ -84,6 +84,15 @@ const buildVoucherFilters = (filters = {}) => {
   if (filters.class_id) {
     base.class_id = filters.class_id;
   }
+  if (filters.section_id) {
+    base.section_id = filters.section_id;
+  }
+  if (filters.fee_type) {
+    base.fee_type = filters.fee_type;
+  }
+  if (filters.fee_template_id) {
+    base.fee_template_id = filters.fee_template_id;
+  }
   if (filters.academic_year_id) {
     base.academic_year_id = filters.academic_year_id;
   }
@@ -105,6 +114,21 @@ const transformVoucherResponse = (data) => {
       ? `${data.Student.first_name} ${data.Student.last_name}`
       : data.student_name || 'N/A',
     registrationNo: data.Student?.registration_no || data.registration_no,
+    classId: data.class_id || data.Student?.class_id,
+    className:
+      data.class_name ||
+      data.Class?.name ||
+      data.class?.name ||
+      data.Student?.class_name ||
+      data.Student?.Class?.name ||
+      'N/A',
+    sectionName:
+      data.section_name ||
+      data.Section?.name ||
+      data.section?.name ||
+      data.Student?.section_name ||
+      data.Student?.Section?.name ||
+      'N/A',
     month: data.month,
     year: data.year,
     amount: parseFloat(data.amount),
@@ -112,6 +136,9 @@ const transformVoucherResponse = (data) => {
     netAmount: parseFloat(data.net_amount),
     currency: data.currency || 'PKR',
     status: data.status,
+    feeType: data.fee_type,
+    feeTemplateId: data.fee_template_id,
+    sectionId: data.section_id || data.Student?.section_id,
     notes: data.notes,
     feeBreakdown: data.fee_breakdown || {},
     issuedDate: data.issued_date,
@@ -268,10 +295,11 @@ export const feeVoucherService = {
    * @param {object} pagination - {page, limit}
    * @returns {Promise<object>} Vouchers list with pagination
    */
-  getAll: async (filters = {}, pagination = {}) => {
+  getAll: async (filters = {}, pagination = {}, requestOptions = {}) => {
     try {
       const { page, limit } = normalizePagination(pagination.page, pagination.limit);
       const voucherFilters = buildVoucherFilters(filters);
+      const timeout = Number.isFinite(requestOptions?.timeout) ? requestOptions.timeout : 10000;
       
       const queryParams = {
         ...voucherFilters,
@@ -281,7 +309,7 @@ export const feeVoucherService = {
 
       const queryString = buildQuery(queryParams);
       const response = await api.get(`/fee-vouchers${queryString}`, {
-        timeout: 10000
+        timeout
       });
 
       return transformVouchersList(response.data);
