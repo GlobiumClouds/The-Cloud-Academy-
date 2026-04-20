@@ -348,6 +348,15 @@ export const feeVoucherService = {
   },
 
   /**
+   * Backward-compatible alias used by FeesPage
+   * @param {string} voucherId - Voucher UUID
+   * @returns {Promise<object>} Voucher details
+   */
+  getVoucherById: async (voucherId) => {
+    return feeVoucherService.getById(voucherId);
+  },
+
+  /**
    * Archive/Delete voucher
    * @param {string} voucherId - Voucher UUID
    * @returns {Promise<object>} Archived voucher
@@ -602,6 +611,64 @@ export const feeVoucherService = {
         status: error.response?.status,
         details: error.response?.data?.details,
         error
+      };
+    }
+  },
+
+  /**
+   * Backward-compatible collect API used by FeeCollectForm flows
+   * Supports both legacy collect endpoint and new payment endpoint.
+   * @param {string} voucherId - Voucher UUID
+   * @param {object} body - {amount_paid, payment_method, transaction_id, notes, paid_date}
+   * @returns {Promise<object>} Payment/collection response
+   */
+  collect: async (voucherId, body = {}) => {
+    try {
+      if (!voucherId) throw new Error('Voucher ID is required');
+
+      const normalizedAmount = Number(body.amount_paid ?? body.amount);
+      const normalizedMethod = body.payment_method || body.paymentMethod;
+
+      if (!normalizedAmount || normalizedAmount <= 0) {
+        throw new Error('Valid payment amount is required');
+      }
+      if (!normalizedMethod) {
+        throw new Error('Payment method is required');
+      }
+
+      const legacyPayload = {
+        amount_paid: normalizedAmount,
+        payment_method: normalizedMethod,
+        transaction_id: body.transaction_id || body.referenceNo || null,
+        notes: body.notes || body.remarks || null,
+        paid_date: body.paid_date || body.paidDate || undefined,
+      };
+
+      try {
+        const response = await api.patch(`/fee-vouchers/${voucherId}/collect`, legacyPayload, {
+          timeout: 10000,
+        });
+        return response.data?.data || response.data;
+      } catch (legacyError) {
+        if (legacyError?.response?.status && legacyError.response.status !== 404) {
+          throw legacyError;
+        }
+
+        return await feeVoucherService.recordPayment(voucherId, {
+          amount: normalizedAmount,
+          paymentMethod: normalizedMethod,
+          referenceNo: legacyPayload.transaction_id,
+          remarks: legacyPayload.notes,
+          paidDate: legacyPayload.paid_date,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Failed to collect payment:', error);
+      throw {
+        message: error.response?.data?.message || error.message || 'Failed to collect payment',
+        status: error.response?.status,
+        details: error.response?.data?.details,
+        error,
       };
     }
   },
