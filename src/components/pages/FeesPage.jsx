@@ -9,7 +9,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2, Loader2, Eye } from 'lucide-react';
+import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2, Loader2, Eye, Coins } from 'lucide-react';
 import useInstituteConfig from '@/hooks/useInstituteConfig';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
@@ -24,6 +24,7 @@ import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
 import { feeVoucherService, academicYearService, classService, feeTemplateService } from '@/services';
 import { downloadBlob } from '@/lib/download';
 import { generateBulkFeeVouchersPdfBlob } from '@/lib/pdf/feeVoucherPdf';
+import FeeCollectForm from '@/components/forms/FeeCollectForm';
 
 // const STATUS_OPTS = [
 //   { value: 'paid', label: 'Paid' },
@@ -57,6 +58,9 @@ export default function FeesPage() {
   const canDo = useAuthStore((s) => s.canDo);
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
   const { terms } = useInstituteConfig();
+  const [isMounted, setIsMounted] = useState(false);
+  const [collectTarget, setCollectTarget] = useState(null);
+
 
   const [voucherGeneratorModal, setVoucherGeneratorModal] = useState(false);
   const [singleVoucherModal, setSingleVoucherModal] = useState(false);
@@ -82,6 +86,35 @@ export default function FeesPage() {
     month: currentMonth,
     dueDate: '',
   });
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+
+  const { data: collectedVoucher, isLoading: isLoadingCollectVoucher } = useQuery({
+    queryKey: ['fee-voucher-collect', collectTarget],
+    queryFn: async () => {
+      if (!collectTarget) return null;
+      const response = await feeVoucherService.getVoucherById(collectTarget);
+      return response?.data ?? response ?? null;
+    },
+    enabled: !!collectTarget,
+  });
+
+  const collectMutation = useMutation({
+    mutationFn: ({ id, body }) => feeVoucherService.collect(id, body),
+    onSuccess: () => {
+      toast.success('Payment recorded');
+      setCollectTarget(null);
+      refetchVouchers();
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+    },
+    onError: (err) => {
+      toast.error(err?.message || 'Failed to record payment');
+    },
+  });
+
 
   // Academic years
   const { data: academicYearsData = [] } = useQuery({
@@ -511,14 +544,11 @@ export default function FeesPage() {
           sectionFromApi ||
           'All Sections';
 
+        const feeTypeLabel = bulkFilters.feeType ? FEE_TYPE_OPTS.find(opt => opt.value === bulkFilters.feeType)?.label || bulkFilters.feeType : voucher.feeType || voucher.fee_type || 'Monthly Fee';
         return {
           ...voucher,
-          ...(bulkFilters.feeType
-            ? {
-              feeType: bulkFilters.feeType,
-              fee_type: bulkFilters.feeType,
-            }
-            : {}),
+          feeType: feeTypeLabel,
+          fee_type: feeTypeLabel,
           className: resolvedClassName,
           class_name: resolvedClassName,
           sectionName: resolvedSectionName,
@@ -531,6 +561,7 @@ export default function FeesPage() {
             : {}),
         };
       });
+
 
       const blob = generateBulkFeeVouchersPdfBlob({
         vouchers: vouchersForPdf,
@@ -607,6 +638,13 @@ export default function FeesPage() {
               <Eye size={14} />
             </button>
             <button
+              onClick={() => setCollectTarget(row.original.id)}
+              className="rounded p-1 text-sky-700 hover:bg-sky-100 hover:text-sky-800"
+              title="Record Payment"
+            >
+              <Coins size={14} />
+            </button>
+            <button
               onClick={() => handleDownloadVoucher(row.original)}
               disabled={downloadingVoucherId === (row.original?.id || row.original?.voucherNumber || row.original?.voucher_number)}
               className="rounded p-1 hover:bg-accent disabled:opacity-50"
@@ -625,6 +663,11 @@ export default function FeesPage() {
     ],
     [canDo, setViewingVoucher, setDeletingVoucher, downloadingVoucherId]
   );
+
+  const selectedVoucher = collectedVoucher ?? vouchers.find((item) => String(item.id) === String(collectTarget)) ?? null;
+  const collectOutstanding = selectedVoucher
+    ? Math.max((Number(selectedVoucher.amount) || 0) - (Number(selectedVoucher.discount) || 0), 0)
+    : null;
 
   return (
     <div className="space-y-5">
@@ -678,7 +721,7 @@ export default function FeesPage() {
               <Download size={14} />
               Bulk Download PDF
             </button>
-            {canDo('fees.create') && (
+            {isMounted && canDo('fees.create') && (
               <button
                 onClick={() => {
                   setVoucherGeneratorModal(true);
@@ -779,6 +822,27 @@ export default function FeesPage() {
             </button>
           </div>
         </div>
+      </AppModal>
+
+      <AppModal open={!!collectTarget} onClose={() => setCollectTarget(null)} title="Record Payment" size="md">
+        {isLoadingCollectVoucher ? (
+          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading payment details...
+          </div>
+        ) : (
+          <FeeCollectForm
+            defaultValues={{
+              amount_paid: collectOutstanding ?? '',
+              payment_method: 'cash',
+              transaction_id: '',
+              notes: '',
+            }}
+            maxAmount={collectOutstanding}
+            onSubmit={(body) => collectMutation.mutate({ id: collectTarget, body })}
+            onCancel={() => setCollectTarget(null)}
+            loading={collectMutation.isPending}
+          />
+        )}
       </AppModal>
 
       {/* Delete Confirmation Dialog */}
