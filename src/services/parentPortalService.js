@@ -41,12 +41,6 @@ export const parentPortalService = {
   // ─────────────────────────────────────────────────────────────────────────
   // CHILD ATTENDANCE
   // ─────────────────────────────────────────────────────────────────────────
-  // getChildAttendance: (childId) =>
-  //   api.get(`/portal/parent/children/${childId}/attendance`).then(r => r.data),
-
-  // frontend/src/services/parentPortal.service.js
-  // Update the getChildAttendance function:
-
   getChildAttendance: (childId, filters = {}) =>
     api.get(`/portal/parent/children/${childId}/attendance`, {
       params: filters
@@ -58,12 +52,6 @@ export const parentPortalService = {
   // ─────────────────────────────────────────────────────────────────────────
   // CHILD RESULTS
   // ─────────────────────────────────────────────────────────────────────────
-  // getChildResults: (childId) =>
-  //   api.get(`/portal/parent/children/${childId}/results`).then(r => r.data),
-
-  // frontend/src/services/parentPortal.service.js
-  // Add these functions:
-
   getChildResults: (childId, filters = {}) =>
     api.get(`/portal/parent/children/${childId}/results`, {
       params: filters
@@ -133,9 +121,15 @@ export const parentPortalService = {
   // ─────────────────────────────────────────────────────────────────────────
   // NOTICES
   // ─────────────────────────────────────────────────────────────────────────
-  getNotices: (limit = 10) =>
-    api.get('/portal/parent/notices', { params: { limit } }).then(r => r.data),
+  // getNotices: (limit = 10) =>
+  //   api.get('/portal/parent/notices', { params: { limit } }).then(r => r.data),
 
+  getNotices: (limit = 10, page = 1) =>
+    api.get('/portal/parent/notices', { params: { limit, page } }).then(r => r.data),
+
+
+getNoticesForChild: (childId, filters = {}) =>
+  api.get(`/portal/parent/children/${childId}/notices`, { params: filters }).then(r => r.data),
   // ─────────────────────────────────────────────────────────────────────────
   // LEAVE REQUESTS
   // ─────────────────────────────────────────────────────────────────────────
