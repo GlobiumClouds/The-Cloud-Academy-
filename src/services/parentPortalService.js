@@ -24,6 +24,11 @@ export const parentPortalService = {
       headers: { 'Content-Type': 'multipart/form-data' }
     }),
 
+  updateChildProfile: (childId, data) =>
+    api.put(`/portal/parent/children/${childId}`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(r => r.data),
+
   // ─────────────────────────────────────────────────────────────────────────
   // CHILDREN
   // ─────────────────────────────────────────────────────────────────────────
@@ -40,15 +45,15 @@ export const parentPortalService = {
   //   api.get(`/portal/parent/children/${childId}/attendance`).then(r => r.data),
 
   // frontend/src/services/parentPortal.service.js
-// Update the getChildAttendance function:
+  // Update the getChildAttendance function:
 
-getChildAttendance: (childId, filters = {}) =>
-  api.get(`/portal/parent/children/${childId}/attendance`, { 
-    params: filters 
-  }).then(r => r.data),
+  getChildAttendance: (childId, filters = {}) =>
+    api.get(`/portal/parent/children/${childId}/attendance`, {
+      params: filters
+    }).then(r => r.data),
 
-getAttendanceMonths: (childId) =>
-  api.get(`/portal/parent/children/${childId}/attendance/months`).then(r => r.data),
+  getAttendanceMonths: (childId) =>
+    api.get(`/portal/parent/children/${childId}/attendance/months`).then(r => r.data),
 
   // ─────────────────────────────────────────────────────────────────────────
   // CHILD RESULTS
@@ -57,28 +62,28 @@ getAttendanceMonths: (childId) =>
   //   api.get(`/portal/parent/children/${childId}/results`).then(r => r.data),
 
   // frontend/src/services/parentPortal.service.js
-// Add these functions:
+  // Add these functions:
 
-getChildResults: (childId, filters = {}) =>
-  api.get(`/portal/parent/children/${childId}/results`, { 
-    params: filters 
-  }).then(r => r.data),
+  getChildResults: (childId, filters = {}) =>
+    api.get(`/portal/parent/children/${childId}/results`, {
+      params: filters
+    }).then(r => r.data),
 
-getResultStatistics: (childId) =>
-  api.get(`/portal/parent/children/${childId}/results/statistics`).then(r => r.data),
+  getResultStatistics: (childId) =>
+    api.get(`/portal/parent/children/${childId}/results/statistics`).then(r => r.data),
 
-getExamResultDetails: (resultId) =>
-  api.get(`/portal/parent/results/${resultId}`).then(r => r.data),
+  getExamResultDetails: (resultId) =>
+    api.get(`/portal/parent/results/${resultId}`).then(r => r.data),
 
   // ─────────────────────────────────────────────────────────────────────────
   // CHILD FEES
   // ─────────────────────────────────────────────────────────────────────────
-   // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   // CHILD FEE MANAGEMENT (Updated)
   // ─────────────────────────────────────────────────────────────────────────
   getChildFees: (childId, filters = {}) =>
-    api.get(`/portal/parent/children/${childId}/fees`, { 
-      params: filters 
+    api.get(`/portal/parent/children/${childId}/fees`, {
+      params: filters
     }).then(r => r.data),
 
   getFeeSummary: () =>
@@ -100,7 +105,7 @@ getExamResultDetails: (resultId) =>
     api.get(`/portal/parent/children/${childId}/fees/statistics`).then(r => r.data),
 
   downloadFeeReceipt: (voucherId, format = 'pdf') =>
-    api.get(`/portal/parent/fees/receipt/${voucherId}`, { 
+    api.get(`/portal/parent/fees/receipt/${voucherId}`, {
       params: { format },
       responseType: 'blob'
     }).then(r => r.data),
@@ -109,8 +114,8 @@ getExamResultDetails: (resultId) =>
   // CHILD ASSIGNMENTS
   // ─────────────────────────────────────────────────────────────────────────
   getChildAssignments: (childId, filters = {}, page = 1, limit = 10) =>
-    api.get(`/portal/parent/children/${childId}/assignments`, { 
-      params: { ...filters, page, limit } 
+    api.get(`/portal/parent/children/${childId}/assignments`, {
+      params: { ...filters, page, limit }
     }).then(r => r.data),
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -135,8 +140,8 @@ getExamResultDetails: (resultId) =>
   // LEAVE REQUESTS
   // ─────────────────────────────────────────────────────────────────────────
   getLeaveRequests: (filters = {}, page = 1, limit = 10) =>
-    api.get('/portal/parent/leave-requests', { 
-      params: { ...filters, page, limit } 
+    api.get('/portal/parent/leave-requests', {
+      params: { ...filters, page, limit }
     }).then(r => r.data),
 
   createLeaveRequest: (data) =>
