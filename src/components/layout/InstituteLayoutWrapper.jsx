@@ -256,9 +256,9 @@ function SidebarContent({
               <p className="truncate text-xs font-semibold text-foreground leading-snug">
                 {user?.first_name} {user?.last_name}
               </p>
-              <p className="truncate text-[10px] text-muted-foreground leading-none mt-0.5">
+              {/* <p className="truncate text-[10px] text-muted-foreground leading-none mt-0.5">
                 {user?.role?.name}
-              </p>
+              </p> */}
             </div>
             <button
               onClick={onLogout}
