@@ -1118,8 +1118,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, DollarSign, AlertCircle, FileText, Filter, Download, Trash2, Loader2, Eye, Coins } from 'lucide-react';
-import useInstituteConfig from '@/hooks/useInstituteConfig';
+import { DollarSign, AlertCircle, FileText, Filter, Download, Trash2, Loader2, Eye, Coins } from 'lucide-react';
 import useAuthStore from '@/store/authStore';
 import useInstituteStore from '@/store/instituteStore';
 import DataTable from '@/components/common/DataTable';
@@ -1134,6 +1133,7 @@ import { feeVoucherService, academicYearService, classService, feeTemplateServic
 import { downloadBlob } from '@/lib/download';
 import { generateBulkFeeVouchersPdfBlob } from '@/lib/pdf/feeVoucherPdf';
 import FeeCollectForm from '@/components/forms/FeeCollectForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // const STATUS_OPTS = [
 //   { value: 'paid', label: 'Paid' },
@@ -1166,19 +1166,20 @@ export default function FeesPage() {
   const qc = useQueryClient();
   const canDo = useAuthStore((s) => s.canDo);
   const currentInstitute = useInstituteStore((s) => s.currentInstitute);
-  const { terms } = useInstituteConfig();
   const [isMounted, setIsMounted] = useState(false);
   const [collectTarget, setCollectTarget] = useState(null);
 
 
   const [voucherGeneratorModal, setVoucherGeneratorModal] = useState(false);
-  const [singleVoucherModal, setSingleVoucherModal] = useState(false);
   const [deletingVoucher, setDeletingVoucher] = useState(null);
+  const [confirmMarkPaid, setConfirmMarkPaid] = useState(null);
+  const [markingPaid, setMarkingPaid] = useState(new Map());
   const [voucherPage, setVoucherPage] = useState(1);
   const [voucherPageSize, setVoucherPageSize] = useState(20);
   const [isGeneratingVouchers, setIsGeneratingVouchers] = useState(false);
   const [downloadingVoucherId, setDownloadingVoucherId] = useState(null);
   const [bulkDownloadOpen, setBulkDownloadOpen] = useState(false);
+  const [bulkDownloadMode, setBulkDownloadMode] = useState('class');
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [recordingPayment, setRecordingPayment] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
@@ -1228,23 +1229,25 @@ export default function FeesPage() {
 
   // Record partial payment
   const recordPaymentMutation = useMutation({
-    mutationFn: (paymentData) => feeVoucherService.recordPayment(paymentData.voucherId, {
-      amount: parseFloat(paymentData.amount),
-      paymentMethod: paymentData.method,
-      referenceNo: paymentData.referenceNo || null,
-      remarks: paymentData.remarks || null
-    }),
-    onSuccess: (result) => {
-      toast.success('Payment recorded successfully');
-      setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
-      setRecordingPayment(null);
-      refetchVouchers();
-      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
-    },
-    onError: (err) => {
-      toast.error(err.message || 'Failed to record payment');
-    },
-  });
+      mutationFn: (paymentData) => feeVoucherService.recordPayment(paymentData.voucherId, {
+        amount: parseFloat(paymentData.amount),
+        paymentMethod: paymentData.method,
+        referenceNo: paymentData.referenceNo || null,
+        remarks: paymentData.remarks || null
+      }),
+      onSuccess: (result) => {
+        toast.success('Payment recorded successfully');
+        setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
+        setRecordingPayment(null);
+        setMarkingPaid(new Map()); // Clear all marking states
+        refetchVouchers();
+        qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+      },
+      onError: (err) => {
+        toast.error(err.message || 'Failed to record payment');
+        setMarkingPaid(new Map()); // Clear loading on error
+      },
+    });
 
   const handleRecordPayment = async (voucherId) => {
     if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
@@ -1351,6 +1354,12 @@ export default function FeesPage() {
   useEffect(() => {
     setBulkFilters((prev) => ({ ...prev, sectionId: '' }));
   }, [bulkFilters.classId]);
+
+  useEffect(() => {
+    if (bulkDownloadMode === 'institute') {
+      setBulkFilters((prev) => ({ ...prev, classId: '', sectionId: '' }));
+    }
+  }, [bulkDownloadMode]);
 
   // Fetch vouchers with pagination
   const {
@@ -1596,8 +1605,13 @@ export default function FeesPage() {
       return;
     }
 
-    if (!bulkFilters.academicYearId || !bulkFilters.classId) {
-      toast.error('Please select academic year and class');
+    if (!bulkFilters.academicYearId) {
+      toast.error('Please select academic year');
+      return;
+    }
+
+    if (bulkDownloadMode === 'class' && !bulkFilters.classId) {
+      toast.error('Please select class');
       return;
     }
 
@@ -1609,8 +1623,8 @@ export default function FeesPage() {
 
       const filters = {
         academic_year_id: bulkFilters.academicYearId,
-        class_id: bulkFilters.classId,
-        section_id: bulkFilters.sectionId || undefined,
+        class_id: bulkDownloadMode === 'class' ? bulkFilters.classId : undefined,
+        section_id: bulkDownloadMode === 'class' ? (bulkFilters.sectionId || undefined) : undefined,
         fee_template_id: bulkFilters.feeTemplateId || undefined,
         fee_type: bulkFilters.feeType || undefined,
         month: bulkFilters.month ? parseInt(bulkFilters.month, 10) : undefined,
@@ -1709,7 +1723,10 @@ export default function FeesPage() {
 
       const className = selectedClassName || 'class';
       const sectionName = selectedSectionLabel || 'all-sections';
-      const safeName = `bulk-fee-vouchers-${className}-${sectionName}-${bulkFilters.month}`.replace(/[^a-zA-Z0-9_-]+/g, '-');
+      const safeName = (bulkDownloadMode === 'institute'
+        ? `bulk-fee-vouchers-institute-${bulkFilters.month}`
+        : `bulk-fee-vouchers-${className}-${sectionName}-${bulkFilters.month}`
+      ).replace(/[^a-zA-Z0-9_-]+/g, '-');
 
       downloadBlob(blob, `${safeName}.pdf`);
       toast.success(`Downloaded ${vouchersList.length} vouchers in one PDF`);
@@ -1776,13 +1793,28 @@ export default function FeesPage() {
             >
               <Eye size={14} />
             </button>
-            <button
-              onClick={() => setCollectTarget(row.original.id)}
-              className="rounded p-1 text-sky-700 hover:bg-sky-100 hover:text-sky-800"
-              title="Record Payment"
-            >
-              <Coins size={14} />
-            </button>
+            {row.original.status !== 'paid' && canDo('fees.update') && (
+              <button
+                onClick={() => {
+                  const fullAmount = parseFloat(row.original.netAmount || row.original.net_amount || row.original.amount || 0);
+                  if (fullAmount <= 0) {
+                    toast.error('Invalid amount for this voucher');
+                    return;
+                  }
+                  setMarkingPaid(new Map(markingPaid.set(row.original.id, true)));
+                  recordPaymentMutation.mutate({
+                    voucherId: row.original.id,
+                    amount: fullAmount,
+                    method: 'cash'
+                  });
+                }}
+                disabled={markingPaid.get(row.original.id)}
+                className="rounded p-1 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Mark Paid (Full Amount)"
+              >
+                {markingPaid.get(row.original.id) ? <Loader2 size={14} className="animate-spin" /> : <Coins size={14} />}
+              </button>
+            )}
             {row.original.status !== 'paid' && canDo('fees.update') && (
               <button
                 onClick={() => { setRecordingPayment(row.original); setPaymentForm({ amount: '', method: 'cash', referenceNo: '', remarks: '' }); }}
@@ -1909,50 +1941,97 @@ export default function FeesPage() {
 
       <AppModal open={bulkDownloadOpen} onClose={() => setBulkDownloadOpen(false)} title="Bulk Voucher Download" size="xl">
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <SelectField
-              label="Academic Year"
-              options={academicYearsData.map((ay) => ({ value: ay.id, label: ay.name }))}
-              value={bulkFilters.academicYearId}
-              onChange={(val) => setBulkFilters((prev) => ({ ...prev, academicYearId: val }))}
-            />
-            <SelectField
-              label="Class"
-              options={bulkClasses.map((item) => ({ value: item.id, label: item.name }))}
-              value={bulkFilters.classId}
-              onChange={(val) => setBulkFilters((prev) => ({ ...prev, classId: val }))}
-            />
-            <SelectField
-              label="Section"
-              options={bulkSectionOptions}
-              value={bulkFilters.sectionId}
-              onChange={(val) => setBulkFilters((prev) => ({ ...prev, sectionId: val }))}
-            />
-            <SelectField
-              label="Fee Template"
-              options={[{ value: '', label: 'All Templates' }, ...bulkFeeTemplates]}
-              value={bulkFilters.feeTemplateId}
-              onChange={(val) => setBulkFilters((prev) => ({ ...prev, feeTemplateId: val }))}
-            />
-            <SelectField
-              label="Fee Type"
-              options={FEE_TYPE_OPTS}
-              value={bulkFilters.feeType}
-              onChange={(val) => setBulkFilters((prev) => ({ ...prev, feeType: val }))}
-            />
-            <SelectField
-              label="Month"
-              options={MONTH_OPTS}
-              value={bulkFilters.month}
-              onChange={(val) => setBulkFilters((prev) => ({ ...prev, month: val }))}
-            />
-            <DatePickerField
-              label="Due Date"
-              value={bulkFilters.dueDate}
-              onChange={(val) => setBulkFilters((prev) => ({ ...prev, dueDate: val || '' }))}
-              placeholder="Select due date for downloaded PDF"
-            />
-          </div>
+          <Tabs value={bulkDownloadMode} onValueChange={setBulkDownloadMode} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="class">By Class</TabsTrigger>
+              <TabsTrigger value="institute">Entire Institute</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="class" className="mt-0">
+              <div className="grid gap-4 md:grid-cols-2">
+                <SelectField
+                  label="Academic Year"
+                  options={academicYearsData.map((ay) => ({ value: ay.id, label: ay.name }))}
+                  value={bulkFilters.academicYearId}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, academicYearId: val }))}
+                />
+                <SelectField
+                  label="Class"
+                  options={bulkClasses.map((item) => ({ value: item.id, label: item.name }))}
+                  value={bulkFilters.classId}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, classId: val }))}
+                />
+                <SelectField
+                  label="Section"
+                  options={bulkSectionOptions}
+                  value={bulkFilters.sectionId}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, sectionId: val }))}
+                />
+                <SelectField
+                  label="Fee Template"
+                  options={[{ value: '', label: 'All Templates' }, ...bulkFeeTemplates]}
+                  value={bulkFilters.feeTemplateId}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, feeTemplateId: val }))}
+                />
+                <SelectField
+                  label="Fee Type"
+                  options={FEE_TYPE_OPTS}
+                  value={bulkFilters.feeType}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, feeType: val }))}
+                />
+                <SelectField
+                  label="Month"
+                  options={MONTH_OPTS}
+                  value={bulkFilters.month}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, month: val }))}
+                />
+                <DatePickerField
+                  label="Due Date"
+                  value={bulkFilters.dueDate}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, dueDate: val || '' }))}
+                  placeholder="Select due date for downloaded PDF"
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="institute" className="mt-0 space-y-3">
+              <div className="grid gap-4 md:grid-cols-2">
+                <SelectField
+                  label="Academic Year"
+                  options={academicYearsData.map((ay) => ({ value: ay.id, label: ay.name }))}
+                  value={bulkFilters.academicYearId}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, academicYearId: val }))}
+                />
+                <SelectField
+                  label="Fee Template"
+                  options={[{ value: '', label: 'All Templates' }, ...bulkFeeTemplates]}
+                  value={bulkFilters.feeTemplateId}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, feeTemplateId: val }))}
+                />
+                <SelectField
+                  label="Fee Type"
+                  options={FEE_TYPE_OPTS}
+                  value={bulkFilters.feeType}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, feeType: val }))}
+                />
+                <SelectField
+                  label="Month"
+                  options={MONTH_OPTS}
+                  value={bulkFilters.month}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, month: val }))}
+                />
+                <DatePickerField
+                  label="Due Date"
+                  value={bulkFilters.dueDate}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, dueDate: val || '' }))}
+                  placeholder="Select due date for downloaded PDF"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Entire Institute mode selected: download will include all classes for selected filters.
+              </p>
+            </TabsContent>
+          </Tabs>
           <div className="flex justify-end gap-2">
             <button
               type="button"
