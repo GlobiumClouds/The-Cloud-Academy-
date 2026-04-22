@@ -28,7 +28,7 @@ import StatsCard from '@/components/common/StatsCard';
 import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/download';
-import { generateBulkFeeVouchersPdfBlob } from '@/lib/pdf/feeVoucherPdf';
+import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob } from '@/lib/pdf/feeVoucherPdf';
 import { feeVoucherService, academicYearService, classService, studentService } from '@/services';
 import { Check, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -701,36 +701,150 @@ const { data: bulkClasses = [] } = useQuery({
     }
   };
 
-  // Download single voucher PDF using same logic as bulk
-  const handleDownloadVoucher = async (voucher) => {
-    if (!hasPermission('fees.read')) {
-      toast.error('You need fees.read permission to download vouchers');
-      return;
+// Download single voucher PDF - IMPROVED VERSION
+const handleDownloadVoucher = async (voucher) => {
+  if (!hasPermission('fees.read')) {
+    toast.error('You need fees.read permission to download vouchers');
+    return;
+  }
+
+  try {
+    toast.info(`Generating PDF for voucher ${voucher.voucherNumber || voucher.voucher_number}`);
+    
+    let className = '';
+    let sectionName = '';
+    
+    // METHOD 1: Try to get from student record with full details
+    if (voucher.studentId) {
+      try {
+        // Fetch student with all relations
+        const studentResponse = await studentService.getById(voucher.studentId);
+        const student = studentResponse?.data || studentResponse;
+        
+        console.log('📚 Student data received:', student);
+        
+        // Extract class name - try all possible paths
+        className = 
+          student.class_name ||
+          student.Class?.name ||
+          student.class?.name ||
+          student.current_class?.name ||
+          student.enrolled_class?.name ||
+          (student.classes && student.classes[0]?.name) ||
+          (student.currentClass?.name) ||
+          '';
+        
+        // Extract section name - try all possible paths
+        sectionName = 
+          student.section_name ||
+          student.Section?.name ||
+          student.section?.name ||
+          student.current_section?.name ||
+          student.enrolled_section?.name ||
+          (student.sections && student.sections[0]?.name) ||
+          (student.currentSection?.name) ||
+          '';
+        
+        console.log(`📚 Found from student: Class="${className}", Section="${sectionName}"`);
+        
+      } catch (studentErr) {
+        console.error('Failed to fetch student:', studentErr);
+      }
     }
-
-    try {
-      toast.info(`Generating PDF for voucher ${voucher.voucherNumber || voucher.voucher_number}`);
-      
-      // Get voucher details (already enriched)
-      const enrichedVoucher = {
-        ...voucher,
-        className: voucher.className || voucher.class_name || 'N/A',
-        sectionName: voucher.sectionName || voucher.section_name || 'N/A',
-      };
-
-      const blob = generateBulkFeeVouchersPdfBlob({
-        vouchers: [enrichedVoucher],
-        instituteName: currentInstitute?.name || 'School Management System',
-      });
-
-      const safeName = `fee-voucher-${enrichedVoucher.voucherNumber || enrichedVoucher.voucher_number || 'unknown'}.pdf`;
-      downloadBlob(blob, safeName);
-      toast.success('Voucher PDF downloaded');
-    } catch (error) {
-      console.error('Failed to download voucher PDF:', error);
-      toast.error('Failed to generate PDF');
+    
+    // METHOD 2: If no class found, try direct class fetch from voucher's classId
+    if ((!className || className === '') && voucher.classId) {
+      try {
+        const classResponse = await classService.getById(voucher.classId);
+        const classData = classResponse?.data || classResponse;
+        className = classData.name || classData.class_name || '';
+        console.log(`📚 Direct class fetch: "${className}"`);
+      } catch (classErr) {
+        console.error('Failed to fetch class:', classErr);
+      }
     }
-  };
+    
+    // METHOD 3: Try from voucher's own data
+    if ((!className || className === '') && (voucher.className || voucher.class_name)) {
+      className = voucher.className || voucher.class_name;
+      console.log(`📚 From voucher data: "${className}"`);
+    }
+    
+    // METHOD 4: Ultimate fallback
+    if (!className || className === '') {
+      className = 'Class Not Specified';
+    }
+    
+    // Similar for section
+    if ((!sectionName || sectionName === '') && voucher.sectionId) {
+      try {
+        // Try to fetch via student with include
+        if (voucher.studentId) {
+          const studentWithDetails = await studentService.getById(voucher.studentId, {
+            params: { include: ['section'] }
+          });
+          const detailedStudent = studentWithDetails?.data || studentWithDetails;
+          sectionName = detailedStudent.section_name || 
+                       detailedStudent.Section?.name ||
+                       '';
+        }
+      } catch (sectionErr) {
+        console.error('Failed to fetch section:', sectionErr);
+      }
+    }
+    
+    if ((!sectionName || sectionName === '') && (voucher.sectionName || voucher.section_name)) {
+      sectionName = voucher.sectionName || voucher.section_name;
+      console.log(`📚 Section from voucher data: "${sectionName}"`);
+    }
+    
+    if (!sectionName || sectionName === '') {
+      sectionName = 'Section Not Specified';
+    }
+    
+    console.log('📚 FINAL values for PDF:', { className, sectionName });
+    
+    // Create enriched student data - MAKE SURE class/section are in the student object
+    const studentData = {
+      className: className,
+      sectionName: sectionName,
+      name: voucher.studentName || 'Student',
+      registrationNo: voucher.registrationNo || 'N/A',
+      class: className,     // Add for compatibility
+      section: sectionName  // Add for compatibility
+    };
+    
+    // Enrich voucher with the fetched data - PUT BOTH IN VOUCHER AND STUDENT
+    const enrichedVoucher = {
+      ...voucher,
+      className: className,
+      class_name: className,
+      sectionName: sectionName,
+      section_name: sectionName,
+      student: studentData  // Also attach student data to voucher
+    };
+    
+    console.log('📚 Enriched voucher:', {
+      voucherNumber: enrichedVoucher.voucherNumber,
+      className: enrichedVoucher.className,
+      sectionName: enrichedVoucher.sectionName
+    });
+    
+    const blob = generateFeeVoucherPdfBlob({
+      voucher: enrichedVoucher,
+      student: studentData,
+      instituteName: currentInstitute?.name || 'School Management System',
+    });
+    
+    const safeName = `fee-voucher-${enrichedVoucher.voucherNumber || enrichedVoucher.voucher_number || 'unknown'}.pdf`;
+    downloadBlob(blob, safeName);
+    toast.success('Voucher PDF downloaded');
+    
+  } catch (error) {
+    console.error('Failed to download voucher PDF:', error);
+    toast.error('Failed to generate PDF: ' + (error.message || 'Unknown error'));
+  }
+};
 
   const voucherColumns = useMemo(
     () => [

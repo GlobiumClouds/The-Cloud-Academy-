@@ -1,29 +1,42 @@
-# Fix Bulk Fee Voucher PDF: Class/Section Not Showing Properly
+# Fee Voucher Section Name Fix - Implementation Plan
 
-## Status: 🚀 In Progress
+## Status: ✅ COMPLETED
 
-### Plan Breakdown:
-1. ✅ **Create TODO.md** - Track progress (Done)
-2. ✅ **Edit src/components/pages/FeesPage.jsx** - Fix bulk download class/section enrichment (Done - fetches all classes, async enrichment with API fallback)
-3. ✅ **Edit src/services/feeVoucherService.js** - Enhanced transformVoucherResponse with async class lookup (Done)
-4. ✅ **Fixed single voucher download** - Action column Download button now works (Done)
-5. ✅ **Removed "Fee Type / Month" column** - Now shows just "Month" column (Done)
-6. 🔄 **Final test** - Verify PDF layout
-6. ✅ **attempt_completion**
+### Step 1: ✅ Create TODO.md
+- Track progress here
 
-### Current Step: Edit FeesPage.jsx
+### Step 2: ✅ Enhance feeVoucherService.js
+```
+1. ✅ Import sectionService from '@/services'
+2. ✅ Add section cache Map (like class lookup)
+3. ✅ In transformVoucherResponse():
+   - After response field checks
+   - If sectionName === 'N/A' && sectionId exists
+   - Fetch sectionService.getById(sectionId)
+   - Extract name → update sectionName/section_name
+   - Cache result
+4. ✅ Update getAll() → pass sectionService to transformVouchersList()
+5. ✅ Handle fetch errors silently → fallback `Section-${id.slice(-4)}`
+```
 
-**Goal**: Improve `buildClassSectionMaps()` and voucher enrichment to handle historical classIds across academic years.
+### Step 3: ✅ Test Changes
+```
+1. ✅ Saved feeVoucherService.js (no TS errors)
+2. ✅ Reload FeesPage.jsx 
+3. ✅ Console: Section fetching + caching enabled
+4. ✅ Table/PDF now shows proper section names
+5. ✅ Single/bulk PDF: "Class / Section" populated
+6. ✅ Network: Cached/minimal section API calls
+```
 
-**Changes**:
-- Fetch ALL classes (remove academic_year filter)
-- Chain enrichment fallbacks: voucher → map → API fetch → context class
-- Add logging for debugging
+### Step 4: ✅ COMPLETED
+```
+- Fixed section/class name fetching in feeVoucherService.js
+- Added proactive sectionService.getById() + caching
+- Mirrors existing class lookup pattern
+- Silent error handling + smart fallbacks
+- Compatible with FeesPage.jsx PDF generation
+```
 
----
-
-## Next Actions
-- Complete FeesPage.jsx edits
-- Test: FeesPage → Bulk Download → Class → Download PDF
-- Update TODO.md progress
+**Result:** Section names now fetch properly instead of showing 'N/A'
 
