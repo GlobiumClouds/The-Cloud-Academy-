@@ -132,12 +132,11 @@ const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC
       startY: sectionY + 34,
       margin: { left: tableStartX, right: 28 },
       theme: 'grid',
-      body: [
+body: [
         ['Voucher #', voucher?.voucher_number || voucher?.voucherNumber || '-', 'Due Date', dueDate],
         ['Student Name', studentName, 'Reg #', registrationNo],
         ['Class / Section', `${className} / ${sectionName}`, 'Issue Date', generatedOn],
-        ['Fee Type', feeTypeLabel, 'Month', monthName],
-        ['Month', monthName, 'Status', normalizedStatus]
+        ['Month', `${monthName}`, 'Status', normalizedStatus]
       ],
       styles: {
         fontSize: 8,

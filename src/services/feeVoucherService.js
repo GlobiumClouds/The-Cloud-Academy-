@@ -103,9 +103,36 @@ const buildVoucherFilters = (filters = {}) => {
 /**
  * Transform API response for consistent structure
  */
-const transformVoucherResponse = (data) => {
+const transformVoucherResponse = async (data, classService = null) => {
   if (!data) return null;
   
+  let className = 
+    data.class_name ||
+    data.Class?.name ||
+    data.class?.name ||
+    data.Student?.class_name ||
+    data.Student?.Class?.name ||
+    'N/A';
+
+  let sectionName = 
+    data.section_name ||
+    data.Section?.name ||
+    data.section?.name ||
+    data.Student?.section_name ||
+    data.Student?.Section?.name ||
+    'N/A';
+
+  // If classService available and className empty, try to lookup
+  if (className === 'N/A' && classService && data.class_id) {
+    try {
+      const classData = await classService.getById(data.class_id);
+      className = classData?.data?.name || `Class ${data.class_id.slice(-4)}`;
+      console.log(`🔍 Enhanced voucher ${data.id}: class "${className}"`);
+    } catch (error) {
+      console.warn(`⚠️ Could not lookup class ${data.class_id} for voucher ${data.id}`);
+    }
+  }
+
   return {
     id: data.id,
     voucherNumber: data.voucher_number || data.voucher_no,
@@ -115,20 +142,11 @@ const transformVoucherResponse = (data) => {
       : data.student_name || 'N/A',
     registrationNo: data.Student?.registration_no || data.registration_no,
     classId: data.class_id || data.Student?.class_id,
-    className:
-      data.class_name ||
-      data.Class?.name ||
-      data.class?.name ||
-      data.Student?.class_name ||
-      data.Student?.Class?.name ||
-      'N/A',
-    sectionName:
-      data.section_name ||
-      data.Section?.name ||
-      data.section?.name ||
-      data.Student?.section_name ||
-      data.Student?.Section?.name ||
-      'N/A',
+    className,
+    class_name: className, // Ensure both for PDF compatibility
+    sectionId: data.section_id || data.Student?.section_id,
+    sectionName,
+    section_name: sectionName,
     month: data.month,
     year: data.year,
     amount: parseFloat(data.amount),
@@ -138,7 +156,6 @@ const transformVoucherResponse = (data) => {
     status: data.status,
     feeType: data.fee_type,
     feeTemplateId: data.fee_template_id,
-    sectionId: data.section_id || data.Student?.section_id,
     notes: data.notes,
     feeBreakdown: data.fee_breakdown || {},
     issuedDate: data.issued_date,
@@ -152,9 +169,12 @@ const transformVoucherResponse = (data) => {
 /**
  * Transform list response
  */
-const transformVouchersList = (response) => {
+const transformVouchersList = async (response, classService = null) => {
+  const vouchers = await Promise.all(
+    (response.data?.vouchers || response.data || []).map(v => transformVoucherResponse(v, classService))
+  );
   return {
-    vouchers: (response.data?.vouchers || response.data || []).map(transformVoucherResponse),
+    vouchers,
     pagination: response.data?.pagination || response.pagination || {
       total: response.data?.vouchers?.length || response.data?.length || 0,
       page: 1,

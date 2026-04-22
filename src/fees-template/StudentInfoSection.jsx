@@ -23,6 +23,10 @@ export default function StudentInfoSection({ studentData = {}, voucherMeta = {} 
             <Cell label="Reg #" value={studentData.studentId || studentData.rollNumber} />
           </tr>
           <tr className="border-b" style={{ borderColor: '#bcbcbc' }}>
+            <Cell label="Class" value={studentData.className || studentData.class_name || 'N/A'} borderedRight />
+            <Cell label="Section" value={studentData.sectionName || studentData.section_name || 'N/A'} />
+          </tr>
+          <tr className="month-row border-b" style={{ borderColor: '#bcbcbc' }}>
             <Cell label="Generate Date" value={fmtDate(voucherMeta.issueDate)} borderedRight />
             <Cell label="Due Date" value={fmtDate(voucherMeta.dueDate)} />
           </tr>
