@@ -83,6 +83,7 @@ const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC
   const dueDate = formatDate(voucher?.due_date || voucher?.dueDate);
   const monthName = formatMonth(voucher);
   const normalizedStatus = String(voucher?.status || '').toLowerCase() === 'paid' ? 'Paid' : 'Pending';
+  const feeTypeLabel = formatFeeType(voucher?.fee_type || voucher?.feeType);
   const className =
     student?.class ||
     student?.className ||
@@ -135,6 +136,7 @@ const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC
         ['Voucher #', voucher?.voucher_number || voucher?.voucherNumber || '-', 'Due Date', dueDate],
         ['Student Name', studentName, 'Reg #', registrationNo],
         ['Class / Section', `${className} / ${sectionName}`, 'Issue Date', generatedOn],
+        ['Fee Type', feeTypeLabel, 'Month', monthName],
         ['Month', monthName, 'Status', normalizedStatus]
       ],
       styles: {
