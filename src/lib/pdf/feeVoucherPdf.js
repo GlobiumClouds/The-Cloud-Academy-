@@ -410,7 +410,7 @@ const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC
   const normalizedStatus = String(voucher?.status || '').toLowerCase() === 'paid' ? 'Paid' : 'Pending';
   const feeTypeLabel = formatFeeType(voucher?.fee_type || voucher?.feeType);
   
-  // ENHANCED: Better class name extraction with multiple fallbacks
+// ENHANCED: Better class/section extraction with enrollment context
   let className = 
     voucher?.class_name ||
     voucher?.className ||
@@ -419,9 +419,8 @@ const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC
     student?.class_name ||
     voucher?.student?.class_name ||
     voucher?.student?.className ||
-    'Class Not Specified';
+    'N/A';
     
-  // ENHANCED: Better section name extraction with multiple fallbacks
   let sectionName =
     voucher?.section_name ||
     voucher?.sectionName ||
@@ -430,7 +429,11 @@ const renderVoucherPage = (doc, voucher = {}, student = {}, instituteName = 'ABC
     student?.section_name ||
     voucher?.student?.section_name ||
     voucher?.student?.sectionName ||
-    'Section Not Specified';
+    'N/A';
+    
+  // PDF-specific fallback: Clean N/A-like values
+  className = className && className.toLowerCase() !== 'n/a' && className.trim() !== '' ? className.trim() : 'N/A';
+  sectionName = sectionName && sectionName.toLowerCase() !== 'n/a' && sectionName.trim() !== '' ? sectionName.trim() : 'N/A';
     
   // Clean up the values
   className = String(className).replace(/^Class\s+Class\s+/i, 'Class ').trim();

@@ -29,7 +29,7 @@ import BulkVoucherGenerator from '@/components/forms/BulkVoucherGenerator';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/download';
 import { generateBulkFeeVouchersPdfBlob, generateFeeVoucherPdfBlob } from '@/lib/pdf/feeVoucherPdf';
-import { feeVoucherService, academicYearService, classService, studentService } from '@/services';
+import { feeVoucherService, academicYearService, classService, sectionService, studentService } from '@/services';
 import { Check, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -150,10 +150,10 @@ export default function FeesPage() {
   const [voucherAcademicYearId, setVoucherAcademicYearId] = useState('');
   const [voucherStatus, setVoucherStatus] = useState('');
   const [viewingVoucher, setViewingVoucher] = useState(null);
-  const [bulkFilters, setBulkFilters] = useState({
+const [bulkFilters, setBulkFilters] = useState({
     academicYearId: '',
-    classId: '',
-    sectionId: '',
+    classId: currentInstitute?.type === 'institute' ? '__all__' : '',
+  sectionId: currentInstitute?.type === 'institute' ? '__all__' : '',
     month: currentMonth,
     studentId: '',
     feeType: '__all__',
@@ -211,8 +211,9 @@ const { data: bulkClasses = [] } = useQuery({
       if (!currentInstitute?.id) return [];
       try {
         // Fetch ALL classes across ALL academic years for comprehensive mapping
-        const response = await classService.getAll({
+      const response = await classService.getAll({
           institute_id: currentInstitute?.id,
+          institute_type: currentInstitute?.type,
           include_sections: true,
           limit: 2000, // Increased limit for historical classes
           archived: false, // Exclude truly deleted classes
@@ -274,6 +275,7 @@ const { data: bulkClasses = [] } = useQuery({
         const response = await studentService.getAll(
           {
             institute_id: currentInstitute?.id,
+            institute_type: currentInstitute?.type,
             academic_year_id: bulkFilters.academicYearId,
             class_id: bulkFilters.classId,
             section_id: bulkFilters.sectionId && bulkFilters.sectionId !== '__all__' ? bulkFilters.sectionId : undefined,
@@ -301,17 +303,17 @@ const { data: bulkClasses = [] } = useQuery({
   );
 
   useEffect(() => {
-    setBulkFilters((prev) => ({ ...prev, classId: '', sectionId: '' }));
+    setBulkFilters((prev) => ({ ...prev, classId: '', sectionId: '__all__' }));
   }, [bulkFilters.academicYearId]);
 
   useEffect(() => {
-    setBulkFilters((prev) => ({ ...prev, sectionId: '' }));
+    setBulkFilters((prev) => ({ ...prev, sectionId: '__all__' }));
   }, [bulkFilters.classId]);
 
   useEffect(() => {
     setBulkFilters((prev) => ({
       ...prev,
-      sectionId: '',
+      sectionId: '__all__',
       classId: bulkDownloadMode === 'institute' ? '__all__' : prev.classId,
     }));
   }, [bulkDownloadMode]);
@@ -367,6 +369,8 @@ const { data: bulkClasses = [] } = useQuery({
       });
 
     console.log('✅ Class map size:', classNameById.size, 'Section map size:', sectionNameById.size);
+    console.log('Class map sample:', Array.from(classNameById.entries()).slice(0, 3));
+    console.log('Section map sample:', Array.from(sectionNameById.entries()).slice(0, 3));
     return { classNameById, sectionNameById };
   };
 
@@ -498,208 +502,354 @@ const { data: bulkClasses = [] } = useQuery({
     }
     recordPaymentMutation.mutate({ voucherId, ...paymentForm });
   };
+  // Bulk download vouchers as PDF 
+const handleBulkDownload = async () => {
+  // Check permission first
+  if (!hasPermission('fees.read')) {
+    toast.error('You need fees.read permission to download vouchers');
+    return;
+  }
 
-  const handleBulkDownload = async () => {
-    // Check permission first - USING CORRECT PERMISSION
-    if (!hasPermission('fees.read')) {
-      toast.error('You need fees.read permission to download vouchers');
+  if (!currentInstitute?.id) {
+    toast.error('Institute is missing');
+    return;
+  }
+
+  if (bulkDownloadMode === 'student') {
+    if (!bulkFilters.studentId.trim()) {
+      toast.error('Please enter Student ID');
       return;
     }
-
-    if (!currentInstitute?.id) {
-      toast.error('Institute is missing');
+    if (!bulkFilters.academicYearId) {
+      toast.error('Please select academic year');
       return;
     }
-
-    if (bulkDownloadMode === 'student') {
-      if (!bulkFilters.studentId.trim()) {
-        toast.error('Please enter Student ID');
-        return;
-      }
-      if (!bulkFilters.academicYearId) {
-        toast.error('Please select academic year');
-        return;
-      }
-      if (!bulkFilters.classId || bulkFilters.classId === '__all__') {
-        toast.error('Please select class');
-        return;
-      }
+    if (!bulkFilters.classId || bulkFilters.classId === '__all__') {
+      toast.error('Please select class');
+      return;
     }
+  }
 
-    if (bulkDownloadMode === 'class') {
-      if (!bulkFilters.academicYearId || !bulkFilters.classId || bulkFilters.classId === '__all__') {
-        toast.error('Please select academic year and class');
-        return;
-      }
+  if (bulkDownloadMode === 'class') {
+    if (!bulkFilters.academicYearId || !bulkFilters.classId || bulkFilters.classId === '__all__') {
+      toast.error('Please select academic year and class');
+      return;
     }
+  }
 
-    if (bulkDownloadMode === 'institute') {
-      if (!bulkFilters.academicYearId) {
-        toast.error('Please select academic year');
-        return;
-      }
+  if (bulkDownloadMode === 'institute') {
+    if (!bulkFilters.academicYearId) {
+      toast.error('Please select academic year');
+      return;
     }
+  }
 
-    setBulkDownloading(true);
-    setBulkDownloadProgress({ current: 0, total: 0 });
-    try {
-      const BULK_PAGE_SIZE = 100;
-      const isStudentMode = bulkDownloadMode === 'student';
-      const isClassMode = bulkDownloadMode === 'class';
-      const isInstituteMode = bulkDownloadMode === 'institute';
-      const filters = isStudentMode
-        ? {
-          student_id: bulkFilters.studentId.trim(),
-          academic_year_id: bulkFilters.academicYearId,
-          class_id: bulkFilters.classId,
-        }
-        : {
-          academic_year_id: bulkFilters.academicYearId,
-          class_id: isClassMode && bulkFilters.classId !== '__all__' ? bulkFilters.classId : undefined,
-          section_id: isClassMode ? (bulkFilters.sectionId && bulkFilters.sectionId !== '__all__' ? bulkFilters.sectionId : undefined) : undefined,
-          month: bulkFilters.month ? parseInt(bulkFilters.month, 10) : undefined,
-        };
+  setBulkDownloading(true);
+  setBulkDownloadProgress({ current: 0, total: 0 });
+  
+  try {
+    const BULK_PAGE_SIZE = 100;
+    const isStudentMode = bulkDownloadMode === 'student';
+    const isClassMode = bulkDownloadMode === 'class';
+    const isInstituteMode = bulkDownloadMode === 'institute';
+    
+    console.group('🛠️ FIX: Bulk Fee Voucher Download - Enrolled Students Only');
 
-      const firstPage = await feeVoucherService.getAll(filters, { page: 1, limit: BULK_PAGE_SIZE }, { timeout: 45000 });
-      const totalPages = firstPage?.pagination?.totalPages || 1;
-      const vouchersList = [...(firstPage?.vouchers || [])];
-      setBulkDownloadProgress({ current: 1, total: totalPages });
+    let enrolledStudentIds = [];
+    let voucherFilters = {
+      academic_year_id: bulkFilters.academicYearId,
+    };
 
-      for (let page = 2; page <= totalPages; page += 1) {
-        const response = await feeVoucherService.getAll(filters, { page, limit: BULK_PAGE_SIZE }, { timeout: 45000 });
-        vouchersList.push(...(response?.vouchers || []));
-        setBulkDownloadProgress({ current: page, total: totalPages });
-      }
-
-      if (!vouchersList.length) {
-        if (isStudentMode) {
-          toast.error('No vouchers found for the selected academic year.');
-        } else if (isClassMode) {
-          toast.error('No vouchers generated for the selected class and month.');
-        } else {
-          toast.error('No vouchers generated for the selected month.');
-        }
-        return;
-      }
-
-      // const { classNameById, sectionNameById } = buildClassSectionMaps();
-
-      const { classNameById, sectionNameById } = buildClassSectionMaps();
+    // 🎯 STEP 1: Get ENROLLED students only (FIXES N/A issue)
+    if (isClassMode) {
+      console.log('📚 Class mode: Fetching enrolled students for class', bulkFilters.classId);
       
-      console.log('🔍 Processing', vouchersList.length, 'vouchers for PDF');
-      let missingClassCount = 0;
-      let missingSectionCount = 0;
+      // Get students enrolled in this class (specific section OR all sections)
+      const studentFilters = {
+        class_id: bulkFilters.classId,
+        academic_year_id: bulkFilters.academicYearId,
+        ...(bulkFilters.sectionId !== '__all__' && { section_id: bulkFilters.sectionId }),
+        limit: 1000,  // Max students per class
+      };
+      
+      const enrolledStudentsRes = await studentService.getAll(studentFilters, currentInstitute?.type || 'school');
+      enrolledStudentIds = (enrolledStudentsRes?.data?.rows || enrolledStudentsRes?.rows || enrolledStudentsRes || [])
+        .map(student => student.id)
+        .filter(Boolean);
+      
+      console.log(`✅ Found ${enrolledStudentIds.length} enrolled students`);
+      
+      if (enrolledStudentIds.length === 0) {
+        toast.warning('No students enrolled in this class/section');
+        return;
+      }
+      
+      // Filter vouchers BY THESE STUDENT IDS only
+      voucherFilters.student_ids = enrolledStudentIds;
+      voucherFilters.month = bulkFilters.month ? parseInt(bulkFilters.month, 10) : undefined;
+    } else if (isStudentMode) {
+      enrolledStudentIds = [bulkFilters.studentId.trim()];
+      voucherFilters.student_id = enrolledStudentIds[0];
+      voucherFilters.class_id = bulkFilters.classId;
+    } else {
+      // Institute mode - get all students with vouchers for month
+      voucherFilters.month = bulkFilters.month ? parseInt(bulkFilters.month, 10) : undefined;
+    }
 
-      const vouchersForPdf = await Promise.all(vouchersList.map(async (voucher) => {
-        const classId = String(voucher?.classId || voucher?.class_id || '');
-        const sectionId = String(voucher?.sectionId || voucher?.section_id || '');
-        
-        // Comprehensive class name fallback chain
-        let finalClassName = normalizeDisplayValue(voucher?.className) ||
-                           normalizeDisplayValue(voucher?.class_name) ||
-                           classNameById.get(classId);
-        
-        if (!finalClassName && classId) {
-          try {
-            // Fallback: fetch individual class if not in map
-            const classResponse = await classService.getById(classId);
-            finalClassName = classResponse?.data?.name || 'Class Not Found';
-            console.log(`✅ Fetched class ${classId}:`, finalClassName);
-            // Add to map for future lookups
-            classNameById.set(classId, finalClassName);
-          } catch (fetchError) {
-            console.warn(`⚠️ Could not fetch class ${classId}:`, fetchError.message);
-            finalClassName = `Class-${classId.slice(-4)}`;
-            missingClassCount++;
+    console.log('🔍 Final voucher filters:', voucherFilters);
+    console.log('👥 Limiting to student IDs:', enrolledStudentIds.slice(0, 5), '...');
+
+    // 🎯 STEP 2: Fetch vouchers for enrolled students only
+    const firstPage = await feeVoucherService.getAll(
+      voucherFilters, 
+      { page: 1, limit: BULK_PAGE_SIZE }, 
+      { timeout: 45000 }
+    );
+    
+    const totalPages = firstPage?.pagination?.totalPages || 1;
+    let vouchersList = [...(firstPage?.vouchers || [])];
+    
+    console.log('📄 Page 1:', firstPage?.vouchers?.length || 0, 'vouchers');
+    console.log('📊 Total pages:', totalPages);
+    setBulkDownloadProgress({ current: 1, total: totalPages });
+
+    // Paginate if needed
+    for (let page = 2; page <= totalPages; page++) {
+      const response = await feeVoucherService.getAll(
+        voucherFilters, 
+        { page, limit: BULK_PAGE_SIZE }, 
+        { timeout: 45000 }
+      );
+      vouchersList.push(...(response?.vouchers || []));
+      setBulkDownloadProgress({ current: page, total: totalPages });
+    }
+
+    console.log(`✅ Total vouchers for enrolled students: ${vouchersList.length}`);
+
+    if (!vouchersList.length) {
+      const modeMsg = isStudentMode ? 'student' : 
+                     isClassMode ? `class ${selectedClassLabel} ${selectedSectionLabel}` : 
+                     'institute';
+      toast.error(`No vouchers found for ${modeMsg}`);
+      return;
+    }
+
+    // 🎯 STEP 3: Same enrichment logic (but now correct students)
+    const { classNameById, sectionNameById } = buildClassSectionMaps();
+    
+    // ... [rest of existing hydration/enrichment code remains the same]
+    const getStudentPayload = (response) =>
+      response?.data?.data || response?.data || response || {};
+
+    const getStudentIdFromVoucher = (voucher) =>
+      String(
+        voucher?.studentId ||
+        voucher?.student_id ||
+        voucher?.student?.id ||
+        voucher?.student?.student_id ||
+        ''
+      );
+
+    const studentHydrationMap = new Map();
+    const vouchersNeedingHydration = vouchersList.filter((voucher) => {
+      const hasClass = normalizeDisplayValue(voucher?.className) || normalizeDisplayValue(voucher?.class_name);
+      const hasSection = normalizeDisplayValue(voucher?.sectionName) || normalizeDisplayValue(voucher?.section_name);
+      return !hasClass || !hasSection;
+    });
+
+    const uniqueStudentIds = Array.from(
+      new Set(
+        vouchersNeedingHydration
+          .map(getStudentIdFromVoucher)
+          .filter((id) => id && id !== 'undefined' && id !== 'null')
+      )
+    );
+
+    console.log('Vouchers needing hydration:', vouchersNeedingHydration.length);
+    console.log('Unique student IDs for hydration:', uniqueStudentIds.length);
+
+    if (uniqueStudentIds.length) {
+      const chunkSize = 20;
+      for (let i = 0; i < uniqueStudentIds.length; i += chunkSize) {
+        const chunk = uniqueStudentIds.slice(i, i + chunkSize);
+        const results = await Promise.all(
+          chunk.map(async (studentId) => {
+            try {
+              const response = await studentService.getById(studentId, { params: { institute_type: currentInstitute?.type, include: 'class,section' } });
+              const student = getStudentPayload(response);
+
+              const hydratedClassId = String(
+                student?.class_id ||
+                student?.classId ||
+                student?.Class?.id ||
+                student?.Class?.class_id ||
+                student?.class?.id ||
+                ''
+              );
+
+              const hydratedSectionId = String(
+                student?.section_id ||
+                student?.sectionId ||
+                student?.Section?.id ||
+                student?.Section?.section_id ||
+                student?.section?.id ||
+                ''
+              );
+
+              const hydratedClassName =
+                normalizeDisplayValue(student?.class_name) ||
+                normalizeDisplayValue(student?.Class?.name) ||
+                normalizeDisplayValue(student?.class?.name) ||
+                normalizeDisplayValue(student?.className) ||
+                (hydratedClassId ? classNameById.get(hydratedClassId) : '');
+
+              const hydratedSectionName =
+                normalizeDisplayValue(student?.section_name) ||
+                normalizeDisplayValue(student?.Section?.name) ||
+                normalizeDisplayValue(student?.section?.name) ||
+                normalizeDisplayValue(student?.sectionName) ||
+                (hydratedSectionId ? sectionNameById.get(hydratedSectionId) : '');
+
+              return {
+                studentId,
+                hydratedClassId,
+                hydratedSectionId,
+                hydratedClassName,
+                hydratedSectionName,
+              };
+            } catch (error) {
+              console.warn(`⚠️ Student hydration failed for ${studentId}:`, error?.message || error);
+              return null;
+            }
+          })
+        );
+
+        results.filter(Boolean).forEach((item) => {
+          studentHydrationMap.set(item.studentId, item);
+          if (item.hydratedClassId && item.hydratedClassName) {
+            classNameById.set(item.hydratedClassId, item.hydratedClassName);
           }
-        } else if (!finalClassName && (isClassMode && bulkFilters.classId !== '__all__')) {
-          finalClassName = selectedClassLabel;
-        }
-        
-        if (!finalClassName) finalClassName = 'N/A';
-        
-        // Comprehensive section name fallback chain - FIXED for bulk class downloads
-        let finalSectionName = normalizeDisplayValue(voucher?.sectionName) ||
-                             normalizeDisplayValue(voucher?.section_name) ||
-                             sectionNameById.get(sectionId);
-        
-        // PRIORITY FIX: For bulk class downloads, ALWAYS lookup section from voucher's sectionId
-        if (!finalSectionName && sectionId && !sectionNameById.has(sectionId)) {
-          try {
-            // Fetch individual section via student or direct lookup
-            const sectionResponse = await sectionService?.getById?.(sectionId) || 
-                                  (await studentService.getById(voucher.studentId || voucher.student_id))?.Section;
-            finalSectionName = sectionResponse?.name || `Section-${sectionId.slice(-4)}`;
-            sectionNameById.set(sectionId, finalSectionName);
-            console.log(`✅ Fetched section ${sectionId}:`, finalSectionName);
-          } catch (sectionFetchError) {
-            console.warn(`⚠️ Section fetch failed ${sectionId}:`, sectionFetchError.message);
+          if (item.hydratedSectionId && item.hydratedSectionName) {
+            sectionNameById.set(item.hydratedSectionId, item.hydratedSectionName);
           }
-        }
-        
-        // Context fallback if still missing
-        if (!finalSectionName && isClassMode && bulkFilters.sectionId && bulkFilters.sectionId !== '__all__') {
-          finalSectionName = sectionNameById.get(String(bulkFilters.sectionId)) || selectedSectionLabel;
-        }
-        
-        if (!finalSectionName) {
-          finalSectionName = 'All Sections'; // Better default for class bulk
-        }
-        
-        if (!normalizeDisplayValue(finalClassName)) missingClassCount++;
-        if (!normalizeDisplayValue(finalSectionName)) missingSectionCount++;
+        });
+      }
+    }
 
-        return {
-          ...voucher,
-          className: finalClassName,
-          class_name: finalClassName, // Ensure both fields for PDF compatibility
-          sectionName: finalSectionName,
-          section_name: finalSectionName,
-        };
-      }));
+    console.log('Hydrated student records:', studentHydrationMap.size);
+    
+    console.log('🔍 Processing', vouchersList.length, 'vouchers for PDF');
+    let missingClassCount = 0;
+    let missingSectionCount = 0;
 
-      console.log(`📊 Enrichment complete: ${missingClassCount} missing classes, ${missingSectionCount} missing sections out of ${vouchersList.length} vouchers`);
+    const vouchersForPdf = await Promise.all(vouchersList.map(async (voucher) => {
+      const voucherStudentId = getStudentIdFromVoucher(voucher);
+      const hydratedStudent = studentHydrationMap.get(voucherStudentId);
 
-      const sortLabel = (value) => String(value || '').toLowerCase();
-      const vouchersForPdfSorted = [...vouchersForPdf].sort((left, right) => {
-        if (isStudentMode) {
-          const monthDiff = (Number(left.month) || 0) - (Number(right.month) || 0);
-          if (monthDiff !== 0) return monthDiff;
-          return sortLabel(left.voucherNumber || left.voucher_number).localeCompare(sortLabel(right.voucherNumber || right.voucher_number));
-        }
+      const classId = String(
+        voucher?.classId ||
+        voucher?.class_id ||
+        voucher?.student?.class_id ||
+        voucher?.student?.classId ||
+        hydratedStudent?.hydratedClassId ||
+        ''
+      );
+      const sectionId = String(
+        voucher?.sectionId ||
+        voucher?.section_id ||
+        voucher?.student?.section_id ||
+        voucher?.student?.sectionId ||
+        hydratedStudent?.hydratedSectionId ||
+        ''
+      );
+      
+      // Comprehensive class name fallback chain - ENHANCED for class context
+      let finalClassName = normalizeDisplayValue(voucher?.className) ||
+                         normalizeDisplayValue(voucher?.class_name) ||
+                         normalizeDisplayValue(hydratedStudent?.hydratedClassName) ||
+                         classNameById.get(classId) ||
+                         (isClassMode ? selectedClassLabel : 'N/A');
+      
+      // Comprehensive section name fallback chain  
+      let finalSectionName = normalizeDisplayValue(voucher?.sectionName) ||
+                           normalizeDisplayValue(voucher?.section_name) ||
+                           normalizeDisplayValue(hydratedStudent?.hydratedSectionName) ||
+                           sectionNameById.get(sectionId) ||
+                           (isClassMode && bulkFilters.sectionId === '__all__' ? 'All Sections' : selectedSectionLabel);
+      
+      // Final fallbacks
+      finalClassName = finalClassName || (isClassMode ? selectedClassLabel : 'N/A');
+      finalSectionName = finalSectionName || (isClassMode && bulkFilters.sectionId === '__all__' ? 'All Sections' : 'N/A');
+      
+      console.log(`📋 Voucher ${voucher?.voucherNumber}: Class="${finalClassName}", Section="${finalSectionName}"`);
+      
+      if (!normalizeDisplayValue(finalClassName)) missingClassCount++;
+      if (!normalizeDisplayValue(finalSectionName)) missingSectionCount++;
 
-        const classDiff = sortLabel(left.className).localeCompare(sortLabel(right.className));
-        if (classDiff !== 0) return classDiff;
-        const sectionDiff = sortLabel(left.sectionName).localeCompare(sortLabel(right.sectionName));
-        if (sectionDiff !== 0) return sectionDiff;
+      const enrichedStudent = {
+        ...voucher.student,
+        class_name: finalClassName,
+        className: finalClassName,
+        section_name: finalSectionName,
+        sectionName: finalSectionName,
+        class: finalClassName,
+        section: finalSectionName
+      };
+
+      return {
+        ...voucher,
+        student: enrichedStudent,
+        classId: classId || voucher?.classId || voucher?.class_id,
+        class_id: classId || voucher?.class_id || voucher?.classId,
+        className: finalClassName,
+        class_name: finalClassName,
+        sectionId: sectionId || voucher?.sectionId || voucher?.section_id,
+        section_id: sectionId || voucher?.section_id || voucher?.sectionId,
+        sectionName: finalSectionName,
+        section_name: finalSectionName,
+      };
+    }));
+
+    // 🎯 STEP 4: Sort and generate PDF (same as before)
+    const sortLabel = (value) => String(value || '').toLowerCase();
+    const vouchersForPdfSorted = [...vouchersForPdf].sort((left, right) => {
+      if (isStudentMode) {
         const monthDiff = (Number(left.month) || 0) - (Number(right.month) || 0);
         if (monthDiff !== 0) return monthDiff;
-        return sortLabel(left.studentName).localeCompare(sortLabel(right.studentName));
-      });
-
-      const blob = generateBulkFeeVouchersPdfBlob({
-        vouchers: vouchersForPdfSorted,
-        instituteName: currentInstitute?.name || 'School Management System',
-      });
-
-      const safeName = `bulk-fee-vouchers-${bulkDownloadMode}-${selectedClassLabel}-${selectedSectionLabel}-${bulkFilters.month || 'all-months'}`
-        .replace(/[^a-zA-Z0-9_-]+/g, '-');
-
-      downloadBlob(blob, `${safeName}.pdf`);
-      toast.success(`Downloaded ${vouchersList.length} vouchers`);
-      setBulkDownloadOpen(false);
-    } catch (error) {
-      console.error('Bulk voucher download failed:', error);
-      if (error.response?.status === 403) {
-        toast.error('Permission denied. Required: fees.read');
-      } else {
-        toast.error(error?.message || 'Failed to download bulk vouchers');
+        return sortLabel(left.voucherNumber || left.voucher_number).localeCompare(sortLabel(right.voucherNumber || right.voucher_number));
       }
-    } finally {
-      setBulkDownloadProgress({ current: 0, total: 0 });
-      setBulkDownloading(false);
-    }
-  };
+
+      const classDiff = sortLabel(left.className).localeCompare(sortLabel(right.className));
+      if (classDiff !== 0) return classDiff;
+      const sectionDiff = sortLabel(left.sectionName).localeCompare(sortLabel(right.sectionName));
+      if (sectionDiff !== 0) return sectionDiff;
+      const monthDiff = (Number(left.month) || 0) - (Number(right.month) || 0);
+      if (monthDiff !== 0) return monthDiff;
+      return sortLabel(left.studentName).localeCompare(sortLabel(right.studentName));
+    });
+
+    const blob = generateBulkFeeVouchersPdfBlob({
+      vouchers: vouchersForPdfSorted,
+      instituteName: currentInstitute?.name || 'School Management System',
+    });
+
+    const safeName = `class-fee-vouchers-${selectedClassLabel}-${selectedSectionLabel}-${bulkFilters.month || 'all'}-${enrolledStudentIds.length}students`
+      .replace(/[^a-zA-Z0-9_-]+/g, '-');
+
+    downloadBlob(blob, `${safeName}.pdf`);
+    toast.success(`✅ Downloaded ${vouchersList.length} vouchers for ${enrolledStudentIds.length} enrolled students only! 🎉`);
+    setBulkDownloadOpen(false);
+    
+    console.groupEnd();
+  } catch (error) {
+    console.error('❌ Bulk download failed:', error);
+    console.groupEnd();
+    toast.error(error?.message || 'Failed to download bulk vouchers');
+  } finally {
+    setBulkDownloadProgress({ current: 0, total: 0 });
+    setBulkDownloading(false);
+  }
+};
 
 // Download single voucher PDF - IMPROVED VERSION
 const handleDownloadVoucher = async (voucher) => {
@@ -718,7 +868,7 @@ const handleDownloadVoucher = async (voucher) => {
     if (voucher.studentId) {
       try {
         // Fetch student with all relations
-        const studentResponse = await studentService.getById(voucher.studentId);
+        const studentResponse = await studentService.getById(voucher.studentId, { params: { institute_type: currentInstitute?.type, include: 'class,section' } });
         const student = studentResponse?.data || studentResponse;
         
         console.log('📚 Student data received:', student);
@@ -755,7 +905,7 @@ const handleDownloadVoucher = async (voucher) => {
     // METHOD 2: If no class found, try direct class fetch from voucher's classId
     if ((!className || className === '') && voucher.classId) {
       try {
-        const classResponse = await classService.getById(voucher.classId);
+        const classResponse = await classService.getById(voucher.classId, { params: { institute_type: currentInstitute?.type } });
         const classData = classResponse?.data || classResponse;
         className = classData.name || classData.class_name || '';
         console.log(`📚 Direct class fetch: "${className}"`);
@@ -781,7 +931,7 @@ const handleDownloadVoucher = async (voucher) => {
         // Try to fetch via student with include
         if (voucher.studentId) {
           const studentWithDetails = await studentService.getById(voucher.studentId, {
-            params: { include: ['section'] }
+            params: { institute_type: currentInstitute?.type, include: ['class','section'] }
           });
           const detailedStudent = studentWithDetails?.data || studentWithDetails;
           sectionName = detailedStudent.section_name || 
@@ -1120,7 +1270,7 @@ const handleDownloadVoucher = async (voucher) => {
                   label="Section"
                   options={bulkSectionOptions}
                   value={bulkFilters.sectionId ? String(bulkFilters.sectionId) : '__all__'}
-                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, sectionId: val === '__all__' ? '' : val }))}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, sectionId: val || '__all__' }))}
                 />
                 <SelectField
                   label="Month"

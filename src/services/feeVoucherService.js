@@ -1137,6 +1137,7 @@
 import api from '@/lib/api';
 import { buildQuery } from '@/lib/utils';
 import { sectionService, classService } from '@/services';
+import { studentService } from './studentService';
 
 // ============================================================
 // Constants
@@ -1201,6 +1202,9 @@ const buildVoucherFilters = (filters = {}) => {
   if (filters.student_id) {
     base.student_id = filters.student_id;
   }
+ if (Array.isArray(filters.student_ids) && filters.student_ids.length > 0) {
+   base.student_ids = filters.student_ids;
+ }
   if (filters.class_id) {
     base.class_id = filters.class_id;
   }
@@ -1220,6 +1224,27 @@ const buildVoucherFilters = (filters = {}) => {
   return base;
 };
 
+const normalizeText = (value) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const normalized = raw.toLowerCase();
+  if (normalized === 'n/a' || normalized === 'na' || normalized === '-' || normalized === 'undefined' || normalized === 'null') {
+    return '';
+  }
+  return raw;
+};
+
+const pickFirst = (...values) => {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const studentMetaCache = new Map();
+
 /**
  * Transform API response for consistent structure
  */
@@ -1228,6 +1253,14 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
   
   // Extract student record for deeper resolution
   const studentRaw = data.Student || data.student || {};
+
+  const studentId = pickFirst(
+    data.student_id,
+    data.studentId,
+    studentRaw.id,
+    studentRaw.student_id,
+    studentRaw.studentId,
+  );
 
   // Comprehensive Class Name Resolution
   let className = 
@@ -1239,6 +1272,8 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     studentRaw.className ||
     studentRaw.Class?.name ||
     studentRaw.class?.name ||
+    studentRaw.current_class?.name ||
+    studentRaw.currentClass?.name ||
     studentRaw.Class?.class_name ||
     null;
 
@@ -1252,11 +1287,87 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     studentRaw.sectionName ||
     studentRaw.Section?.name ||
     studentRaw.section?.name ||
+    studentRaw.current_section?.name ||
+    studentRaw.currentSection?.name ||
     studentRaw.Section?.section_name ||
     null;
 
-  const classId = data.class_id || data.classId || studentRaw.class_id || studentRaw.classId;
-  const sectionId = data.section_id || data.sectionId || studentRaw.section_id || studentRaw.sectionId;
+  let classId = pickFirst(
+    data.class_id,
+    data.classId,
+    studentRaw.class_id,
+    studentRaw.classId,
+    studentRaw.Class?.id,
+    studentRaw.Class?.class_id,
+    studentRaw.class?.id,
+    studentRaw.current_class_id,
+    studentRaw.currentClassId,
+  );
+
+  let sectionId = pickFirst(
+    data.section_id,
+    data.sectionId,
+    studentRaw.section_id,
+    studentRaw.sectionId,
+    studentRaw.Section?.id,
+    studentRaw.Section?.section_id,
+    studentRaw.section?.id,
+    studentRaw.current_section_id,
+    studentRaw.currentSectionId,
+  );
+
+  if ((!classId || !sectionId || !normalizeText(className) || !normalizeText(sectionName)) && studentId) {
+    try {
+      const cacheKey = String(studentId);
+      let hydratedStudent = studentMetaCache.get(cacheKey);
+
+      if (!hydratedStudent) {
+        const studentResponse = await studentService.getById(studentId);
+        hydratedStudent = studentResponse?.data?.data || studentResponse?.data || studentResponse || {};
+        studentMetaCache.set(cacheKey, hydratedStudent);
+      }
+
+      classId = classId || pickFirst(
+        hydratedStudent?.class_id,
+        hydratedStudent?.classId,
+        hydratedStudent?.Class?.id,
+        hydratedStudent?.Class?.class_id,
+        hydratedStudent?.class?.id,
+        hydratedStudent?.current_class_id,
+        hydratedStudent?.currentClassId,
+      );
+
+      sectionId = sectionId || pickFirst(
+        hydratedStudent?.section_id,
+        hydratedStudent?.sectionId,
+        hydratedStudent?.Section?.id,
+        hydratedStudent?.Section?.section_id,
+        hydratedStudent?.section?.id,
+        hydratedStudent?.current_section_id,
+        hydratedStudent?.currentSectionId,
+      );
+
+      className = className ||
+        hydratedStudent?.class_name ||
+        hydratedStudent?.className ||
+        hydratedStudent?.Class?.name ||
+        hydratedStudent?.class?.name ||
+        hydratedStudent?.current_class?.name ||
+        hydratedStudent?.currentClass?.name ||
+        null;
+
+      sectionName = sectionName ||
+        hydratedStudent?.section_name ||
+        hydratedStudent?.sectionName ||
+        hydratedStudent?.Section?.name ||
+        hydratedStudent?.section?.name ||
+        hydratedStudent?.current_section?.name ||
+        hydratedStudent?.currentSection?.name ||
+        null;
+    } catch (studentHydrationError) {
+      console.warn(`Failed to hydrate student ${studentId}:`, studentHydrationError?.message || studentHydrationError);
+    }
+  }
 
   // Try to resolve class name if missing
   if ((!className || className === null) && classId && classServiceInstance) {
@@ -1299,14 +1410,14 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
   }
 
   // Final fallbacks
-  className = className || 'N/A';
-  sectionName = sectionName || 'N/A';
+  className = normalizeText(className) || 'N/A';
+  sectionName = normalizeText(sectionName) || 'N/A';
 
   return {
     id: data.id,
     voucherNumber: data.voucher_number || data.voucher_no || data.voucherNumber,
  
-    studentId: data.student_id || data.studentId,
+    studentId: studentId,
     studentName: studentRaw.first_name || studentRaw.full_name
       ? `${studentRaw.first_name || ''} ${studentRaw.last_name || ''}`.trim() || studentRaw.full_name
       : data.student_name || data.studentName || 'N/A',
@@ -1317,6 +1428,7 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     section_name: sectionName,
     month: data.month,
     year: data.year,
+    academicYearId: data.academic_year_id || data.academicYearId || studentRaw.academic_year_id || studentRaw.academicYearId,
     amount: parseFloat(data.amount || 0),
     discount: parseFloat(data.discount || 0),
     netAmount: parseFloat(data.net_amount || data.netAmount || data.amount || 0),
@@ -1429,11 +1541,12 @@ export const feeVoucherService = {
       });
 
       const result = response.data?.data || {};
+      const vouchers = await Promise.all((result.vouchers || []).map((voucher) => transformVoucherResponse(voucher, classService, sectionService)));
       return {
         total: result.total || 0,
         generated: result.generated || 0,
         failed: result.failed || 0,
-        vouchers: (result.vouchers || []).map(transformVoucherResponse),
+        vouchers,
         message: `Successfully generated ${result.generated} out of ${result.total} vouchers`
       };
     } catch (error) {
@@ -1470,12 +1583,13 @@ export const feeVoucherService = {
       });
 
       const result = response.data?.data || {};
+      const vouchers = await Promise.all((result.vouchers || []).map((voucher) => transformVoucherResponse(voucher, classService, sectionService)));
       return {
         total: result.total || 0,
         generated: result.generated || 0,
         failed: result.failed || 0,
         failedDetails: result.failedDetails || [],
-        vouchers: (result.vouchers || []).map(transformVoucherResponse),
+        vouchers,
         message: `Successfully generated ${result.generated} out of ${result.total} vouchers`,
         successRate: result.total > 0 ? Math.round((result.generated / result.total) * 100) : 0
       };
