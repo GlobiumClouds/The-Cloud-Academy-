@@ -20,6 +20,9 @@ export const masterAdminService = {
   getStats: () =>
     api.get('/dashboard/master').then((r) => r.data?.data ?? r.data),
 
+  getReports: (params = {}) =>
+    api.get(`/master-admin/reports${buildQuery(params)}`).then((r) => r.data?.data ?? r.data),
+
   // ─── Lookup tables (for dropdowns) ───────────────────────
   getInstituteTypes: () =>
     api.get('/master-admin/institute-types').then((r) => r.data),
