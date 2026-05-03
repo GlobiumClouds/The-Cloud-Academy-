@@ -40,6 +40,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { Button } from '../ui/button';
 
 const STATUS_OPTS = [
   { value: 'paid', label: 'Paid' },
@@ -218,9 +219,10 @@ const { data: bulkClasses = [] } = useQuery({
           limit: 2000, // Increased limit for historical classes
           archived: false, // Exclude truly deleted classes
         });
-        const rows = response?.data?.rows || response?.rows || response?.data || response || [];
-        console.log('✅ Loaded', rows.length, 'classes across all years for PDF mapping');
-        return Array.isArray(rows) ? rows : [];
+        const rows = response?.data?.rows || response?.rows || (Array.isArray(response?.data) ? response.data : []) || (Array.isArray(response) ? response : []);
+        const finalRows = Array.isArray(rows) ? rows : [];
+        console.log('✅ Loaded', finalRows.length, 'classes across all years for PDF mapping');
+        return finalRows;
       } catch (error) {
         console.error('❌ Failed to load bulk download classes:', error);
         return [];
@@ -265,7 +267,7 @@ const { data: bulkClasses = [] } = useQuery({
   }, [selectedBulkClass]);
 
   const { data: bulkStudents = [] } = useQuery({
-    queryKey: ['fees-bulk-students', currentInstitute?.id, bulkFilters.academicYearId, bulkFilters.classId],
+    queryKey: ['fees-bulk-students', currentInstitute?.id, bulkFilters.academicYearId, bulkFilters.classId, bulkFilters.sectionId],
     queryFn: async () => {
       if (!currentInstitute?.id || !bulkFilters.academicYearId || !bulkFilters.classId || bulkFilters.classId === '__all__') {
         return [];
@@ -307,8 +309,12 @@ const { data: bulkClasses = [] } = useQuery({
   }, [bulkFilters.academicYearId]);
 
   useEffect(() => {
-    setBulkFilters((prev) => ({ ...prev, sectionId: '__all__' }));
+    setBulkFilters((prev) => ({ ...prev, sectionId: '__all__', studentId: '' }));
   }, [bulkFilters.classId]);
+
+  useEffect(() => {
+    setBulkFilters((prev) => ({ ...prev, studentId: '' }));
+  }, [bulkFilters.sectionId]);
 
   useEffect(() => {
     setBulkFilters((prev) => ({
@@ -326,13 +332,16 @@ const { data: bulkClasses = [] } = useQuery({
   }, [bulkClassOptions, bulkDownloadMode]);
 
   const selectedClassLabel = useMemo(() => {
-    if (bulkDownloadMode === 'institute') return 'all-classes';
-    return modalClassOptions.find((item) => String(item.value) === String(bulkFilters.classId))?.label || 'class';
+    if (bulkDownloadMode === 'institute') return 'All Classes';
+    const found = modalClassOptions.find((item) => String(item.value) === String(bulkFilters.classId));
+    return found?.label || '';
   }, [bulkDownloadMode, modalClassOptions, bulkFilters.classId]);
 
-  const selectedSectionLabel = useMemo(() => (
-    bulkSectionOptions.find((item) => String(item.value) === String(bulkFilters.sectionId))?.label || 'all-sections'
-  ), [bulkSectionOptions, bulkFilters.sectionId]);
+  const selectedSectionLabel = useMemo(() => {
+    const found = bulkSectionOptions.find((item) => String(item.value) === String(bulkFilters.sectionId));
+    if (found?.value === '__all__') return 'All Sections';
+    return found?.label || '';
+  }, [bulkSectionOptions, bulkFilters.sectionId]);
 
   const normalizeDisplayValue = (value) => {
     const raw = String(value ?? '').trim();
@@ -573,9 +582,9 @@ const handleBulkDownload = async () => {
       };
       
       const enrolledStudentsRes = await studentService.getAll(studentFilters, currentInstitute?.type || 'school');
-      enrolledStudentIds = (enrolledStudentsRes?.data?.rows || enrolledStudentsRes?.rows || enrolledStudentsRes || [])
-        .map(student => student.id)
-        .filter(Boolean);
+      const studentData = enrolledStudentsRes?.data?.rows || enrolledStudentsRes?.rows || (Array.isArray(enrolledStudentsRes?.data) ? enrolledStudentsRes.data : []) || (Array.isArray(enrolledStudentsRes) ? enrolledStudentsRes : []);
+      
+      enrolledStudentIds = studentData.map(student => student.id).filter(Boolean);
       
       console.log(`✅ Found ${enrolledStudentIds.length} enrolled students`);
       
@@ -767,19 +776,23 @@ const handleBulkDownload = async () => {
       let finalClassName = normalizeDisplayValue(voucher?.className) ||
                          normalizeDisplayValue(voucher?.class_name) ||
                          normalizeDisplayValue(hydratedStudent?.hydratedClassName) ||
-                         classNameById.get(classId) ||
-                         (isClassMode ? selectedClassLabel : 'N/A');
+                         (classId ? classNameById.get(classId) : '') ||
+                         (isClassMode || isStudentMode ? selectedClassLabel : '');
       
       // Comprehensive section name fallback chain  
       let finalSectionName = normalizeDisplayValue(voucher?.sectionName) ||
                            normalizeDisplayValue(voucher?.section_name) ||
                            normalizeDisplayValue(hydratedStudent?.hydratedSectionName) ||
-                           sectionNameById.get(sectionId) ||
+                           (sectionId ? sectionNameById.get(sectionId) : '') ||
                            (isClassMode && bulkFilters.sectionId === '__all__' ? 'All Sections' : selectedSectionLabel);
       
-      // Final fallbacks
-      finalClassName = finalClassName || (isClassMode ? selectedClassLabel : 'N/A');
-      finalSectionName = finalSectionName || (isClassMode && bulkFilters.sectionId === '__all__' ? 'All Sections' : 'N/A');
+      // Final fallbacks - strictly use mode-based labels if still empty
+      if (!normalizeDisplayValue(finalClassName)) {
+        finalClassName = selectedClassLabel || (isClassMode ? 'Class' : 'N/A');
+      }
+      if (!normalizeDisplayValue(finalSectionName)) {
+        finalSectionName = selectedSectionLabel || (isClassMode ? 'All Sections' : 'N/A');
+      }
       
       console.log(`📋 Voucher ${voucher?.voucherNumber}: Class="${finalClassName}", Section="${finalSectionName}"`);
       
@@ -838,6 +851,17 @@ const handleBulkDownload = async () => {
 
     downloadBlob(blob, `${safeName}.pdf`);
     toast.success(`✅ Downloaded ${vouchersList.length} vouchers for ${enrolledStudentIds.length} enrolled students only! 🎉`);
+    
+    // 🎯 STEP 5: Reset filters
+    setBulkFilters({
+      academicYearId: bulkFilters.academicYearId, // Keep year
+      classId: currentInstitute?.type === 'institute' ? '__all__' : '',
+      sectionId: currentInstitute?.type === 'institute' ? '__all__' : '',
+      month: currentMonth,
+      studentId: '',
+      feeType: '__all__',
+      dueDate: '',
+    });
     setBulkDownloadOpen(false);
     
     console.groupEnd();
@@ -1102,7 +1126,30 @@ const handleDownloadVoucher = async (voucher) => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Fee Vouchers" description={`${voucherStats.total} vouchers • ${voucherStats.pending} pending`} />
+      <PageHeader 
+        title="Fee Vouchers" 
+        description={`${voucherStats.total} vouchers • ${voucherStats.pending} pending`} 
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {hasPermission('fees.read') && (
+              <Button
+                onClick={() => setBulkDownloadOpen(true)}
+                // className="flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Download size={14} /> Bulk Download
+              </Button>
+            )}
+            {canGenerateBulkVouchers && (
+              <Button 
+                onClick={() => setVoucherGeneratorModal(true)} 
+                // className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity shadow-sm"
+              >
+                <Plus size={14} /> Generate Bulk Vouchers
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       {/* Filters */}
       <div className="space-y-3">
@@ -1144,26 +1191,6 @@ const handleDownloadVoucher = async (voucher) => {
             setVoucherPage(1);
           },
         }}
-        action={
-          <div className="flex items-center gap-2">
-            {hasPermission('fees.read') && (
-              <button
-                onClick={() => setBulkDownloadOpen(true)}
-                className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <Download size={14} /> Download Bulk Voucher
-              </button>
-            )}
-            {canGenerateBulkVouchers && (
-              <button 
-                onClick={() => setVoucherGeneratorModal(true)} 
-                className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
-              >
-                <FileText size={14} /> Generate Vouchers
-              </button>
-            )}
-          </div>
-        }
       />
 
       {/* Bulk Voucher Generator Modal */}
@@ -1229,14 +1256,6 @@ const handleDownloadVoucher = async (voucher) => {
           <div className="grid gap-4 md:grid-cols-2">
             {bulkDownloadMode === 'student' && (
               <>
-                <SearchableSingleSelect
-                  label="Student ID"
-                  options={bulkStudentOptions}
-                  value={String(bulkFilters.studentId || '')}
-                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, studentId: val }))}
-                  placeholder={bulkFilters.classId ? 'Select student' : 'Select class first'}
-                  disabled={!bulkFilters.classId || bulkFilters.classId === '__all__'}
-                />
                 <SelectField
                   label="Academic Year"
                   options={academicYearsData.map((ay) => ({ value: String(ay.id), label: ay.name }))}
@@ -1248,6 +1267,26 @@ const handleDownloadVoucher = async (voucher) => {
                   options={modalClassOptions}
                   value={String(bulkFilters.classId || '')}
                   onChange={(val) => setBulkFilters((prev) => ({ ...prev, classId: val }))}
+                />
+                <SelectField
+                  label="Section"
+                  options={bulkSectionOptions}
+                  value={bulkFilters.sectionId ? String(bulkFilters.sectionId) : '__all__'}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, sectionId: val || '__all__' }))}
+                />
+                <SearchableSingleSelect
+                  label="Student"
+                  options={bulkStudentOptions}
+                  value={String(bulkFilters.studentId || '')}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, studentId: val }))}
+                  placeholder={bulkFilters.classId ? 'Select student' : 'Select class first'}
+                  disabled={!bulkFilters.classId || bulkFilters.classId === '__all__'}
+                />
+                <SelectField
+                  label="Month"
+                  options={MONTH_OPTS}
+                  value={String(bulkFilters.month || currentMonth)}
+                  onChange={(val) => setBulkFilters((prev) => ({ ...prev, month: val }))}
                 />
               </>
             )}
@@ -1521,12 +1560,22 @@ const handleDownloadVoucher = async (voucher) => {
               <div className="rounded-lg border p-4 space-y-3">
                 <h4 className="font-semibold text-sm">Fee Breakdown</h4>
                 <div className="space-y-2 text-sm">
-                  {Object.entries(viewingVoucher.feeBreakdown).map(([key, value]) => (
-                    <div key={key} className="flex justify-between">
-                      <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
-                      <span className="font-medium">{typeof value === 'number' ? `PKR ${value.toLocaleString('en-PK')}` : String(value)}</span>
-                    </div>
-                  ))}
+                  {Object.entries(viewingVoucher.feeBreakdown).map(([key, value]) => {
+                    const isPercentage = key.toLowerCase().includes('percentage');
+                    const discountType = viewingVoucher.feeBreakdown.discount_type;
+                    const isConcessionField = key.toLowerCase().includes('concession') || key.toLowerCase().includes('discount');
+                    
+                    return (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
+                        <span className="font-medium">
+                          {typeof value === 'number' 
+                            ? (isPercentage || (isConcessionField && discountType === 'percentage') ? `${value}%` : `PKR ${value.toLocaleString('en-PK')}`) 
+                            : String(value)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
