@@ -81,6 +81,7 @@ function SearchableSingleSelect({ label, value, onChange, options = [], placehol
           <button
             type="button"
             disabled={disabled}
+            suppressHydrationWarning
             className={cn(
               'flex h-10 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 text-left text-sm outline-none transition-colors focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50',
               !selectedOption && 'text-slate-400'
@@ -140,6 +141,11 @@ export default function FeesPage() {
   const [markingAsPaid, setMarkingAsPaid] = useState(null);
   const [recordingPayment, setRecordingPayment] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', referenceNo: '', remarks: '' });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [bulkDownloadOpen, setBulkDownloadOpen] = useState(false);
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [bulkDownloadMode, setBulkDownloadMode] = useState('class');
@@ -1130,24 +1136,24 @@ const handleDownloadVoucher = async (voucher) => {
         title="Fee Vouchers" 
         description={`${voucherStats.total} vouchers • ${voucherStats.pending} pending`} 
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            {hasPermission('fees.read') && (
-              <Button
-                onClick={() => setBulkDownloadOpen(true)}
-                // className="flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <Download size={14} /> Bulk Download
-              </Button>
-            )}
-            {canGenerateBulkVouchers && (
-              <Button 
-                onClick={() => setVoucherGeneratorModal(true)} 
-                // className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity shadow-sm"
-              >
-                <Plus size={14} /> Generate Bulk Vouchers
-              </Button>
-            )}
-          </div>
+          mounted && (
+            <div className="flex flex-wrap items-center gap-2">
+              {hasPermission('fees.read') && (
+                <Button
+                  onClick={() => setBulkDownloadOpen(true)}
+                >
+                  <Download size={14} /> Bulk Download
+                </Button>
+              )}
+              {canGenerateBulkVouchers && (
+                <Button 
+                  onClick={() => setVoucherGeneratorModal(true)} 
+                >
+                  <Plus size={14} /> Generate Bulk Vouchers
+                </Button>
+              )}
+            </div>
+          )
         }
       />
 
