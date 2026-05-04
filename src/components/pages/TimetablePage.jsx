@@ -29,6 +29,7 @@ import ErrorAlert from '@/components/common/ErrorAlert';
 import PageLoader from '@/components/common/PageLoader';
 import StatusBadge from '@/components/common/StatusBadge';
 import TimePickerField from '@/components/common/TimePickerField';
+import DatePickerField from '@/components/common/DatePickerField';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -191,21 +192,41 @@ function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, l
   const [breaks, setBreaks] = useState([]);
   const [totalPeriods, setTotalPeriods] = useState(8);
   const [selectedDays, setSelectedDays] = useState([]);
+  
+  // Extra Fields
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().split('T')[0]);
+  const [effectiveTo, setEffectiveTo] = useState('');
 
   // Initialize form when modal opens
   useEffect(() => {
     if (open) {
       if (initialConfig) {
         // Edit mode - use existing config
-        setTotalPeriods(initialConfig.total_periods || 8);
-        setPeriods(initialConfig.periods || []);
-        setBreaks(initialConfig.breaks || []);
-        setSelectedDays(initialConfig.days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+        setName(initialConfig.name || '');
+        setDescription(initialConfig.description || '');
+        setIsActive(initialConfig.is_active !== false);
+        setEffectiveFrom(initialConfig.effective_from ? new Date(initialConfig.effective_from).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+        setEffectiveTo(initialConfig.effective_to ? new Date(initialConfig.effective_to).toISOString().split('T')[0] : '');
+
+        const config = initialConfig.period_config || {};
+        setTotalPeriods(config.total_periods || 8);
+        setPeriods(config.periods || []);
+        setBreaks(config.breaks || []);
+        setSelectedDays(config.days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
       } else {
-        // Create mode - default config
+        // Create mode
+        setName('');
+        setDescription('');
+        setIsActive(true);
+        setEffectiveFrom(new Date().toISOString().split('T')[0]);
+        setEffectiveTo('');
+        
         setTotalPeriods(8);
         const defaultPeriods = [];
-        let currentTime = 8 * 60; // 8:00 AM in minutes
+        let currentTime = 8 * 60; // 8:00 AM
         
         for (let i = 1; i <= 8; i++) {
           const startHour = Math.floor(currentTime / 60);
@@ -372,15 +393,22 @@ function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, l
   const handleSubmit = () => {
     if (!validateForm()) return;
 
-    const config = {
-      total_periods: totalPeriods,
-      periods: periods,
-      breaks: breaks,
-      days: selectedDays,
-      days_count: selectedDays.length
+    const data = {
+      name: name || '',
+      description: description || '',
+      is_active: isActive,
+      effective_from: effectiveFrom,
+      effective_to: effectiveTo || null,
+      period_config: {
+        total_periods: totalPeriods,
+        periods: periods,
+        breaks: breaks,
+        days: selectedDays,
+        days_count: selectedDays.length
+      }
     };
 
-    onSubmit(config);
+    onSubmit(data);
   };
 
   return (
@@ -401,6 +429,56 @@ function TimetableConfigModal({ open, onClose, onSubmit, initialConfig = null, l
       }
     >
       <div className="space-y-6 max-h-[70vh] overflow-y-auto px-1">
+        {/* Basic Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Timetable Name</Label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Class 1 Section A Timetable"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Brief description"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            />
+          </div>
+          <DatePickerField
+            label="Effective From"
+            name="effective_from"
+            value={effectiveFrom}
+            onChange={setEffectiveFrom}
+            required
+          />
+          <DatePickerField
+            label="Effective To (Optional)"
+            name="effective_to"
+            value={effectiveTo}
+            onChange={setEffectiveTo}
+          />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox 
+            id="modal_is_active" 
+            checked={isActive} 
+            onCheckedChange={setIsActive} 
+          />
+          <Label htmlFor="modal_is_active" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            Timetable is Active
+          </Label>
+        </div>
+
+        <Separator />
+
         {/* Days Selection */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -901,6 +979,15 @@ export default function TimetablePage({ type }) {
     onError: (error) => toast.error(error.message || 'Failed to delete slot')
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, isActive }) => timetableService.toggleStatus(id, isActive),
+    onSuccess: (data) => {
+      toast.success(data.message || 'Status updated');
+      queryClient.invalidateQueries({ queryKey: ['timetables'] });
+    },
+    onError: (error) => toast.error(error.message || 'Failed to update status')
+  });
+
   // Slot Form
   const { control, register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -1081,41 +1168,45 @@ export default function TimetablePage({ type }) {
 
   const handleEditConfig = () => {
     if (currentTimetable) {
-      setPeriodConfig(currentTimetable.period_config);
+      setPeriodConfig(currentTimetable);
       setConfigModalOpen(true);
     }
   };
 
-  const handleConfigSubmit = (config) => {
+  const handleConfigSubmit = (formData) => {
     const entityIds = {};
-    let name = '';
+    let autoName = '';
 
     if (entityType === 'school') {
       entityIds.class_id = selectedClass;
       const classObj = classes.find(c => c.id === selectedClass);
-      name = classObj?.name || 'Class';
+      autoName = classObj?.name || 'Class';
 
       if (selectedSection) {
         entityIds.section_id = selectedSection;
         const section = classObj?.sections?.find(s => s.id === selectedSection);
-        name += ` - ${section?.name || 'Section'}`;
+        autoName += ` - ${section?.name || 'Section'}`;
       }
     }
 
+    const payload = {
+      ...formData,
+      name: formData.name || `${autoName} Timetable`,
+      academic_year_id: selectedAcademicYear,
+      entity_type: entityType,
+      entity_ids: entityIds,
+    };
+
     if (currentTimetable) {
-      // Update existing timetable config
+      // Update existing timetable
       updateTimetableMutation.mutate({
         id: currentTimetable.id,
-        data: { period_config: config }
+        data: payload
       });
     } else {
       // Create new timetable
       createTimetableMutation.mutate({
-        name: `${name} Timetable`,
-        academic_year_id: selectedAcademicYear,
-        entity_type: entityType,
-        entity_ids: entityIds,
-        period_config: config,
+        ...payload,
         slots: []
       });
     }
@@ -1192,6 +1283,13 @@ export default function TimetablePage({ type }) {
       doc.setFontSize(14);
       doc.setTextColor(15, 23, 42);
       doc.text('WEEKLY CLASS TIMETABLE', margin, yPos);
+      
+      if (currentTimetable?.name) {
+        yPos += 6;
+        doc.setFontSize(11);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`${currentTimetable.name} (${currentTimetable.is_active ? 'ACTIVE' : 'INACTIVE'})`, margin, yPos);
+      }
 
       // Class Info
       yPos += 7;
@@ -1745,7 +1843,23 @@ export default function TimetablePage({ type }) {
                 <Badge variant="outline" className="text-sm">
                   {currentTimetable.name}
                 </Badge>
-                <StatusBadge status={currentTimetable.is_active ? 'active' : 'inactive'} />
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={currentTimetable.is_active ? 'active' : 'inactive'} />
+                  {canDo('timetable.update') && (
+                    <Button 
+                      variant="ghost" 
+                      size="xs" 
+                      className="h-7 px-2 text-[10px]"
+                      onClick={() => toggleStatusMutation.mutate({ 
+                        id: currentTimetable.id, 
+                        isActive: !currentTimetable.is_active 
+                      })}
+                      disabled={toggleStatusMutation.isPending}
+                    >
+                      {currentTimetable.is_active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                  )}
+                </div>
                 <span className="text-sm text-muted-foreground">
                   Periods: {currentTimetable.period_config?.total_periods || 8}
                 </span>
