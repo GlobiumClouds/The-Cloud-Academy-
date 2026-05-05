@@ -35,8 +35,8 @@ export default function ChangePasswordModal({ open, onClose, user }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (password.length < 6) {
-      return toast.error('Password must be at least 6 characters long');
+    if (password.length < 8) {
+      return toast.error('Password must be at least 8 characters long');
     }
     if (password !== confirmPassword) {
       return toast.error('Passwords do not match');
