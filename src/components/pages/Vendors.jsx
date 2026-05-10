@@ -135,25 +135,47 @@ export default function Vendors() {
   const totalPages = vendorsData?.pagination?.totalPages || 0;
 
   // ─── Fetch Students for Assignment Modal ────────────────────────────────
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(assignmentSearch);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [assignmentSearch]);
+
   const {
     data: studentsData = [],
     isLoading: studentsLoading,
   } = useQuery({
-    queryKey: ['students-for-vendors', type],
+    queryKey: ['students-assignment', type, debouncedSearch],
     queryFn: async () => {
       if (!type) return [];
       try {
-        const res = await studentService.getAll({ page: 1, limit: 1000, is_active: true }, type);
-        if (Array.isArray(res?.data?.rows)) return res.data.rows;
-        if (Array.isArray(res?.data)) return res.data;
-        if (Array.isArray(res?.rows)) return res.rows;
-        if (Array.isArray(res)) return res;
-        return [];
+        let res;
+        const q = debouncedSearch.trim();
+        
+        if (q) {
+          res = await studentService.search(q, 100);
+        } else {
+          res = await studentService.getAll({ page: 1, limit: 1000, is_active: true }, type);
+        }
+
+        let list = [];
+        if (Array.isArray(res?.data?.data)) list = res.data.data;
+        else if (Array.isArray(res?.data?.rows)) list = res.data.rows;
+        else if (Array.isArray(res?.data)) list = res.data;
+        else if (Array.isArray(res?.rows)) list = res.rows;
+        else if (Array.isArray(res)) list = res;
+        
+        return list;
       } catch (error) {
+        console.error('Error fetching students:', error);
         return [];
       }
     },
-    staleTime: 5 * 60 * 1000,
+    enabled: !!type,
+    staleTime: 2 * 60 * 1000,
   });
 
   // ─── Mutations ──────────────────────────────────────────────────────────
@@ -324,9 +346,6 @@ export default function Vendors() {
 
   // ─── Memos ──────────────────────────────────────────────────────────────
   const filteredStudents = useMemo(() => {
-    const q = assignmentSearch.trim().toLowerCase();
-
-    // Find all student IDs assigned to OTHER vendors
     const assignedToOtherVendors = new Set();
     vendors.forEach(v => {
       if (v.id !== assigningVendor?.id && v.assigned_student_ids) {
@@ -334,17 +353,8 @@ export default function Vendors() {
       }
     });
 
-    return studentsData.filter((student) => {
-      // Exclude if assigned to another vendor
-      if (assignedToOtherVendors.has(student.id)) return false;
-
-      if (!q) return true;
-      const name = studentDisplayName(student).toLowerCase();
-      const regNo = String(student.registration_no || student.roll_no || '').toLowerCase();
-      const classSec = `${student.class_name || ''} ${student.section_name || ''}`.toLowerCase();
-      return name.includes(q) || regNo.includes(q) || classSec.includes(q);
-    });
-  }, [studentsData, assignmentSearch, vendors, assigningVendor]);
+    return studentsData.filter((student) => !assignedToOtherVendors.has(student.id));
+  }, [studentsData, vendors, assigningVendor]);
 
   const assignedStudentsList = useMemo(() => {
     if (!viewingVendor?.assigned_student_ids?.length) return [];
@@ -368,20 +378,22 @@ export default function Vendors() {
         return opt?.label || normalizeTypeLabel(value);
       }
     },
-    { accessorKey: 'phone', header: 'Phone', cell: ({ getValue }) => getValue() || '—' },
-    { accessorKey: 'email', header: 'Email', cell: ({ getValue }) => getValue() || '—' },
+    { accessorKey: 'phone', header: 'Phone', cell: ({ getValue }) => <div className="text-center">{getValue() || '—'}</div> },
+    { accessorKey: 'email', header: 'Email', cell: ({ getValue }) => <div className="text-center">{getValue() || '—'}</div> },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: () => <div className="text-center">Status</div>,
       cell: ({ getValue }) => {
         const value = getValue();
         return (
-          <span className={cn(
-            'rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
-            value === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-          )}>
-            {value}
-          </span>
+          <div className="flex justify-center">
+            <span className={cn(
+              'rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
+              value === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+            )}>
+              {value}
+            </span>
+          </div>
         );
       }
     },
@@ -420,11 +432,13 @@ export default function Vendors() {
     },
   ], [canDo]);
 
+  if (!mounted) return null;
+
   if (!canDo('vendors.read')) {
     return <div className="py-20 text-center text-muted-foreground">You don't have permission to view vendors.</div>;
   }
 
-  if (!mounted || (vendorsLoading && vendors.length === 0)) {
+  if (vendorsLoading && vendors.length === 0) {
     return (
       <div className="flex h-[60vh] w-full items-center justify-center">
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
