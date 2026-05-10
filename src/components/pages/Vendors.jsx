@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Eye, EyeOff, Pencil, Plus, Trash2, RefreshCw, Users, Search, X, Zap } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, Trash2, RefreshCw, Users, Search, X, Zap, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import DataTable from '@/components/common/DataTable';
@@ -10,6 +10,8 @@ import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
 import SelectField from '@/components/common/SelectField';
 import CreatableSelectField from '@/components/common/CreatableSelectField';
+import TableRowActions from '@/components/common/TableRowActions';
+import PhoneInputField from '@/components/common/PhoneInput';
 import { cn } from '@/lib/utils';
 import { studentService } from '@/services/studentService';
 import { vendorService } from '@/services/vendorService';
@@ -252,8 +254,19 @@ export default function Vendors() {
   const onSave = (e) => {
     e.preventDefault();
 
-    if (!form.name || !form.type || !form.phone || !form.status) {
+    if (!form.name || !form.type || !form.phone || !form.status || !form.email) {
       toast.error('Please fill all required fields');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (form.email && !emailRegex.test(form.email.trim())) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    if (form.phone && form.phone.length < 11) {
+      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -266,10 +279,15 @@ export default function Vendors() {
       name: form.name.trim(),
       type: form.type,
       phone: form.phone.trim(),
-      email: form.email?.trim() || '',
       address: form.address?.trim() || '',
       status: form.status,
     };
+
+    if (form.email?.trim()) {
+      payload.email = form.email.trim();
+    } else {
+      payload.email = null;
+    }
 
     if (form.password) {
       payload.password = form.password;
@@ -307,14 +325,26 @@ export default function Vendors() {
   // ─── Memos ──────────────────────────────────────────────────────────────
   const filteredStudents = useMemo(() => {
     const q = assignmentSearch.trim().toLowerCase();
+
+    // Find all student IDs assigned to OTHER vendors
+    const assignedToOtherVendors = new Set();
+    vendors.forEach(v => {
+      if (v.id !== assigningVendor?.id && v.assigned_student_ids) {
+        v.assigned_student_ids.forEach(id => assignedToOtherVendors.add(id));
+      }
+    });
+
     return studentsData.filter((student) => {
+      // Exclude if assigned to another vendor
+      if (assignedToOtherVendors.has(student.id)) return false;
+
       if (!q) return true;
       const name = studentDisplayName(student).toLowerCase();
       const regNo = String(student.registration_no || student.roll_no || '').toLowerCase();
       const classSec = `${student.class_name || ''} ${student.section_name || ''}`.toLowerCase();
       return name.includes(q) || regNo.includes(q) || classSec.includes(q);
     });
-  }, [studentsData, assignmentSearch]);
+  }, [studentsData, assignmentSearch, vendors, assigningVendor]);
 
   const assignedStudentsList = useMemo(() => {
     if (!viewingVendor?.assigned_student_ids?.length) return [];
@@ -357,51 +387,33 @@ export default function Vendors() {
     },
     {
       id: 'actions',
-      header: 'Actions',
+      header: () => <div className="text-center">Actions</div>,
       enableHiding: false,
       cell: ({ row }) => {
-        const isTransport = row.original.type === 'transport';
-        const assignCount = row.original.assigned_student_ids?.length || 0;
+        const vendor = row.original;
+        const isTransport = vendor.type === 'transport';
+        const assignCount = vendor.assigned_student_ids?.length || 0;
+
+        const extraActions = [];
+        if (canDo('vendors.update') && isTransport) {
+          extraActions.push({
+            label: `Assign Students (${assignCount})`,
+            icon: Users,
+            onClick: () => openAssignModal(vendor),
+          });
+        }
 
         return (
-          <div className="flex items-center justify-end gap-1">
-            {canDo('vendors.read') && (
-              <button onClick={() => openView(row.original)} className="rounded p-1.5 hover:bg-accent" title="View">
-                <Eye size={14} />
-              </button>
-            )}
-            {canDo('vendors.update') && (
-              <button onClick={() => openEdit(row.original)} className="rounded p-1.5 hover:bg-accent" title="Edit">
-                <Pencil size={14} />
-              </button>
-            )}
-            {/* Show "Add Students" button only for Transport vendors */}
-            {canDo('vendors.update') && isTransport && (
-              <button
-                onClick={() => openAssignModal(row.original)}
-                className="rounded p-1.5 hover:bg-accent text-blue-600 hover:text-blue-700 relative"
-                title={`${assignCount} students assigned`}
-              >
-                <Users size={14} />
-                {assignCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold">
-                    {assignCount}
-                  </span>
-                )}
-              </button>
-            )}
-            {canDo('vendors.delete') && (
-              <button
-                onClick={() => {
-                  setDeletingVendor(row.original);
-                  setDeleteModalOpen(true);
-                }}
-                className="rounded p-1.5 text-destructive hover:bg-destructive/10"
-                title="Delete"
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
+          <div className="flex justify-center">
+            <TableRowActions
+              onView={canDo('vendors.read') ? () => openView(vendor) : undefined}
+              onEdit={canDo('vendors.update') ? () => openEdit(vendor) : undefined}
+              onDelete={canDo('vendors.delete') ? () => {
+                setDeletingVendor(vendor);
+                setDeleteModalOpen(true);
+              } : undefined}
+              extra={extraActions}
+            />
           </div>
         );
       }
@@ -410,6 +422,17 @@ export default function Vendors() {
 
   if (!canDo('vendors.read')) {
     return <div className="py-20 text-center text-muted-foreground">You don't have permission to view vendors.</div>;
+  }
+
+  if (!mounted || (vendorsLoading && vendors.length === 0)) {
+    return (
+      <div className="flex h-[60vh] w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm font-medium">Loading Vendors...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -492,7 +515,10 @@ export default function Vendors() {
       {/* Add/Edit Vendor Modal */}
       <AppModal
         open={formModalOpen}
-        onClose={closeFormModal}
+        onClose={() => {
+          if (createMutation.isPending || updateMutation.isPending) return;
+          closeFormModal();
+        }}
         title={editingVendor ? 'Edit Vendor' : 'Add Vendor'}
         size="lg"
         footer={
@@ -541,24 +567,21 @@ export default function Vendors() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <PhoneInputField
+              label="Phone"
+              value={form.phone}
+              onChange={(val) => setForm((p) => ({ ...p, phone: val }))}
+              required
+            />
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Phone *</label>
-              <input
-                value={form.phone}
-                onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                className="input-base"
-                placeholder="0300-1234567"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Email</label>
+              <label className="text-sm font-medium">Email *</label>
               <input
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                 className="input-base"
                 placeholder="vendor@example.com"
+                required
               />
             </div>
           </div>
