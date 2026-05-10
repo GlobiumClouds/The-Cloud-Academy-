@@ -154,7 +154,7 @@ export default function Vendors() {
       try {
         let res;
         const q = debouncedSearch.trim();
-        
+
         if (q) {
           res = await studentService.search(q, 100);
         } else {
@@ -167,7 +167,7 @@ export default function Vendors() {
         else if (Array.isArray(res?.data)) list = res.data;
         else if (Array.isArray(res?.rows)) list = res.rows;
         else if (Array.isArray(res)) list = res;
-        
+
         return list;
       } catch (error) {
         console.error('Error fetching students:', error);
