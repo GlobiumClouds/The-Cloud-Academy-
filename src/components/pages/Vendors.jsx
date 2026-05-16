@@ -282,7 +282,7 @@ export default function Vendors() {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (form.email && !emailRegex.test(form.email.trim())) {
+    if (!emailRegex.test(trimmedEmail)) {
       toast.error('Please enter a valid email address');
       return;
     }
