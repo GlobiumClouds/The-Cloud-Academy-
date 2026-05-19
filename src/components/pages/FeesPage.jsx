@@ -140,6 +140,8 @@ export default function FeesPage() {
 
   const [voucherGeneratorModal, setVoucherGeneratorModal] = useState(false);
   const [deletingVoucher, setDeletingVoucher] = useState(null);
+  const [selectedVouchers, setSelectedVouchers] = useState([]);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(null);
   const [markingPaid, setMarkingPaid] = useState(new Map());
   const [voucherPage, setVoucherPage] = useState(1);
@@ -476,6 +478,33 @@ const { data: bulkClasses = [] } = useQuery({
       }
     },
   });
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (voucherIds) => feeVoucherService.bulkDelete(voucherIds),
+    onSuccess: (res) => {
+      toast.success(res?.message || 'Selected vouchers deleted successfully');
+      setConfirmBulkDelete(false);
+      setSelectedVouchers([]);
+      refetchVouchers();
+      qc.invalidateQueries({ queryKey: ['fee-vouchers'] });
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to delete selected vouchers');
+      setConfirmBulkDelete(false);
+    }
+  });
+
+  const handleBulkDelete = () => {
+    const voucherIds = Array.isArray(selectedVouchers)
+      ? selectedVouchers.map(v => v.id).filter(Boolean)
+      : [];
+    if (voucherIds.length === 0) {
+      toast.warning('No vouchers selected');
+      return;
+    }
+    bulkDeleteMutation.mutate(voucherIds);
+  };
 
   // Mark voucher as paid
   const markAsPaidMutation = useMutation({
@@ -1235,6 +1264,18 @@ const downloadReceipt = async (payment, voucher) => {
         emptyMessage="No vouchers found for selected filters"
         enableColumnVisibility
         exportConfig={{ fileName: `fee-vouchers-${voucherMonth}` }}
+        enableRowSelection={hasPermission('fees.delete')}
+        onRowSelectionChange={setSelectedVouchers}
+        selectionActions={
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            className="h-9 gap-1.5 text-sm"
+            onClick={() => setConfirmBulkDelete(true)}
+          >
+            <Trash2 size={14} /> Delete Selected Vouchers
+          </Button>
+        }
         pagination={{
           page: voucherPagination.page,
           pageSize: voucherPageSize,
@@ -1448,6 +1489,18 @@ const downloadReceipt = async (payment, voucher) => {
         title="Delete Voucher"
         description={`Delete voucher ${deletingVoucher?.voucher_number}? This action cannot be undone.`}
         confirmLabel="Delete"
+        variant="destructive"
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
+        onConfirm={handleBulkDelete}
+        loading={bulkDeleteMutation.isPending}
+        title="Delete Selected Vouchers"
+        description={`Are you sure you want to delete ${Array.isArray(selectedVouchers) ? selectedVouchers.length : 0} selected vouchers? This action cannot be undone.`}
+        confirmLabel="Delete All Selected"
         variant="destructive"
       />
 

@@ -426,7 +426,7 @@ export const feeVoucherService = {
         academicYearId: options.academicYearId || undefined,
         feeTemplateId: options.feeTemplateId || undefined,
       }, {
-        timeout: 30000
+        timeout: 600000
       });
 
       const result = response.data?.data || {};
@@ -468,7 +468,7 @@ export const feeVoucherService = {
         academicYearId: options.academicYearId || undefined,
         feeTemplateId: options.feeTemplateId || undefined,
       }, {
-        timeout: 60000
+        timeout: 600000
       });
 
       const result = response.data?.data || {};
@@ -1367,4 +1367,21 @@ export const feeVoucherService = {
 
 };
 
-export default feeVoucherService;
+feeVoucherService.bulkDelete = async (voucherIds) => {
+  try {
+    if (!Array.isArray(voucherIds) || voucherIds.length === 0) {
+      throw new Error('Voucher IDs array is required');
+    }
+    const response = await api.post('/fee-vouchers/bulk-delete', { voucherIds }, { timeout: 15000 });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to bulk delete vouchers:', error);
+    throw {
+      message: error.response?.data?.message || error.message || 'Failed to bulk delete vouchers',
+      status: error.response?.status,
+      error
+    };
+  }
+};
+
+export default feeVoucherService;
