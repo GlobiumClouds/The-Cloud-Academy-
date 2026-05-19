@@ -62,6 +62,7 @@ import { NotificationBell } from "../common";
 import { useQuery } from "@tanstack/react-query";
 import { publicService } from "@/services";
 import { ShieldAlert } from "lucide-react";
+import { useSocket } from "@/hooks/useSocket";
 
 // ─── Nav helpers with updated permissions ────────────────────────────────────
 function buildParentNav(t, navLabels) {
@@ -267,6 +268,9 @@ export default function PortalShell({ children, type }) {
   const [hydrated, setHydrated] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const user = portalUser;
+
+  // Initialize and keep real-time Socket.io active across all portal pages
+  useSocket();
 
   // ── Global Platform Status Query ──
   const { data: platformStatus } = useQuery({
