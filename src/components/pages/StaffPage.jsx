@@ -25,6 +25,7 @@ import { TableRowActions } from '@/components/common';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import useAuthStore from '@/store/authStore';
 import { staffService } from '@/services/staffService';
+import { settingService } from '@/services';
 import DataTable from '@/components/common/DataTable';
 import PageHeader from '@/components/common/PageHeader';
 import AppModal from '@/components/common/AppModal';
@@ -189,6 +190,15 @@ export default function StaffManagementPage({ instituteType }) {
     const qc = useQueryClient();
     const canDo = useAuthStore((s) => s.canDo);
     const user = useAuthStore((s) => s.user);
+
+    // Fetch settingsData to check document allowance settings
+    const { data: settingsData } = useQuery({
+        queryKey: ['institute-settings'],
+        queryFn: () => settingService.getSettings(),
+        staleTime: 5 * 60_000,
+    });
+
+    const staffDocsAllowed = settingsData?.institute?.settings?.document_settings?.staff_docs_allowed !== false;
 
     // State
     const [search, setSearch] = useState('');
@@ -1349,19 +1359,27 @@ export default function StaffManagementPage({ instituteType }) {
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center">
                                             <h3 className="text-lg font-semibold">Documents</h3>
-                                            <Button type="button" variant="outline" size="sm" onClick={addDocument}>
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add Document
-                                            </Button>
+                                            {staffDocsAllowed ? (
+                                                <Button type="button" variant="outline" size="sm" onClick={addDocument}>
+                                                    <Plus className="h-4 w-4 mr-2" />
+                                                    Add Document
+                                                </Button>
+                                            ) : (
+                                                <span className="text-xs font-medium text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                                                    ⚠️ File upload is disabled by administrator
+                                                </span>
+                                            )}
                                         </div>
 
                                         {watchDocuments?.length === 0 ? (
                                             <div className="text-center py-8 border-2 border-dashed rounded-lg">
                                                 <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                                                 <p className="text-muted-foreground">No documents added yet</p>
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Click "Add Document" to upload files
-                                                </p>
+                                                {staffDocsAllowed && (
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        Click "Add Document" to upload files
+                                                    </p>
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="space-y-4">
@@ -1369,15 +1387,17 @@ export default function StaffManagementPage({ instituteType }) {
                                                     <div key={index} className="border rounded-lg p-4">
                                                         <div className="flex justify-between mb-3">
                                                             <h4 className="font-medium">Document {index + 1}</h4>
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => removeDocument(index)}
-                                                                className="text-destructive"
-                                                            >
-                                                                <X className="h-4 w-4" />
-                                                            </Button>
+                                                            {staffDocsAllowed && (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => removeDocument(index)}
+                                                                    className="text-destructive"
+                                                                >
+                                                                    <X className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
                                                         </div>
 
                                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1436,24 +1456,30 @@ export default function StaffManagementPage({ instituteType }) {
                                                                 </div>
                                                             )}
 
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="file"
-                                                                    id={`doc-${index}`}
-                                                                    className="hidden"
-                                                                    onChange={(e) => handleDocumentUpload(e, index)}
-                                                                />
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => document.getElementById(`doc-${index}`).click()}
-                                                                    className="flex-1"
-                                                                >
-                                                                    <Upload className="h-4 w-4 mr-2" />
-                                                                    {uploadingFiles[index] || 'Choose File'}
-                                                                </Button>
-                                                            </div>
+                                                            {staffDocsAllowed ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="file"
+                                                                        id={`doc-${index}`}
+                                                                        className="hidden"
+                                                                        onChange={(e) => handleDocumentUpload(e, index)}
+                                                                    />
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => document.getElementById(`doc-${index}`).click()}
+                                                                        className="flex-1"
+                                                                    >
+                                                                        <Upload className="h-4 w-4 mr-2" />
+                                                                        {uploadingFiles[index] || 'Choose File'}
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-xs font-medium text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 mt-1">
+                                                                    ℹ️ Uploading new files or choosing alternative attachments is disabled.
+                                                                </div>
+                                                            )}
                                                         </div>
 
                                                         {editingStaff && doc.file_url && (
@@ -1527,3 +1553,8 @@ export default function StaffManagementPage({ instituteType }) {
         </div>
     );
 }
+
+
+
+
+

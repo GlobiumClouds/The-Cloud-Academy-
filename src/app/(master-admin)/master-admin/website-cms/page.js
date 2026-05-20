@@ -764,7 +764,10 @@ export default function WebsiteCMSPage() {
               <div className="w-3 h-3 rounded-full bg-rose-500" />
               <div className="w-3 h-3 rounded-full bg-amber-500" />
               <div className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span className="text-[10px] font-mono bg-white/5 px-4 py-1 rounded-md text-white/40 ml-4">https://thecloudsacademy.pk</span>
+              {branding.faviconUrl ? (
+                <img src={branding.faviconUrl} alt="Favicon" className="w-3.5 h-3.5 ml-3 object-contain rounded" />
+              ) : null}
+              <span className={`text-[10px] font-mono bg-white/5 px-4 py-1 rounded-md text-white/40 ${branding.faviconUrl ? 'ml-1.5' : 'ml-4'}`}>https://thecloudsacademy.pk</span>
             </div>
             <div className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live Mockup Simulator
@@ -786,8 +789,14 @@ export default function WebsiteCMSPage() {
           {/* 2. NAVBAR MOCKUP */}
           <div className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded flex items-center justify-center font-black text-white text-base" style={{ backgroundColor: branding.primaryColor }}>C</div>
-              <span className="font-black text-slate-800 tracking-tight text-base">The Clouds Academy</span>
+              {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt="Logo" className="h-8 max-w-[150px] object-contain" />
+              ) : (
+                <>
+                  <div className="w-8 h-8 rounded flex items-center justify-center font-black text-white text-base" style={{ backgroundColor: branding.primaryColor }}>C</div>
+                  <span className="font-black text-slate-800 tracking-tight text-base">The Clouds Academy</span>
+                </>
+              )}
             </div>
             <div className="hidden md:flex items-center gap-6 text-xs font-bold text-slate-600">
               <a href="#about" className="hover:opacity-80 transition-opacity">About</a>
@@ -1063,8 +1072,14 @@ export default function WebsiteCMSPage() {
             <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-white/5 pb-8 mb-8">
               <div className="space-y-2">
                 <div className="flex items-center justify-center md:justify-start gap-2">
-                  <div className="w-8 h-8 rounded flex items-center justify-center font-black text-white text-base" style={{ backgroundColor: branding.primaryColor }}>C</div>
-                  <span className="font-black text-white tracking-tight text-base">The Clouds Academy</span>
+                  {branding.logoUrl ? (
+                    <img src={branding.logoUrl} alt="Logo" className="h-8 max-w-[150px] object-contain invert brightness-200" />
+                  ) : (
+                    <>
+                      <div className="w-8 h-8 rounded flex items-center justify-center font-black text-white text-base" style={{ backgroundColor: branding.primaryColor }}>C</div>
+                      <span className="font-black text-white tracking-tight text-base">The Clouds Academy</span>
+                    </>
+                  )}
                 </div>
                 <p className="text-[11px] text-white/40">The next-generation smart school cloud system compiler.</p>
               </div>

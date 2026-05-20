@@ -8,13 +8,14 @@ import {
   Type, Settings2, Database, Loader2, Award, CloudLightning
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { InputField, AppModal, FormSubmitButton, SelectField, ColorPickerField } from '@/components/common';
+import { InputField, AppModal, FormSubmitButton, SelectField, ColorPickerField, GlobalFileUploader } from '@/components/common';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { masterAdminService } from '@/services';
 
 export default function BrandingPage() {
   const [mounted, setMounted] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [primaryColor, setPrimaryColor] = useState('#4F46E5');
   const [secondaryColor, setSecondaryColor] = useState('#0F172A');
   const [showAssetModal, setShowAssetModal] = useState(false);
@@ -59,7 +60,6 @@ export default function BrandingPage() {
 
   // Load from Postgres on mount
   useEffect(() => {
-    setMounted(true);
     const fetchBranding = async () => {
       try {
         setLoading(true);
@@ -79,6 +79,8 @@ export default function BrandingPage() {
         toast.error('Offline mode: Could not fetch branding settings from database.');
       } finally {
         setLoading(false);
+        setInitialLoaded(true);
+        setMounted(true);
       }
     };
     fetchBranding();
@@ -86,7 +88,7 @@ export default function BrandingPage() {
 
   // ⚡ HIGH-TECH REALTIME AUTO-SAVE DEBOUNCE ENGINE for Colors
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !initialLoaded) return;
 
     const delayDebounceFn = setTimeout(async () => {
       try {
@@ -109,7 +111,7 @@ export default function BrandingPage() {
     }, 700);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [primaryColor, secondaryColor, logoUrl, logoPublicId, faviconUrl, faviconPublicId, customAssets, mounted]);
+  }, [primaryColor, secondaryColor, logoUrl, logoPublicId, faviconUrl, faviconPublicId, customAssets, mounted, initialLoaded]);
 
   // General fallback save
   const handleSaveBranding = async () => {
@@ -140,8 +142,7 @@ export default function BrandingPage() {
   };
 
   // 🟢 LOGO FILE UPLOAD AND SAVE
-  const handleLogoUpload = async (e) => {
-    const file = e.target.files?.[0];
+  const handleLogoUpload = async (file) => {
     if (!file) return;
 
     try {
@@ -173,8 +174,7 @@ export default function BrandingPage() {
   };
 
   // 🟢 FAVICON FILE UPLOAD AND SAVE
-  const handleFaviconUpload = async (e) => {
-    const file = e.target.files?.[0];
+  const handleFaviconUpload = async (file) => {
     if (!file) return;
 
     try {
@@ -449,68 +449,62 @@ export default function BrandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* Logo Asset Card */}
-              <div className="group p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center space-y-3 hover:border-primary/50 transition-all bg-slate-50/30 relative">
-                {logoUrl ? (
-                  <div className="w-24 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center mx-auto overflow-hidden p-1.5 border">
-                    <img src={logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                    <Layout className="w-8 h-8 text-primary/40" />
-                  </div>
-                )}
-                <h5 className="font-bold text-slate-800">Main Header Logo</h5>
-                <p className="text-[9px] text-slate-400 line-clamp-1">{logoUrl ? 'Active Logo Asset on Cloud' : 'No custom logo uploaded yet'}</p>
-                <div className="flex gap-2 justify-center pt-2 relative z-10">
-                  <label className="h-8 px-4 inline-flex items-center justify-center text-xs font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors shadow-sm">
-                    {uploadingLogo ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
-                    {logoUrl ? 'Replace Logo' : 'Upload Logo'}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploadingLogo} />
-                  </label>
-                  {logoUrl && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => { setLogoUrl(''); setLogoPublicId(''); }}
-                      className="h-8 w-8 text-red-500 rounded-lg"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
+              {/* Logo Asset Card via GlobalFileUploader */}
+              <div className="p-4 bg-white border border-slate-200 rounded-3xl space-y-2">
+                <GlobalFileUploader
+                  label="Main Header Logo"
+                  value={logoUrl}
+                  resize={true}
+                  resizeWidth={400}
+                  resizeHeight={null}
+                  resizeQuality={0.9}
+                  onFile={handleLogoUpload}
+                  onClear={async () => {
+                    setLogoUrl('');
+                    setLogoPublicId('');
+                    await masterAdminService.updateWebsiteCms('branding', {
+                      primaryColor,
+                      secondaryColor,
+                      logoUrl: '',
+                      logoPublicId: '',
+                      faviconUrl,
+                      faviconPublicId,
+                      customAssets
+                    });
+                    toast.success('Header Logo removed!');
+                  }}
+                  compact={true}
+                  hint="Best size: landscape image. Auto-resizes to 400px wide."
+                />
               </div>
 
-              {/* Favicon Asset Card */}
-              <div className="group p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center space-y-3 hover:border-primary/50 transition-all bg-slate-50/30 relative">
-                {faviconUrl ? (
-                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto overflow-hidden p-3 border">
-                    <img src={faviconUrl} alt="Favicon" className="max-h-full max-w-full object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                    <Monitor className="w-8 h-8 text-primary/40" />
-                  </div>
-                )}
-                <h5 className="font-bold text-slate-800">Browser Favicon</h5>
-                <p className="text-[9px] text-slate-400 line-clamp-1">{faviconUrl ? 'Active Favicon on Cloud' : 'Standard Default Faviconico'}</p>
-                <div className="flex gap-2 justify-center pt-2 relative z-10">
-                  <label className="h-8 px-4 inline-flex items-center justify-center text-xs font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors shadow-sm">
-                    {uploadingFavicon ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
-                    {faviconUrl ? 'Replace Favicon' : 'Upload Favicon'}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleFaviconUpload} disabled={uploadingFavicon} />
-                  </label>
-                  {faviconUrl && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => { setFaviconUrl(''); setFaviconPublicId(''); }}
-                      className="h-8 w-8 text-red-500 rounded-lg"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
+              {/* Favicon Asset Card via GlobalFileUploader */}
+              <div className="p-4 bg-white border border-slate-200 rounded-3xl space-y-2">
+                <GlobalFileUploader
+                  label="Browser Favicon"
+                  value={faviconUrl}
+                  resize={true}
+                  resizeWidth={64}
+                  resizeHeight={64}
+                  resizeQuality={0.9}
+                  onFile={handleFaviconUpload}
+                  onClear={async () => {
+                    setFaviconUrl('');
+                    setFaviconPublicId('');
+                    await masterAdminService.updateWebsiteCms('branding', {
+                      primaryColor,
+                      secondaryColor,
+                      logoUrl,
+                      logoPublicId,
+                      faviconUrl: '',
+                      faviconPublicId: '',
+                      customAssets
+                    });
+                    toast.success('Favicon removed!');
+                  }}
+                  compact={true}
+                  hint="Best size: square icon. Auto-resizes to 64x64px."
+                />
               </div>
             </div>
 
