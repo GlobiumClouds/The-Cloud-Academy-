@@ -194,6 +194,25 @@ export const masterAdminService = {
   updateGlobalSetting: (data) =>
     api.post('/master-admin/settings', data).then((r) => r.data),
 
+  // ─── Website CMS Settings (Dedicated Table) ─────
+  getWebsiteCms: () =>
+    api.get('/master-admin/website-cms').then((r) => r.data?.data ?? r.data),
+  updateWebsiteCms: (key, value) =>
+    api.post('/master-admin/website-cms', { key, value }).then((r) => r.data?.data ?? r.data),
+  bulkUpdateWebsiteCms: (data) =>
+    api.post('/master-admin/website-cms', data).then((r) => r.data?.data ?? r.data),
+  uploadCmsImage: (file, folder, oldPublicId) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('folder', folder);
+    if (oldPublicId) formData.append('oldPublicId', oldPublicId);
+    return api.post('/master-admin/website-cms/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }).then((r) => r.data?.data ?? r.data);
+  },
+
   // ─── Subscription Plans (CRUD) ───────────────────────────
   getSubscriptionTemplates: (filters = {}) =>
     api.get(`/subscription-plans${buildQuery(filters)}`).then((r) => r.data),

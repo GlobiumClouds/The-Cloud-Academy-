@@ -11,7 +11,7 @@ import {
 import { toast } from 'sonner';
 
 import { masterAdminService } from '@/services';
-import { PageHeader, AppModal, StatsCard, DataTable, SelectField, ConfirmDialog } from '@/components/common';
+import { PageHeader, AppModal, StatsCard, DataTable, SelectField, ConfirmDialog, DatePickerField } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -146,8 +146,18 @@ export default function MasterAdminInvoicesPage() {
   };
 
   const handleStatusChange = (s) => { setStatusFilter(s); setPage(1); };
-  const handleDateFrom     = (v) => { setDateFrom(v);     setPage(1); };
-  const handleDateTo       = (v) => { setDateTo(v);       setPage(1); };
+  const handleDateFrom = (v) => {
+    setDateFrom(v);
+    setPage(1);
+    // If "To" date is before "From" date, clear it
+    if (v && dateTo && new Date(dateTo) < new Date(v)) {
+      setDateTo('');
+    }
+  };
+  const handleDateTo = (v) => {
+    setDateTo(v);
+    setPage(1);
+  };
 
   const handleConfirmPaid = () => {
     if (!payModal) return;
@@ -724,35 +734,38 @@ export default function MasterAdminInvoicesPage() {
       header: '',
       enableHiding: false,
       cell: ({ row: { original: inv } }) => (
-        <div className="flex items-center gap-1.5 justify-end">
+        <div className="flex items-center gap-1 sm:gap-1.5 justify-end">
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs gap-1 text-slate-700 border-slate-200 hover:bg-slate-50"
+            className="h-7 text-xs gap-1 text-slate-700 border-slate-200 hover:bg-slate-50 flex items-center justify-center px-2"
             onClick={() => setPreviewInvoice(inv)}
+            title="Print / PDF"
           >
-            <Receipt size={11} />
-            Print / PDF
+            <Receipt size={11} className="shrink-0" />
+            <span className="hidden sm:inline">Print / PDF</span>
           </Button>
           {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              className="h-7 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50 flex items-center justify-center px-2"
               onClick={() => openPayModal(inv)}
+              title="Mark Paid"
             >
-              <CreditCard size={11} />
-              Mark Paid
+              <CreditCard size={11} className="shrink-0" />
+              <span className="hidden sm:inline">Mark Paid</span>
             </Button>
           )}
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 text-xs px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="h-7 text-xs px-2 text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center justify-center"
             onClick={() => handleDelete(inv)}
             disabled={deleteInvoiceMutation.isPending}
+            title="Delete"
           >
-            <Trash2 size={12} />
+            <Trash2 size={12} className="shrink-0" />
           </Button>
         </div>
       ),
@@ -837,7 +850,7 @@ export default function MasterAdminInvoicesPage() {
           </Button>
         }
         enableColumnVisibility
-        exportConfig={{ fileName: 'invoices', dateField: 'created_at' }}
+        // exportConfig={{ fileName: 'invoices', dateField: 'created_at' }}
         filters={[
           {
             name: 'status',
@@ -848,30 +861,31 @@ export default function MasterAdminInvoicesPage() {
           },
         ]}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground whitespace-nowrap">From</span>
-              <Input
-                type="date"
+              <DatePickerField
+                placeholder="From Date"
                 value={dateFrom}
-                onChange={(e) => handleDateFrom(e.target.value)}
-                className="h-9 w-36 text-sm"
+                onChange={handleDateFrom}
+                className="w-36 [&_button]:h-9 [&_button]:text-xs"
               />
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground whitespace-nowrap">To</span>
-              <Input
-                type="date"
+              <DatePickerField
+                placeholder="To Date"
                 value={dateTo}
-                onChange={(e) => handleDateTo(e.target.value)}
-                className="h-9 w-36 text-sm"
+                onChange={handleDateTo}
+                minDate={dateFrom}
+                className="w-36 [&_button]:h-9 [&_button]:text-xs"
               />
             </div>
             {(dateFrom || dateTo) && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 p-0 text-muted-foreground"
+                className="h-9 w-9 p-0 text-muted-foreground shrink-0"
                 onClick={() => { handleDateFrom(''); handleDateTo(''); }}
               >
                 <X size={13} />
