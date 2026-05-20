@@ -8,7 +8,7 @@ import {
   Type, Settings2, Database, Loader2, Award, CloudLightning
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { InputField, AppModal, FormSubmitButton, SelectField } from '@/components/common';
+import { InputField, AppModal, FormSubmitButton, SelectField, ColorPickerField } from '@/components/common';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { masterAdminService } from '@/services';
@@ -359,82 +359,24 @@ export default function BrandingPage() {
               </div>
             </h3>
             
-            {/* MANUAL HEX COLOR PICKERS */}
+            {/* PREMIUM COLOR PICKERS using ColorPickerField */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-4">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Primary Brand Identity</label>
-                <div className="flex gap-4 items-center">
-                  <div className="relative group shrink-0">
-                    <input 
-                      type="color" 
-                      value={primaryColor} 
-                      onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="w-16 h-16 rounded-2xl cursor-pointer border-4 border-white shadow-md"
-                    />
-                    <div className="absolute inset-0 rounded-2xl ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all" />
-                  </div>
-                  <div className="flex-1">
-                    <InputField 
-                      value={primaryColor} 
-                      onChange={(e) => setPrimaryColor(e.target.value)} 
-                      className="bg-white border-slate-200 font-mono font-bold text-xs"
-                      placeholder="#000000"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-2 italic">Auto-syncs to database instantly as you slide the color picker!</p>
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-slate-200/60">
-                  <p className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-wider">Quick Brand Swatches</p>
-                  <div className="flex flex-wrap gap-2.5">
-                    {['#4F46E5', '#3B82F6', '#059669', '#0D9488', '#7C3AED', '#EC4899', '#F59E0B', '#EF4444'].map(c => (
-                      <button 
-                        key={c}
-                        type="button"
-                        onClick={() => { setPrimaryColor(c); toast.success(`Applied primary: ${c}`); }}
-                        className={`w-6 h-6 rounded-full border-2 transition-all ${primaryColor.toLowerCase() === c.toLowerCase() ? 'border-slate-800 scale-125 shadow-md ring-2 ring-slate-800/10' : 'border-white hover:scale-110 shadow-sm'}`}
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Primary Brand Identity</p>
+                <ColorPickerField
+                  value={primaryColor}
+                  onChange={(hex) => { setPrimaryColor(hex); }}
+                />
+                <p className="text-[9px] text-slate-400 italic">Auto-syncs to database 700ms after you stop picking!</p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-4">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Navigation & Dark Surfaces</label>
-                <div className="flex gap-4 items-center">
-                  <div className="relative group shrink-0">
-                    <input 
-                      type="color" 
-                      value={secondaryColor} 
-                      onChange={(e) => setSecondaryColor(e.target.value)}
-                      className="w-16 h-16 rounded-2xl cursor-pointer border-4 border-white shadow-md"
-                    />
-                    <div className="absolute inset-0 rounded-2xl ring-2 ring-slate-900/10 group-hover:ring-slate-900/30 transition-all" />
-                  </div>
-                  <div className="flex-1">
-                    <InputField 
-                      value={secondaryColor} 
-                      onChange={(e) => setSecondaryColor(e.target.value)} 
-                      className="bg-white border-slate-200 font-mono font-bold text-xs"
-                      placeholder="#000000"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-2 italic">Updates the visual header background and dashboard panels instantly.</p>
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-slate-200/60">
-                  <p className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-wider">Quick Dark Swatches</p>
-                  <div className="flex flex-wrap gap-2.5">
-                    {['#0F172A', '#030712', '#022C22', '#111827', '#1E1B4B', '#1F2937', '#0F2A4A', '#000000'].map(c => (
-                      <button 
-                        key={c}
-                        type="button"
-                        onClick={() => { setSecondaryColor(c); toast.success(`Applied secondary: ${c}`); }}
-                        className={`w-6 h-6 rounded-full border-2 transition-all ${secondaryColor.toLowerCase() === c.toLowerCase() ? 'border-slate-800 scale-125 shadow-md ring-2 ring-slate-800/10' : 'border-white hover:scale-110 shadow-sm'}`}
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Navigation & Dark Surfaces</p>
+                <ColorPickerField
+                  value={secondaryColor}
+                  onChange={(hex) => { setSecondaryColor(hex); }}
+                />
+                <p className="text-[9px] text-slate-400 italic">Updates header background and sidebar panels instantly.</p>
               </div>
             </div>
 

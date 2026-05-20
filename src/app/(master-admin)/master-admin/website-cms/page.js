@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { 
-  AppModal, InputField, TextareaField, FormSubmitButton, DataTable, SelectField, ConfirmDialog, PageHeader, TableRowActions
+  AppModal, InputField, TextareaField, FormSubmitButton, DataTable, SelectField, 
+  ConfirmDialog, PageHeader, TableRowActions, ColorPickerField, CmsImageUploader
 } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -378,7 +379,13 @@ export default function WebsiteCMSPage() {
       banner: [banners, setBanners, 'banners'],
       announcement: [announcements, setAnnouncements, 'announcements'],
       about: [aboutSections, setAboutSections, 'about_sections'],
-      feature: [features, setFeatures, 'features']
+      feature: [features, setFeatures, 'features'],
+      faq: [faqs, setFaqs, 'faq'],
+      testimonial: [testimonials, setTestimonials, 'testimonials'],
+      roadmap: [roadmap, setRoadmap, 'roadmap'],
+      social: [socialLinks, setSocialLinks, 'social'],
+      partner: [partners, setPartners, 'partners'],
+      video: [videos, setVideos, 'videos']
     };
 
     const [currentList, setListSetter, dbKey] = stateMap[modalType] || [];
@@ -471,10 +478,16 @@ export default function WebsiteCMSPage() {
   const faqColumns = useMemo(() => [
     { header: 'Question', accessorKey: 'question', cell: ({ row }) => <span className="font-bold text-slate-900 line-clamp-1 text-[11px]">{row.original.question}</span> },
     { header: 'Answer', accessorKey: 'answer', cell: ({ row }) => <span className="text-[10px] text-slate-500 line-clamp-2">{row.original.answer}</span> },
+    { header: 'Status', cell: ({ row }) => <Badge className={row.original.active === false ? 'bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5' : 'bg-emerald-500 text-white border-none text-[9px] px-1.5 py-0.5'}>{row.original.active === false ? 'Inactive' : 'Active'}</Badge> },
     { header: 'Actions', id: 'actions', cell: ({ row }) => (
       <TableRowActions 
         onEdit={() => handleOpenModal('faq', row.original)}
         onDelete={() => confirmDelete('faq', row.original.id)}
+        extra={[{
+          label: row.original.active === false ? 'Activate' : 'Deactivate',
+          icon: row.original.active === false ? Eye : EyeOff,
+          onClick: () => triggerToggleActive('faq', row.original)
+        }]}
       />
     )}
   ], []);
@@ -482,33 +495,51 @@ export default function WebsiteCMSPage() {
   const testimonialColumns = useMemo(() => [
     { header: 'Client Info', cell: ({ row }) => <div className="flex items-center gap-2"><div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center font-bold text-xs">{row.original.name?.[0]}</div><div><p className="font-bold text-[11px]">{row.original.name}</p><p className="text-[9px] text-slate-400">{row.original.school} — {row.original.role}</p></div></div> },
     { header: 'Quote', accessorKey: 'content', cell: ({ row }) => <span className="text-[10px] italic text-slate-600 line-clamp-2">"{row.original.content}"</span> },
+    { header: 'Status', cell: ({ row }) => <Badge className={row.original.active === false ? 'bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5' : 'bg-emerald-500 text-white border-none text-[9px] px-1.5 py-0.5'}>{row.original.active === false ? 'Inactive' : 'Active'}</Badge> },
     { header: 'Actions', id: 'actions', cell: ({ row }) => (
       <TableRowActions 
         onEdit={() => handleOpenModal('testimonial', row.original)}
         onDelete={() => confirmDelete('testimonial', row.original.id)}
+        extra={[{
+          label: row.original.active === false ? 'Activate' : 'Deactivate',
+          icon: row.original.active === false ? Eye : EyeOff,
+          onClick: () => triggerToggleActive('testimonial', row.original)
+        }]}
       />
     )}
   ], []);
 
   const roadmapColumns = useMemo(() => [
     { header: 'Feature', accessorKey: 'title', cell: ({ row }) => <span className="font-bold text-[11px]">{row.original.title}</span> },
-    { header: 'Status', cell: ({ row }) => <Badge variant={row.original.status === 'In Development' ? 'default' : 'outline'} className="text-[9px] px-1.5 py-0.5">{row.original.status}</Badge> },
+    { header: 'Dev Status', cell: ({ row }) => <Badge variant={row.original.status === 'In Development' ? 'default' : 'outline'} className="text-[9px] px-1.5 py-0.5">{row.original.status}</Badge> },
     { header: 'ETA', accessorKey: 'eta', cell: ({ row }) => <span className="text-[10px] font-semibold text-slate-500">{row.original.eta}</span> },
+    { header: 'Visible', cell: ({ row }) => <Badge className={row.original.active === false ? 'bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5' : 'bg-emerald-500 text-white border-none text-[9px] px-1.5 py-0.5'}>{row.original.active === false ? 'Hidden' : 'Visible'}</Badge> },
     { header: 'Actions', id: 'actions', cell: ({ row }) => (
       <TableRowActions 
         onEdit={() => handleOpenModal('roadmap', row.original)}
         onDelete={() => confirmDelete('roadmap', row.original.id)}
+        extra={[{
+          label: row.original.active === false ? 'Show' : 'Hide',
+          icon: row.original.active === false ? Eye : EyeOff,
+          onClick: () => triggerToggleActive('roadmap', row.original)
+        }]}
       />
     )}
   ], []);
 
   const socialColumns = useMemo(() => [
     { header: 'Platform', accessorKey: 'platform', cell: ({ row }) => <span className="font-bold text-[11px]">{row.original.platform}</span> },
-    { header: 'URL', accessorKey: 'url', cell: ({ row }) => <span className="text-[10px] text-primary underline">{row.original.url}</span> },
+    { header: 'URL', accessorKey: 'url', cell: ({ row }) => <span className="text-[10px] text-primary underline line-clamp-1 max-w-[200px] block">{row.original.url}</span> },
+    { header: 'Status', cell: ({ row }) => <Badge className={row.original.active === false ? 'bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5' : 'bg-emerald-500 text-white border-none text-[9px] px-1.5 py-0.5'}>{row.original.active === false ? 'Hidden' : 'Active'}</Badge> },
     { header: 'Actions', id: 'actions', cell: ({ row }) => (
       <TableRowActions 
         onEdit={() => handleOpenModal('social', row.original)}
         onDelete={() => confirmDelete('social', row.original.id)}
+        extra={[{
+          label: row.original.active === false ? 'Activate' : 'Deactivate',
+          icon: row.original.active === false ? Eye : EyeOff,
+          onClick: () => triggerToggleActive('social', row.original)
+        }]}
       />
     )}
   ], []);
@@ -516,11 +547,17 @@ export default function WebsiteCMSPage() {
   const videoColumns = useMemo(() => [
     { header: 'Title', accessorKey: 'title', cell: ({ row }) => <span className="font-bold text-[11px]">{row.original.title}</span> },
     { header: 'Category', cell: ({ row }) => <Badge className="bg-slate-100 text-slate-600 border-none text-[9px] px-1.5 py-0.5">{row.original.category}</Badge> },
-    { header: 'YouTube link', accessorKey: 'url', cell: ({ row }) => <span className="text-[10px] text-slate-500 font-mono">{row.original.url}</span> },
+    { header: 'YouTube link', accessorKey: 'url', cell: ({ row }) => <span className="text-[10px] text-slate-500 font-mono line-clamp-1 max-w-[180px] block">{row.original.url}</span> },
+    { header: 'Status', cell: ({ row }) => <Badge className={row.original.active === false ? 'bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5' : 'bg-emerald-500 text-white border-none text-[9px] px-1.5 py-0.5'}>{row.original.active === false ? 'Hidden' : 'Visible'}</Badge> },
     { header: 'Actions', id: 'actions', cell: ({ row }) => (
       <TableRowActions 
         onEdit={() => handleOpenModal('video', row.original)}
         onDelete={() => confirmDelete('video', row.original.id)}
+        extra={[{
+          label: row.original.active === false ? 'Show' : 'Hide',
+          icon: row.original.active === false ? Eye : EyeOff,
+          onClick: () => triggerToggleActive('video', row.original)
+        }]}
       />
     )}
   ], []);
@@ -544,12 +581,17 @@ export default function WebsiteCMSPage() {
   ], []);
 
   const partnerColumns = useMemo(() => [
-    { header: 'Institute', accessorKey: 'name', cell: ({ row }) => <span className="font-bold text-[11px]">{row.original.name}</span> },
-    { header: 'Logo URL', accessorKey: 'logoUrl', cell: ({ row }) => <span className="text-[10px] text-slate-400 font-mono line-clamp-1">{row.original.logoUrl}</span> },
+    { header: 'Institute', cell: ({ row }) => <div className="flex items-center gap-2">{row.original.logoUrl && <img src={row.original.logoUrl} className="w-10 h-6 object-contain rounded" />}<span className="font-bold text-[11px]">{row.original.name}</span></div> },
+    { header: 'Status', cell: ({ row }) => <Badge className={row.original.active === false ? 'bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5' : 'bg-emerald-500 text-white border-none text-[9px] px-1.5 py-0.5'}>{row.original.active === false ? 'Hidden' : 'Visible'}</Badge> },
     { header: 'Actions', id: 'actions', cell: ({ row }) => (
       <TableRowActions 
         onEdit={() => handleOpenModal('partner', row.original)}
         onDelete={() => confirmDelete('partner', row.original.id)}
+        extra={[{
+          label: row.original.active === false ? 'Show' : 'Hide',
+          icon: row.original.active === false ? Eye : EyeOff,
+          onClick: () => triggerToggleActive('partner', row.original)
+        }]}
       />
     )}
   ], []);
@@ -786,41 +828,52 @@ export default function WebsiteCMSPage() {
           </div>
 
           {/* 4. FLEXIBLE CUSTOM ABOUT SECTIONS MOCKUP */}
-          {aboutSections.filter(s => s.active).length > 0 && (
+          {aboutSections.length === 0 ? null : (
             <div id="about" className="bg-white py-16 px-8 border-b border-slate-100">
               <div className="text-center max-w-2xl mx-auto space-y-2 mb-12">
                 <Badge style={{ color: branding.primaryColor, backgroundColor: `${branding.primaryColor}10`, borderColor: `${branding.primaryColor}30` }} className="font-black px-4 py-1 rounded-full text-[9px] uppercase tracking-widest border">ABOUT PLATFORM</Badge>
                 <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Our Identity & Mission</h2>
+                <p className="text-xs text-slate-400">Only Active sections appear below.</p>
               </div>
-              <div className="max-w-6xl mx-auto space-y-16">
-                {aboutSections.filter(s => s.active).map((sec, index) => {
-                  const isEven = index % 2 === 0;
-                  return (
-                    <div key={sec.id} className={`grid grid-cols-1 lg:grid-cols-12 gap-8 items-center`}>
-                      {/* Text content card */}
-                      <div className={`space-y-4 lg:col-span-7 ${isEven ? 'lg:order-1' : 'lg:order-2'}`}>
-                        <div className="p-6 bg-slate-50 border-l-4 rounded-r-2xl" style={{ borderLeftColor: branding.primaryColor }}>
-                          <h4 className="font-black text-slate-900 text-base md:text-lg mb-2">{sec.title}</h4>
-                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{sec.desc}</p>
+              {aboutSections.filter(s => s.active).length === 0 ? (
+                <div className="text-center py-10 space-y-2">
+                  <EyeOff className="w-10 h-10 mx-auto text-slate-200" />
+                  <p className="text-xs font-bold text-slate-400">All About sections are currently Inactive — activate at least one in the editor tab to display here.</p>
+                </div>
+              ) : (
+                <div className="max-w-6xl mx-auto space-y-20">
+                  {aboutSections.filter(s => s.active).map((sec, index) => {
+                    const isEven = index % 2 === 0;
+                    return (
+                      <div key={sec.id} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+                        <div className={`lg:col-span-7 space-y-5 ${isEven ? 'lg:order-1' : 'lg:order-2'}`}>
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border" style={{ color: branding.primaryColor, backgroundColor: `${branding.primaryColor}08`, borderColor: `${branding.primaryColor}25` }}>
+                            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: branding.primaryColor }}></span>
+                            Section {index + 1} of {aboutSections.filter(s => s.active).length}
+                          </div>
+                          <h4 className="font-black text-slate-900 text-xl md:text-2xl tracking-tight leading-snug">{sec.title}</h4>
+                          <div className="w-10 h-1 rounded-full" style={{ backgroundColor: branding.primaryColor }}></div>
+                          <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{sec.desc}</p>
+                        </div>
+                        <div className={`lg:col-span-5 flex justify-center ${isEven ? 'lg:order-2' : 'lg:order-1'}`}>
+                          {sec.imageUrl ? (
+                            <div className="w-full aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl border border-slate-100">
+                              <img src={sec.imageUrl} alt={sec.title} className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="w-full aspect-[4/3] rounded-3xl flex flex-col items-center justify-center gap-3 border-2 border-dashed" style={{ backgroundColor: `${branding.primaryColor}05`, borderColor: `${branding.primaryColor}20` }}>
+                              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${branding.primaryColor}15` }}>
+                                <Info className="w-8 h-8" style={{ color: branding.primaryColor }} />
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-400">No Illustration Uploaded</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      {/* Image viewport if present */}
-                      <div className={`lg:col-span-5 flex justify-center ${isEven ? 'lg:order-2' : 'lg:order-1'}`}>
-                        {sec.imageUrl ? (
-                          <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-md border">
-                            <img src={sec.imageUrl} alt={sec.title} className="w-full h-full object-cover" />
-                          </div>
-                        ) : (
-                          <div className="w-full aspect-[4/3] bg-slate-50 border border-dashed rounded-2xl flex flex-col items-center justify-center text-slate-300 gap-1">
-                            <ImageIcon className="w-8 h-8 opacity-40" />
-                            <span className="text-[10px] font-bold">Text-only Section</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1103,32 +1156,121 @@ export default function WebsiteCMSPage() {
         </div>
       )}
 
-      {/* 2. ABOUT SECTIONS LIST EDITOR */}
+      {/* 2. ABOUT SECTIONS CARD EDITOR */}
       {activeTab === 'about' && (
-        <div className="bg-white shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
-           <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* Header bar */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
+            <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h3 className="font-bold text-lg text-slate-900 tracking-tight flex items-center gap-2"><Info className="w-5 h-5 text-primary" /> Company About Us Sections</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Configure flexible, multi-item About Us sections with optional illustration mockups to build a dynamic story.</p>
+                <h3 className="font-bold text-lg text-slate-900 tracking-tight flex items-center gap-2">
+                  <Info className="w-5 h-5 text-primary" /> About Us Sections Manager
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">Only <span className="text-emerald-600 font-bold">Active</span> sections appear in the Live Landing Preview. Inactive sections are hidden from the public page.</p>
               </div>
-              <Button variant="default" size="sm" onClick={() => handleOpenModal('about')} className="rounded-xl font-bold h-10 px-5 shadow-lg shadow-primary/10">
-                 <Plus className="w-4 h-4 mr-2" /> Add About Section
-              </Button>
-           </div>
-           
-           {aboutSections.length === 0 && !isSyncing ? (
-             <div className="p-20 text-center space-y-3 bg-slate-50/50">
-               <Info className="w-12 h-12 mx-auto text-slate-300" />
-               <p className="text-sm font-bold text-slate-500">No About sections in database.</p>
-               <Button variant="outline" size="sm" onClick={() => handleOpenModal('about')} className="rounded-xl">Add Your First Section</Button>
-             </div>
-           ) : (
-             <DataTable 
-               columns={aboutColumns} 
-               data={paginateList(aboutSections)} 
-               pagination={getPaginationProps(aboutSections)}
-             />
-           )}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="text-[11px] font-bold text-slate-600">{aboutSections.filter(s => s.active).length} Active</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                  <span className="text-[11px] font-bold text-slate-400">{aboutSections.filter(s => !s.active).length} Inactive</span>
+                </div>
+                <Button variant="default" size="sm" onClick={() => handleOpenModal('about')} className="rounded-xl font-bold h-10 px-5 shadow-lg shadow-primary/10">
+                  <Plus className="w-4 h-4 mr-2" /> Add Section
+                </Button>
+              </div>
+            </div>
+
+            {aboutSections.length === 0 && !isSyncing ? (
+              <div className="p-20 text-center space-y-4 bg-slate-50/50 rounded-b-3xl">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
+                  <Info className="w-8 h-8 text-slate-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-500">No About sections in database.</p>
+                  <p className="text-xs text-slate-400 mt-1">The data will auto-seed on first backend startup.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => handleOpenModal('about')} className="rounded-xl">Add Your First Section</Button>
+              </div>
+            ) : (
+              <div className="p-6 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+                {aboutSections.map((sec, index) => (
+                  <div
+                    key={sec.id}
+                    className={`relative rounded-2xl border-2 transition-all hover:shadow-md group ${
+                      sec.active
+                        ? 'border-emerald-200 bg-emerald-50/30 shadow-sm'
+                        : 'border-slate-200 bg-slate-50/60 opacity-70'
+                    }`}
+                  >
+                    {/* Status ribbon */}
+                    <div className={`absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                      sec.active ? 'bg-emerald-500 text-white' : 'bg-slate-300 text-slate-700'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${sec.active ? 'bg-white/60 animate-pulse' : 'bg-slate-500'}`}></span>
+                      {sec.active ? 'Live' : 'Hidden'}
+                    </div>
+
+                    {/* Card body */}
+                    <div className="p-5 pb-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-sm" style={{ backgroundColor: `${branding.primaryColor}15`, color: branding.primaryColor }}>
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0 pr-12">
+                          <h4 className="font-black text-slate-900 text-sm leading-snug line-clamp-2">{sec.title}</h4>
+                        </div>
+                      </div>
+
+                      {/* Illustration if any */}
+                      {sec.imageUrl && (
+                        <div className="mt-3 w-full h-28 rounded-xl overflow-hidden border border-slate-100">
+                          <img src={sec.imageUrl} alt={sec.title} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+
+                      <p className="mt-3 text-[11px] text-slate-500 leading-relaxed line-clamp-3">{sec.desc}</p>
+                    </div>
+
+                    {/* Footer actions */}
+                    <div className="px-5 pb-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => triggerToggleActive('about', sec)}
+                        className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-xl transition-all ${
+                          sec.active
+                            ? 'bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600'
+                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {sec.active ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        {sec.active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleOpenModal('about', sec)}
+                          className="w-8 h-8 rounded-xl text-slate-400 hover:text-primary hover:bg-primary/5"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => confirmDelete('about', sec.id)}
+                          className="w-8 h-8 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1460,47 +1602,19 @@ export default function WebsiteCMSPage() {
               <InputField label="Section Title" required register={register} name="title" placeholder="e.g. Empowering Education" />
               <TextareaField label="Section Details / Description" required register={register} name="desc" rows={6} placeholder="Describe the mission, focus area, or branch statistics..." />
               
-              {/* Optional image selector for about sections */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <label className="text-xs font-bold text-slate-800 block">Section Illustration (Optional)</label>
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      setUploadingImage(true);
-                      toast.info('Uploading illustration to Cloudinary under the-clouds-academy/website-cms/about...');
-                      const uploadRes = await masterAdminService.uploadCmsImage(file, 'about', editingItem?.imageUrlPublicId);
-                      reset({
-                        ...control._formValues,
-                        imageUrl: uploadRes.url,
-                        imageUrlPublicId: uploadRes.publicId
-                      });
-                      toast.success('Illustration uploaded successfully!');
-                    } catch (err) {
-                      console.error(err);
-                      toast.error('Image upload failed.');
-                    } finally {
-                      setUploadingImage(false);
-                    }
-                  }}
-                  className="w-full text-xs text-slate-500 cursor-pointer" 
-                />
-                <input type="hidden" {...register('imageUrl')} />
-                <input type="hidden" {...register('imageUrlPublicId')} />
-                {control._formValues?.imageUrl && (
-                  <div className="mt-2 w-full aspect-video rounded border overflow-hidden">
-                    <img src={control._formValues.imageUrl} className="w-full h-full object-cover" />
-                  </div>
-                )}
-                {uploadingImage && (
-                  <div className="flex items-center gap-1.5 text-xs text-primary font-bold animate-pulse">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Uploading image to Cloudinary...
-                  </div>
-                )}
-              </div>
+              {/* About Section Illustration — Premium CmsImageUploader */}
+              <CmsImageUploader
+                label="Section Illustration (Optional)"
+                folder="about"
+                oldPublicId={editingItem?.imageUrlPublicId}
+                value={control._formValues?.imageUrl}
+                aspectRatio="aspect-video"
+                hint="Recommended: 800×500px or wider. Appears alongside the section text in the landing page."
+                onUpload={({ url, publicId }) => reset({ ...control._formValues, imageUrl: url, imageUrlPublicId: publicId })}
+                onClear={() => reset({ ...control._formValues, imageUrl: '', imageUrlPublicId: '' })}
+              />
+              <input type="hidden" {...register('imageUrl')} />
+              <input type="hidden" {...register('imageUrlPublicId')} />
               <SelectField label="Visibility Status" name="active" control={control} options={[{label:'Active',value:'true'},{label:'Inactive',value:'false'}]} />
             </div>
           )}
@@ -1540,48 +1654,19 @@ export default function WebsiteCMSPage() {
             <div className="space-y-4">
               <InputField label="Banner Title" required register={register} name="title" placeholder="e.g. Summer promotion offer - 20% discount" />
               
-              {/* Image Upload Center for Banner */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <label className="text-xs font-bold text-slate-800 block">Banner Image File (Cloudinary)</label>
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      setUploadingImage(true);
-                      toast.info('Uploading banner image to Cloudinary under the-clouds-academy/website-cms/banners...');
-                      const uploadRes = await masterAdminService.uploadCmsImage(file, 'banners', editingItem?.imageUrlPublicId);
-                      
-                      reset({
-                        ...control._formValues,
-                        imageUrl: uploadRes.url,
-                        imageUrlPublicId: uploadRes.publicId
-                      });
-                      toast.success('Banner image uploaded successfully!');
-                    } catch (err) {
-                      console.error(err);
-                      toast.error('Banner upload failed.');
-                    } finally {
-                      setUploadingImage(false);
-                    }
-                  }}
-                  className="w-full text-xs text-slate-500 cursor-pointer" 
-                />
-                <input type="hidden" {...register('imageUrl')} />
-                <input type="hidden" {...register('imageUrlPublicId')} />
-                {control._formValues?.imageUrl && (
-                  <div className="mt-2 relative w-full aspect-[4/1] rounded overflow-hidden border">
-                    <img src={control._formValues.imageUrl} className="w-full h-full object-cover" />
-                  </div>
-                )}
-                {uploadingImage && (
-                  <div className="flex items-center gap-1.5 text-xs text-primary font-bold animate-pulse">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Uploading image to Cloudinary...
-                  </div>
-                )}
-              </div>
+              {/* Banner Image — Premium CmsImageUploader */}
+              <CmsImageUploader
+                label="Banner Image (Cloudinary)"
+                folder="banners"
+                oldPublicId={editingItem?.imageUrlPublicId}
+                value={control._formValues?.imageUrl}
+                aspectRatio="aspect-[4/1]"
+                hint="Recommended wide banner: 1200×300px"
+                onUpload={({ url, publicId }) => reset({ ...control._formValues, imageUrl: url, imageUrlPublicId: publicId })}
+                onClear={() => reset({ ...control._formValues, imageUrl: '', imageUrlPublicId: '' })}
+              />
+              <input type="hidden" {...register('imageUrl')} />
+              <input type="hidden" {...register('imageUrlPublicId')} />
 
               <InputField label="Link Action" register={register} name="link" placeholder="e.g. /pricing" />
               <SelectField label="Status" name="active" control={control} options={[{label:'Active',value:'true'},{label:'Inactive',value:'false'}]} />
@@ -1590,8 +1675,15 @@ export default function WebsiteCMSPage() {
           {modalType === 'announcement' && (
             <div className="space-y-4">
               <TextareaField label="News Text" required register={register} name="text" rows={2} placeholder="e.g. New AI features and WhatsApp alerts integration is now live!" />
-              <InputField label="Bar Color (Hex)" register={register} name="color" placeholder="e.g. #2563eb" />
-              <SelectField label="Visibility" name="active" control={control} options={[{label:'Show',value:'true'},{label:'Hide',value:'false'}]} />
+              {/* 🎨 PREMIUM COLOR PICKER HUB */}
+              <ColorPickerField
+                label="Announcement Bar Color"
+                value={control._formValues?.color || '#2563EB'}
+                onChange={(hex) => reset({ ...control._formValues, color: hex })}
+              />
+              {/* Hidden field keeps value in react-hook-form */}
+              <input type="hidden" {...register('color')} />
+              <SelectField label="Visibility" name="active" control={control} options={[{label:'Show (Live on site)',value:'true'},{label:'Hide (Draft)',value:'false'}]} />
             </div>
           )}
           {modalType === 'partner' && (

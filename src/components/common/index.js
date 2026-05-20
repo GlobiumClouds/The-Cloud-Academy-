@@ -37,6 +37,9 @@ export { default as TimePickerField }   from './TimePickerField';
 export { default as MultiSelectField }  from './MultiSelectField';
 export { default as PasswordInputField } from './PasswordInputField';
 export { default as FormSubmitButton }  from './FormSubmitButton';
+export { default as ColorPickerField }  from './ColorPickerField';
+export { default as CmsImageUploader }  from './CmsImageUploader';
+export { default as GlobalFileUploader } from './GlobalFileUploader';
 
 // Inputs
 export { default as SearchInput }       from './SearchInput';
