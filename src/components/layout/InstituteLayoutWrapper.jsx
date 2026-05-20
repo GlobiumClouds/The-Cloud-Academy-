@@ -615,7 +615,7 @@ export default function InstituteLayoutWrapper({ children }) {
         <GlobalAnnouncementBanner />
         
         {/* Page content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto z-50">
           {isImpersonating && (
             <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between sticky top-0 z-[60] shadow-md">
               <div className="flex items-center gap-2 text-sm font-bold">
