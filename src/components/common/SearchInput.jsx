@@ -33,6 +33,11 @@ export default function SearchInput({
 
   // Debounce upward
   useEffect(() => {
+    if (debounceMs <= 0) {
+      onChange?.(local);
+      return undefined;
+    }
+
     const t = setTimeout(() => onChange?.(local), debounceMs);
     return () => clearTimeout(t);
   }, [local, debounceMs, onChange]);
@@ -42,7 +47,14 @@ export default function SearchInput({
       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
       <Input
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => {
+          const nextValue = e.target.value;
+          setLocal(nextValue);
+
+          if (debounceMs <= 0) {
+            onChange?.(nextValue);
+          }
+        }}
         placeholder={placeholder}
         className="pl-9 pr-8"
       />

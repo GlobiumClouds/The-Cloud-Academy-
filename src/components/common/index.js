@@ -40,7 +40,7 @@ export { default as FormSubmitButton }  from './FormSubmitButton';
 export { default as ColorPickerField }  from './ColorPickerField';
 export { default as CmsImageUploader }  from './CmsImageUploader';
 export { default as GlobalFileUploader } from './GlobalFileUploader';
-
+export { default as TiptapEditor }      from './TiptapEditor';
 // Inputs
 export { default as SearchInput }       from './SearchInput';
 
