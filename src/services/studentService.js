@@ -89,7 +89,7 @@ export const studentService = {
     return api.get(`/students${buildQuery(normalized)}`).then((r) => r.data);
   },
 
-  getById: (id) => api.get(`/students/${id}`).then((r) => r.data),
+  getById: (id, config = {}) => api.get(`/students/${id}`, config).then((r) => r.data),
 
   create: (body) => api.post("/students", body).then((r) => r.data),
 

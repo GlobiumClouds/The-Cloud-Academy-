@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Eye, RefreshCw, Search } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import FeeVoucher from '../components/FeeVoucher';
 import FeeVoucherPreviewModal from '../components/FeeVoucherPreviewModal';

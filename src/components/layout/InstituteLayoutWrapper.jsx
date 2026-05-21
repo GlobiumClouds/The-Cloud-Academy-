@@ -322,7 +322,7 @@ export default function InstituteLayoutWrapper({ children }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const getDashPath = useAuthStore((s) => s.dashboardPath);
-  const dashboardPath = getDashPath() || "/";
+  const dashboardPath = mounted ? (getDashPath() || "/") : "/";
   const instituteType = user?.institute?.institute_type;
 
   // Initialize and keep real-time Socket.io active across all school pages
@@ -455,6 +455,14 @@ export default function InstituteLayoutWrapper({ children }) {
       toast.success("Logged out successfully");
     }
   }, [logout, router]);
+
+  if (!mounted) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <span className="text-sm text-muted-foreground">Loading workspace...</span>
+      </div>
+    );
+  }
 
   const sidebarProps = {
     grouped,

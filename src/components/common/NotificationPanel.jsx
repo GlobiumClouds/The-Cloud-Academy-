@@ -211,9 +211,8 @@ export const NotificationPanel = () => {
         {unreadCount > 0 && (
           <span
             className={clsx(
-              'absolute -top-1 -right-1 inline-flex items-center justify-center',
-              'w-5 h-5 px-1.5 py-0.5 text-xs font-bold text-white',
-              'bg-red-500 rounded-full min-w-max'
+              'absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center',
+              'rounded-full bg-red-500 px-1 text-xs font-bold leading-none tabular-nums text-white whitespace-nowrap'
             )}
           >
             {unreadCount > 99 ? '99+' : unreadCount}

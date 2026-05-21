@@ -643,7 +643,7 @@ export default function PortalShell({ children, type }) {
       )}
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 min-w-0 min-h-0">
+      <div className="flex flex-col flex-1 min-w-0">
         {/* Top navbar - Improved Header */}
         <header className="bg-white border-b border-slate-200 px-4 h-16 flex items-center justify-between flex-shrink-0 shadow-sm">
           <div className="flex items-center gap-3">

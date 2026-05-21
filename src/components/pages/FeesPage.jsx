@@ -5,7 +5,7 @@
  * FeesPage — Fee Vouchers (Single + Bulk Generation)
  * Data from feeVoucherService only.
  */
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -164,6 +164,7 @@ export default function FeesPage() {
   const currentMonth = String(new Date().getMonth() + 1);
   const [voucherMonth, setVoucherMonth] = useState(currentMonth);
   const [voucherAcademicYearId, setVoucherAcademicYearId] = useState('');
+  const [voucherClassId, setVoucherClassId] = useState('');
   const [voucherStatus, setVoucherStatus] = useState('');
   const [voucherSearch, setVoucherSearch] = useState('');
   const [viewingVoucher, setViewingVoucher] = useState(null);
@@ -204,6 +205,45 @@ const [bulkFilters, setBulkFilters] = useState({
     enabled: !!currentInstitute?.id && !!voucherAcademicYearId && activeTab === 'ledger',
   });
 
+  const { data: voucherStudentsData = [] } = useQuery({
+    queryKey: ['fee-voucher-students-map', currentInstitute?.id, voucherAcademicYearId],
+    queryFn: async () => {
+      if (!currentInstitute?.id || !voucherAcademicYearId) return [];
+      try {
+        const response = await studentService.getAll(
+          {
+            institute_id: currentInstitute?.id,
+            institute_type: currentInstitute?.type,
+            academic_year_id: voucherAcademicYearId,
+            limit: 5000,
+          },
+          currentInstitute?.type || 'school'
+        );
+
+        const rows = response?.data?.rows || response?.rows || response?.data || response || [];
+        return Array.isArray(rows) ? rows : [];
+      } catch (err) {
+        console.error('Failed to load voucher students map:', err);
+        return [];
+      }
+    },
+    enabled: !!currentInstitute?.id && !!voucherAcademicYearId && activeTab === 'vouchers' && hasPermission('fees.read'),
+  });
+
+  const voucherStudentLookup = useMemo(() => {
+    const byId = new Map();
+    const byReg = new Map();
+
+    (voucherStudentsData || []).forEach((student) => {
+      const id = String(student?.id || student?.student_id || '').trim();
+      const reg = String(student?.registration_no || student?.registrationNo || '').trim().toLowerCase();
+      if (id) byId.set(id, student);
+      if (reg) byReg.set(reg, student);
+    });
+
+    return { byId, byReg };
+  }, [voucherStudentsData]);
+
   const allStudentOptions = useMemo(() => {
     return allStudentsData.map(student => ({
       value: String(student.id),
@@ -212,13 +252,14 @@ const [bulkFilters, setBulkFilters] = useState({
   }, [allStudentsData]);
 
   const { data: voucherStatsBackend = null, isLoading: statsLoading } = useQuery({
-    queryKey: ['voucher-stats', currentInstitute?.id, voucherMonth, voucherAcademicYearId],
+    queryKey: ['voucher-stats', currentInstitute?.id, voucherMonth, voucherAcademicYearId, voucherClassId],
     queryFn: async () => {
       if (!currentInstitute?.id || !voucherAcademicYearId || !hasPermission('fees.read')) return null;
       try {
         const response = await feeVoucherService.getStats({
           month: voucherMonth ? parseInt(voucherMonth) : undefined,
           academic_year_id: voucherAcademicYearId || undefined,
+          class_id: voucherClassId || undefined,
         });
         return response || null;
       } catch (err) {
@@ -380,6 +421,14 @@ const [bulkFilters, setBulkFilters] = useState({
     }
   }, [academicYearsData, voucherAcademicYearId]);
 
+  const previousVoucherAcademicYearId = useRef(voucherAcademicYearId);
+  useEffect(() => {
+    if (previousVoucherAcademicYearId.current !== voucherAcademicYearId) {
+      previousVoucherAcademicYearId.current = voucherAcademicYearId;
+      setVoucherClassId('');
+    }
+  }, [voucherAcademicYearId]);
+
   useEffect(() => {
     if (academicYearsData.length > 0 && !bulkFilters.academicYearId) {
       const current = academicYearsData.find((ay) => ay.is_current) || academicYearsData[0];
@@ -413,6 +462,60 @@ const { data: bulkClasses = [] } = useQuery({
     },
     enabled: !!currentInstitute?.id,
   });
+
+  const { data: voucherClassesData } = useQuery({
+    queryKey: ['fee-voucher-classes', currentInstitute?.id, currentInstitute?.type, voucherAcademicYearId],
+    queryFn: async () => {
+      if (!currentInstitute?.id || !voucherAcademicYearId) return [];
+      try {
+        const response = await classService.getAll({
+          academic_year_id: voucherAcademicYearId,
+          is_active: true,
+          institute_type: currentInstitute?.type,
+        });
+        const rows = response?.data?.rows || response?.rows || response?.data || response || [];
+        return Array.isArray(rows) ? rows : [];
+      } catch (error) {
+        console.error('Failed to load voucher classes:', error);
+        return [];
+      }
+    },
+    enabled: !!currentInstitute?.id && !!voucherAcademicYearId,
+  });
+
+  const voucherClassOptions = useMemo(() => {
+    return (voucherClassesData || []).map((cls) => ({
+      value: String(cls.id),
+      label: cls.name || 'Unnamed Class',
+    }));
+  }, [voucherClassesData]);
+
+  const voucherClassMaps = useMemo(() => {
+    const classNameById = new Map();
+    const sectionNameById = new Map();
+
+    (voucherClassesData || []).forEach((item) => {
+      const classId = String(item?.id || item?.class_id || '');
+      if (classId) {
+        classNameById.set(classId, item?.name || item?.class_name || 'Unknown Class');
+      }
+
+      const sections = Array.isArray(item?.sections)
+        ? item.sections
+        : Array.isArray(item?.Sections)
+          ? item.Sections
+          : [];
+
+      sections.forEach((section) => {
+        const sectionId = String(section?.id || section?.section_id || '');
+        if (sectionId) {
+          sectionNameById.set(sectionId, section?.name || section?.section_name || 'Unknown Section');
+        }
+      });
+    });
+
+    return { classNameById, sectionNameById };
+  }, [voucherClassesData]);
 
   const bulkClassOptions = useMemo(
     () => (bulkClasses || [])
@@ -510,7 +613,7 @@ const { data: bulkClasses = [] } = useQuery({
   // Reset pagination when filters change
   useEffect(() => {
     setVoucherPage(1);
-  }, [voucherMonth, voucherAcademicYearId, voucherStatus, voucherSearch, voucherPageSize]);
+  }, [voucherMonth, voucherAcademicYearId, voucherClassId, voucherStatus, voucherSearch, voucherPageSize]);
 
   const modalClassOptions = useMemo(() => {
     if (bulkDownloadMode === 'institute') {
@@ -577,7 +680,7 @@ const { data: bulkClasses = [] } = useQuery({
     isLoading: vouchersLoading,
     refetch: refetchVouchers,
   } = useQuery({
-    queryKey: ['fee-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId, voucherStatus, voucherPage, voucherPageSize, voucherSearch],
+    queryKey: ['fee-vouchers', currentInstitute?.id, voucherMonth, voucherAcademicYearId, voucherClassId, voucherStatus, voucherPage, voucherPageSize, voucherSearch],
     queryFn: async () => {
       // Check permission before making request - USING CORRECT PERMISSION
       if (!hasPermission('fees.read')) {
@@ -589,6 +692,7 @@ const { data: bulkClasses = [] } = useQuery({
       const filters = {
         month: voucherMonth ? parseInt(voucherMonth) : undefined,
         academic_year_id: voucherAcademicYearId || undefined,
+        class_id: voucherClassId || undefined,
         status: voucherStatus || undefined,
         search: voucherSearch || undefined,
       };
@@ -609,7 +713,102 @@ const { data: bulkClasses = [] } = useQuery({
     enabled: !!currentInstitute?.id && !!voucherAcademicYearId && hasPermission('fees.read'),
   });
 
-  const vouchers = voucherData?.vouchers || [];
+  const classSectionMaps = useMemo(() => buildClassSectionMaps(), [bulkClasses]);
+  const vouchers = useMemo(() => {
+    const rows = voucherData?.vouchers || [];
+
+    return rows.map((voucher) => {
+      const student = voucher.student || voucher.Student || {};
+      const studentIdKey = String(
+        voucher.studentId ||
+        voucher.student_id ||
+        student.id ||
+        student.student_id ||
+        ''
+      ).trim();
+      const registrationKey = String(
+        voucher.registrationNo ||
+        voucher.registration_no ||
+        student.registration_no ||
+        student.registrationNo ||
+        ''
+      ).trim().toLowerCase();
+      const mappedStudent =
+        (studentIdKey ? voucherStudentLookup.byId.get(studentIdKey) : null) ||
+        (registrationKey ? voucherStudentLookup.byReg.get(registrationKey) : null) ||
+        null;
+
+      const classId = String(
+        voucher.classId ||
+        voucher.class_id ||
+        student.class_id ||
+        student.classId ||
+        mappedStudent?.class_id ||
+        mappedStudent?.classId ||
+        ''
+      );
+
+      const sectionId = String(
+        voucher.sectionId ||
+        voucher.section_id ||
+        student.section_id ||
+        student.sectionId ||
+        mappedStudent?.section_id ||
+        mappedStudent?.sectionId ||
+        ''
+      );
+
+      const className =
+        normalizeDisplayValue(voucher.className) ||
+        normalizeDisplayValue(voucher.class_name) ||
+        normalizeDisplayValue(voucher.class) ||
+        normalizeDisplayValue(student.class_name) ||
+        normalizeDisplayValue(student.className) ||
+        normalizeDisplayValue(student?.Class?.name) ||
+        normalizeDisplayValue(student?.class?.name) ||
+        normalizeDisplayValue(mappedStudent?.class_name) ||
+        normalizeDisplayValue(mappedStudent?.className) ||
+        normalizeDisplayValue(mappedStudent?.Class?.name) ||
+        normalizeDisplayValue(mappedStudent?.class?.name) ||
+          (classId ? voucherClassMaps.classNameById.get(classId) : '') ||
+        (classId ? classSectionMaps.classNameById.get(classId) : '') ||
+        'N/A';
+
+      const sectionName =
+        normalizeDisplayValue(voucher.sectionName) ||
+        normalizeDisplayValue(voucher.section_name) ||
+        normalizeDisplayValue(voucher.section) ||
+        normalizeDisplayValue(student.section_name) ||
+        normalizeDisplayValue(student.sectionName) ||
+        normalizeDisplayValue(student?.Section?.name) ||
+        normalizeDisplayValue(student?.section?.name) ||
+        normalizeDisplayValue(mappedStudent?.section_name) ||
+        normalizeDisplayValue(mappedStudent?.sectionName) ||
+        normalizeDisplayValue(mappedStudent?.Section?.name) ||
+        normalizeDisplayValue(mappedStudent?.section?.name) ||
+        (sectionId ? classSectionMaps.sectionNameById.get(sectionId) : '') ||
+        '';
+
+      return {
+        ...voucher,
+        classId: classId || voucher.classId || voucher.class_id,
+        class_id: classId || voucher.class_id || voucher.classId,
+        className,
+        class_name: className,
+        sectionId: sectionId || voucher.sectionId || voucher.section_id,
+        section_id: sectionId || voucher.section_id || voucher.sectionId,
+        sectionName,
+        section_name: sectionName,
+        student: {
+          ...student,
+          className,
+          class_name: className,
+          sectionName,
+          section_name: sectionName,
+        },
+      };
+    });
+  }, [voucherData?.vouchers, classSectionMaps, voucherStudentLookup]);
   const voucherPagination = voucherData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 };
 
   // Stats calculated using lightweight backend aggregated endpoint
@@ -1304,6 +1503,60 @@ const downloadReceipt = async (payment, voucher) => {
           </div>
         ),
       },
+      {
+        id: 'class',
+        header: 'Class',
+        cell: ({ row: { original: r } }) => {
+          const student = r.student || r.Student || {};
+
+          const classId = String(
+            r.classId ||
+            r.class_id ||
+            student.class_id ||
+            student.classId ||
+            ''
+          );
+
+          const sectionId = String(
+            r.sectionId ||
+            r.section_id ||
+            student.section_id ||
+            student.sectionId ||
+            ''
+          );
+
+          const className =
+            normalizeDisplayValue(r.className) ||
+            normalizeDisplayValue(r.class_name) ||
+            normalizeDisplayValue(r.class) ||
+            normalizeDisplayValue(student.class_name) ||
+            normalizeDisplayValue(student.className) ||
+            normalizeDisplayValue(student?.Class?.name) ||
+            normalizeDisplayValue(student?.class?.name) ||
+            (classId ? classSectionMaps.classNameById.get(classId) : '') ||
+            'N/A';
+
+          const sectionName =
+            normalizeDisplayValue(r.sectionName) ||
+            normalizeDisplayValue(r.section_name) ||
+            normalizeDisplayValue(r.section) ||
+            normalizeDisplayValue(student.section_name) ||
+            normalizeDisplayValue(student.sectionName) ||
+            normalizeDisplayValue(student?.Section?.name) ||
+            normalizeDisplayValue(student?.section?.name) ||
+            (sectionId ? classSectionMaps.sectionNameById.get(sectionId) : '') ||
+            '';
+
+          return (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium leading-tight">{className}</p>
+              {sectionName && sectionName !== className && (
+                <p className="truncate text-xs text-muted-foreground">{sectionName}</p>
+              )}
+            </div>
+          );
+        },
+      },
       { accessorKey: 'month', header: 'Month', cell: ({ getValue }) => MONTH_OPTS.find(m => m.value === String(getValue()))?.label || getValue() },
       {
         accessorKey: 'net_amount',
@@ -1391,8 +1644,19 @@ const downloadReceipt = async (payment, voucher) => {
         ),
       },
     ],
-    [terms.student, hasPermission, setViewingVoucher, setDeletingVoucher, handleDownloadVoucher, markingAsPaid, recordingPayment, setRecordingPayment, setPaymentForm]
+    [terms.student, hasPermission, setViewingVoucher, setDeletingVoucher, handleDownloadVoucher, markingAsPaid, recordingPayment, setRecordingPayment, setPaymentForm, classSectionMaps]
   );
+
+  if (!mounted) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Fee Management & Portals" description="Loading fee vouchers..." />
+        <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
+          Preparing vouchers dashboard...
+        </div>
+      </div>
+    );
+  }
 
   // Show permission denied message if user doesn't have read access
   if (!hasPermission('fees.read') && currentInstitute?.id) {
@@ -1502,9 +1766,15 @@ const downloadReceipt = async (payment, voucher) => {
               <h3 className="text-sm font-semibold text-muted-foreground">Filter Vouchers</h3>
               <Filter size={16} className="text-muted-foreground" />
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-4">
               <SelectField label="Month" options={MONTH_OPTS} value={voucherMonth} onChange={setVoucherMonth} />
               <SelectField label="Academic Year" options={academicYearsData.map(ay => ({ value: ay.id, label: ay.name }))} value={voucherAcademicYearId} onChange={setVoucherAcademicYearId} />
+              <SelectField
+                label="Class"
+                options={[{ value: '__all__', label: 'All Classes' }, ...voucherClassOptions]}
+                value={voucherClassId}
+                onChange={(value) => setVoucherClassId(value === '__all__' ? '' : value)}
+              />
               <SelectField label="Status" options={[{ value: '', label: 'All Statuses' }, ...STATUS_OPTS]} value={voucherStatus} onChange={setVoucherStatus} />
             </div>
           </div>

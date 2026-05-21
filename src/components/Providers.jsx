@@ -5,27 +5,9 @@
 "use client";
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
-import { Toaster } from "react-hot-toast";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { queryClient } from "@/lib/queryClient";
 import MaintenanceProvider from "./MaintenanceProvider";
-import { useEffect } from "react";
-import { useTheme } from "next-themes";
-
-function ForceLightMode() {
-  const { setTheme } = useTheme();
-  
-  useEffect(() => {
-    // Check if we already forced light mode in this session
-    const hasForced = sessionStorage.getItem("theme_forced_light");
-    if (!hasForced) {
-      setTheme("light");
-      sessionStorage.setItem("theme_forced_light", "true");
-    }
-  }, [setTheme]);
-
-  return null;
-}
 
 export default function Providers({ children }) {
   return (
@@ -36,7 +18,6 @@ export default function Providers({ children }) {
         enableSystem={false}
         disableTransitionOnChange
       >
-        <ForceLightMode />
         <MaintenanceProvider>
           {children}
         </MaintenanceProvider>

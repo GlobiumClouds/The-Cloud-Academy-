@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { Download, Printer, X } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/components/theme/ThemeProvider';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
