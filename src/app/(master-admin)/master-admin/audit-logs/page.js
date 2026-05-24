@@ -170,7 +170,7 @@ export default function AuditLogsPage() {
 
       {/* View Details Modal */}
       <AppModal
-        isOpen={!!selectedLog}
+        open={!!selectedLog}
         onClose={() => setSelectedLog(null)}
         title={
           <div className="flex items-center gap-2">
