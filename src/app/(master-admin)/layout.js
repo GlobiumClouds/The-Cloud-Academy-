@@ -38,6 +38,7 @@ const NAV = [
   { href: '/master-admin/announcements', label: 'Broadcasts', icon: Megaphone, perm: 'notification.broadcast' },
   { href: '/master-admin/website-cms', label: 'Website CMS', icon: Globe, perm: 'cms.update_hero' },
   { href: '/master-admin/blog', label: 'Blog Management', icon: Newspaper, perm: 'blog.read' },
+  { href: '/master-admin/audit-logs', label: 'Audit Logs', icon: ShieldCheck, perm: 'global.view_audit_logs' },
   { href: '/master-admin/branding', label: 'Branding', icon: Palette, perm: 'branding.update_colors' },
   { href: '/master-admin/support', label: 'Support Desk', icon: LifeBuoy, perm: 'support.view_tickets' },
 ];

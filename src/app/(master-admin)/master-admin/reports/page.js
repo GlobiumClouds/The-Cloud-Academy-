@@ -267,18 +267,11 @@ function usePaginatedTable(data, searchFields = []) {
 }
 
 // ─── Tab components ───────────────────────────────────────────────────────────
-function RevenueTab({ data = [] }) {
+function RevenueTab({ data = [], reportsData }) {
   const finalData = data.length ? data : [];
   const tbl = usePaginatedTable(finalData, ['institute', 'plan', 'status', 'month']);
 
-  const chartData = useMemo(() => {
-    const map = {};
-    finalData.forEach(({ month, amount }) => {
-      if (!map[month]) map[month] = { month, Revenue: 0 };
-      map[month].Revenue += amount;
-    });
-    return Object.values(map).sort((a, b) => a.month.localeCompare(b.month));
-  }, [finalData]);
+  const chartData = reportsData?.revenueGrowth || [];
 
   return (
     <div className="space-y-6">
@@ -310,13 +303,13 @@ function RevenueTab({ data = [] }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: 11, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
                 formatter={(v) => [`PKR ${v.toLocaleString()}`, 'Revenue']} 
               />
-              <Bar dataKey="Revenue" fill="url(#colorRevenue)" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="revenue" fill="url(#colorRevenue)" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -449,6 +442,22 @@ const SUMMARY_CARDS = [
     color: 'text-teal-600',
     fmt:   (v) => v,
   },
+  {
+    key:   'mrr',
+    label: 'MRR',
+    icon:  TrendingUp,
+    bg:    'bg-indigo-50',
+    color: 'text-indigo-600',
+    fmt:   fmtCcy,
+  },
+  {
+    key:   'churnRate',
+    label: 'Churn Rate',
+    icon:  AlertTriangle,
+    bg:    'bg-orange-50',
+    color: 'text-orange-500',
+    fmt:   (v) => `${v}%`,
+  },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -580,7 +589,9 @@ export default function ReportsPage() {
       prev_month_revenue: reportsData?.prevMonthRevenue || 0,
       active_institutes: reportsData?.activeInstitutes || 0,
       overdue_payments: reportsData?.overduePayments || 0,
-      new_institutes_mtd: reportsData?.newInstitutesMTD || 0
+      new_institutes_mtd: reportsData?.newInstitutesMTD || 0,
+      mrr: reportsData?.mrr || 0,
+      churnRate: reportsData?.churnRate || 0,
     };
   }, [reportsData]);
 
@@ -620,7 +631,7 @@ export default function ReportsPage() {
       />
 
       {/* Stunning Stat Cards Grid with Scale & Glow on Hover */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 animate-in fade-in duration-300">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 animate-in fade-in duration-300">
         {SUMMARY_CARDS.map((c) => {
           const rawVal = liveSummary[c.key] ?? 0;
           return (
@@ -719,7 +730,7 @@ export default function ReportsPage() {
         </TabsList>
 
         <TabsContent value="revenue" className="animate-in fade-in duration-200">
-          <RevenueTab data={revenueList} />
+          <RevenueTab data={revenueList} reportsData={reportsData} />
         </TabsContent>
 
         <TabsContent value="subscriptions" className="animate-in fade-in duration-200">

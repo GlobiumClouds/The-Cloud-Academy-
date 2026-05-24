@@ -126,6 +126,17 @@ export const masterAdminService = {
       () => DUMMY_SUBSCRIPTION_HISTORY,
     ),
 
+  // ==========================================
+  // AUDIT LOGS
+  // ==========================================
+  getAuditLogs: async (params) => {
+    return await api.get('/master-admin/audit-logs', { params });
+  },
+
+  // ==========================================
+  // BRANDING
+  // ==========================================
+  
   // ─── Subscriptions ────────────────────────────────────────
   // filters: { school_id?, status? }
   getSubscriptions: (filters = {}) =>
