@@ -55,7 +55,7 @@ function SubStatusBadge({ status }) {
 }
 
 // ─── Table columns ────────────────────────────────────────────────────────────
-function buildColumns(onEdit, onDelete, onToggle, onStatusChange, router) {
+function buildColumns(onEdit, onDelete, onToggle, onStatusChange, router, activeTab, onRestore) {
   return [
     {
       id: 'name',
@@ -154,6 +154,13 @@ function buildColumns(onEdit, onDelete, onToggle, onStatusChange, router) {
       header: 'Actions',
       cell: ({ row }) => {
         const s = row.original;
+        if (activeTab === 'deleted') {
+          return (
+            <Button size="sm" variant="outline" onClick={() => onRestore(s)} className="gap-2">
+              <RefreshCw size={14} /> Restore
+            </Button>
+          );
+        }
         return (
           <TableRowActions
             onView={() => router.push(`/master-admin/institutes/${s.id}`)}
@@ -237,21 +244,24 @@ export default function MasterAdminInstitutesPage() {
   const [search,       setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter,   setTypeFilter]   = useState('');
+  const [activeTab,    setActiveTab]    = useState('active'); // active | deleted
 
   const [createOpen,   setCreateOpen]   = useState(false);
   const [editTarget,   setEditTarget]   = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
   const [toggleTarget, setToggleTarget] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
 
   // ── Fetch institutes ───────────────────────────────────────────────────────
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['master-institutes', page, search, statusFilter, typeFilter],
+    queryKey: ['master-institutes', page, search, statusFilter, typeFilter, activeTab],
     queryFn:  () => masterAdminService.getSchools({
       page, limit: 15,
       search:              search       || undefined,
       subscription_status: statusFilter || undefined,
       institute_type_id:   typeFilter   || undefined,
+      is_deleted:          activeTab === 'deleted' ? 'true' : 'false',
     }),
     staleTime: 0,
   });
@@ -301,6 +311,12 @@ export default function MasterAdminInstitutesPage() {
     onError: (e) => toast.error(e?.response?.data?.message ?? 'Delete failed'),
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: (id) => masterAdminService.restoreSchool(id),
+    onSuccess: () => { invalidate(); toast.success('Institute restored'); setRestoreTarget(null); },
+    onError: (e) => toast.error(e?.response?.data?.message ?? 'Restore failed'),
+  });
+
   const toggleMutation = useMutation({
     mutationFn: ({ id, is_active }) => masterAdminService.toggleSchoolStatus(id, is_active),
     onSuccess: (_, { is_active }) => {
@@ -324,8 +340,8 @@ export default function MasterAdminInstitutesPage() {
   };
 
   const columns = useMemo(
-    () => buildColumns(setEditTarget, setDeleteTarget, setToggleTarget, setStatusTarget, router),
-    [router],
+    () => buildColumns(setEditTarget, setDeleteTarget, setToggleTarget, setStatusTarget, router, activeTab, setRestoreTarget),
+    [router, activeTab],
   );
 
   return (
@@ -354,6 +370,14 @@ export default function MasterAdminInstitutesPage() {
         <StatsCard label="In Trial" value={isLoading ? '…' : trialCount}               icon={<Clock        size={16} />} />
         <StatsCard label="Inactive" value={isLoading ? '…' : totalCount - activeCount} icon={<XCircle      size={16} />} />
       </div>
+
+      {/* ── Tabs ── */}
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setPage(1); }}>
+        <TabsList>
+          <TabsTrigger value="active">Active Institutes</TabsTrigger>
+          <TabsTrigger value="deleted">Restore / Delete Institutes</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* ── Table ── */}
       <DataTable
@@ -398,9 +422,20 @@ export default function MasterAdminInstitutesPage() {
         onConfirm={() => deleteMutation.mutate(deleteTarget?.id)}
         loading={deleteMutation.isPending}
         title="Delete Institute"
-        description={`Permanently delete "${deleteTarget?.institute_name}"? This cannot be undone.`}
+        description={`Delete "${deleteTarget?.institute_name}"? It will be moved to the Restore / Delete Institutes tab.`}
         confirmLabel="Delete"
         variant="destructive"
+      />
+
+      {/* ── Restore Confirm ── */}
+      <ConfirmDialog
+        open={!!restoreTarget}
+        onClose={() => setRestoreTarget(null)}
+        onConfirm={() => restoreMutation.mutate(restoreTarget?.id)}
+        loading={restoreMutation.isPending}
+        title="Restore Institute"
+        description={`Restore "${restoreTarget?.institute_name}" to active status?`}
+        confirmLabel="Restore"
       />
 
       {/* ── Toggle Active Confirm ── */}

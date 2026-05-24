@@ -23,6 +23,12 @@ export const masterAdminService = {
   getReports: (params = {}) =>
     api.get(`/master-admin/reports${buildQuery(params)}`).then((r) => r.data?.data ?? r.data),
 
+  getSystemHealth: () =>
+    api.get('/master-admin/system-health').then((r) => r.data?.data ?? r.data),
+
+  triggerBackup: () =>
+    api.post('/master-admin/backup/trigger').then((r) => r.data?.data ?? r.data),
+
   // ─── Lookup tables (for dropdowns) ───────────────────────
   getInstituteTypes: () =>
     api.get('/master-admin/institute-types').then((r) => r.data),
@@ -103,9 +109,15 @@ export const masterAdminService = {
   deleteSchool: (id) =>
     api.delete(`/master-admin/institutes/${id}`).then((r) => r.data),
 
+  restoreSchool: (id) =>
+    api.patch(`/master-admin/institutes/${id}/restore`).then((r) => r.data),
+
   // ─── Invoice Management (NEW) ────────────────────────────
   getInstituteInvoices: (instituteId, filters = {}) =>
     api.get(`/master-admin/institutes/${instituteId}/invoices${buildQuery(filters)}`).then((r) => r.data),
+
+  createManualInvoice: (instituteId, data) =>
+    api.post(`/master-admin/institutes/${instituteId}/invoices/manual`, data).then((r) => r.data),
 
   // All invoices across ALL institutes (for master-admin global view)
   getAllInvoices: (filters = {}) =>

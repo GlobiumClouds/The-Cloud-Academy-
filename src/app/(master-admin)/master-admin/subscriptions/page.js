@@ -1,7 +1,7 @@
 //src/app/(master-admin)/master-admin/subscriptions/page.js
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Receipt, RefreshCw, CheckCircle2, AlertTriangle,
@@ -62,6 +62,7 @@ export default function MasterAdminInvoicesPage() {
     payment_reference: '',
     notes: '',
   });
+  const [manualInvoiceOpen, setManualInvoiceOpen] = useState(false);
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -781,10 +782,15 @@ export default function MasterAdminInvoicesPage() {
         title="🧾 Invoices"
         description="View and manage all institute invoices — paid and unpaid"
         action={
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
-            <RefreshCw size={13} className={cn(isFetching && 'animate-spin')} />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
+              <RefreshCw size={13} className={cn(isFetching && 'animate-spin')} />
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => setManualInvoiceOpen(true)} className="gap-1.5">
+              <FileText size={15} /> Create Invoice
+            </Button>
+          </div>
         }
       />
 
@@ -1281,6 +1287,197 @@ export default function MasterAdminInvoicesPage() {
           </div>
         </AppModal>
       )}
+
+      {/* ── Manual Invoice Modal ── */}
+      <ManualInvoiceModal 
+        open={manualInvoiceOpen} 
+        onClose={() => setManualInvoiceOpen(false)} 
+        onSuccess={() => {
+          setManualInvoiceOpen(false);
+          qc.invalidateQueries({ queryKey: ['all-invoices'] });
+        }}
+      />
     </div>
+  );
+}
+
+// ─── Manual Invoice Modal Component ───────────────────────────────────────────
+function ManualInvoiceModal({ open, onClose, onSuccess }) {
+  const { register, handleSubmit, reset, watch, setValue, control } = useForm({
+    defaultValues: {
+      institute_id: '',
+      subscription_plan_id: '',
+      amount: 0,
+      tax_amount: 0,
+      billing_cycle: 'MONTHLY',
+      period_start: new Date().toISOString().split('T')[0],
+      period_end: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+      due_date: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+      notes: ''
+    }
+  });
+
+  const amount = parseFloat(watch('amount') || 0);
+  const tax = parseFloat(watch('tax_amount') || 0);
+  const total = amount + tax;
+
+  // Fetch Institutes for Dropdown
+  const { data: instData } = useQuery({
+    queryKey: ['master-institutes', 'all'],
+    queryFn: () => masterAdminService.getSchools({ limit: 1000 }),
+    enabled: open
+  });
+  const institutes = instData?.data?.rows ?? [];
+  const instituteOptions = useMemo(() => institutes.map(inst => ({
+    label: `${inst.institute_name} (${inst.institute_code})`,
+    value: inst.id
+  })), [institutes]);
+
+  // Fetch Plans for Dropdown
+  const { data: plansData } = useQuery({
+    queryKey: ['subscription-plans', 'all'],
+    queryFn: () => masterAdminService.getSubscriptionTemplates({ limit: 100 }),
+    enabled: open
+  });
+  const plans = plansData?.data ?? [];
+  const planOptions = useMemo(() => plans.map(p => ({
+    label: `${p.name} (${p.price} PKR / ${p.cycle})`,
+    value: p.id
+  })), [plans]);
+
+  // Auto-fill Amount based on Plan Selection
+  const selectedPlanId = watch('subscription_plan_id');
+  useEffect(() => {
+    if (selectedPlanId) {
+      const plan = plans.find(p => p.id === selectedPlanId);
+      if (plan) {
+        setValue('amount', plan.price || 0);
+        setValue('billing_cycle', plan.cycle || 'MONTHLY');
+      }
+    }
+  }, [selectedPlanId, plans, setValue]);
+
+  const mutation = useMutation({
+    mutationFn: (data) => masterAdminService.createManualInvoice(data.institute_id, data),
+    onSuccess: () => {
+      toast.success('Manual invoice created successfully');
+      reset();
+      onSuccess();
+    },
+    onError: (e) => toast.error(e?.response?.data?.message || 'Failed to create manual invoice')
+  });
+
+  const onSubmit = (data) => {
+    mutation.mutate(data);
+  };
+
+  return (
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="Create Manual Invoice"
+      description="Generate a custom invoice for an institute."
+      size="lg"
+      footer={
+        <div className="flex justify-end gap-2 w-full">
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button onClick={handleSubmit(onSubmit)} disabled={mutation.isPending} className="min-w-[140px]">
+            {mutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
+            Create Invoice
+          </Button>
+        </div>
+      }
+    >
+      <form id="manual-invoice-form" className="space-y-4 py-2" onSubmit={handleSubmit(onSubmit)}>
+        <div className="grid grid-cols-2 gap-4">
+          {/* Institute Selection */}
+          <div className="col-span-2">
+            <SelectField
+              control={control}
+              name="institute_id"
+              label="Select Institute *"
+              placeholder="-- Choose Institute --"
+              options={instituteOptions}
+              required
+            />
+          </div>
+
+          {/* Subscription Plan */}
+          <div>
+            <SelectField
+              control={control}
+              name="subscription_plan_id"
+              label="Subscription Plan (Optional)"
+              placeholder="-- Custom Invoice --"
+              options={planOptions}
+            />
+          </div>
+
+          {/* Billing Cycle */}
+          <div>
+            <SelectField
+              control={control}
+              name="billing_cycle"
+              label="Billing Cycle"
+              options={[
+                { label: 'Monthly', value: 'MONTHLY' },
+                { label: 'Yearly', value: 'YEARLY' },
+                { label: 'Custom', value: 'CUSTOM' },
+              ]}
+            />
+          </div>
+
+          {/* Amount */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold">Base Amount (PKR) *</label>
+            <Input type="number" step="0.01" {...register('amount', { required: true, min: 0 })} />
+          </div>
+
+          {/* Tax */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold">Tax Amount (PKR)</label>
+            <Input type="number" step="0.01" {...register('tax_amount', { min: 0 })} />
+          </div>
+
+          {/* Dates */}
+          <div>
+            <DatePickerField
+              control={control}
+              name="period_start"
+              label="Period Start *"
+              required
+            />
+          </div>
+          <div>
+            <DatePickerField
+              control={control}
+              name="period_end"
+              label="Period End *"
+              minDate={watch('period_start')}
+              required
+            />
+          </div>
+          <div>
+            <DatePickerField
+              control={control}
+              name="due_date"
+              label="Due Date *"
+              disablePastDates={true}
+              required
+            />
+          </div>
+          
+          <div className="col-span-1 pt-6 text-right">
+             <div className="text-xs text-muted-foreground">Total Amount</div>
+             <div className="text-xl font-bold text-emerald-700">PKR {total.toLocaleString()}</div>
+          </div>
+
+          <div className="space-y-1.5 col-span-2">
+            <label className="text-xs font-semibold">Notes</label>
+            <Input placeholder="E.g. Custom service charges..." {...register('notes')} />
+          </div>
+        </div>
+      </form>
+    </AppModal>
   );
 }
