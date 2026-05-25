@@ -22,6 +22,7 @@ import {
   AppModal, InputField, SelectField, TextareaField, FormSubmitButton, DatePickerField,
 } from '@/components/common';
 import { cn } from '@/lib/utils';
+import { useSocket } from '@/hooks/useSocket';
 
 const NAV = [
   { href: '/master-admin', label: 'Dashboard', icon: LayoutDashboard, perm: null },
@@ -63,6 +64,9 @@ export default function MasterAdminLayout({ children }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isImpersonating, setIsImpersonating] = useState(false);
+
+  // Initialize socket connection for real-time features like support tickets
+  useSocket();
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

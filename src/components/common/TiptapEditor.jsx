@@ -28,7 +28,9 @@ import { Label } from '@/components/ui/label';
 // Editor ke liye custom styles - CSS import remove kar diya
 const editorStyles = `
   .ProseMirror {
-    min-height: 200px;
+    min-height: 100px;
+    max-height: 250px;
+    overflow-y: auto;
     padding: 1rem;
     outline: none;
     background: white;
