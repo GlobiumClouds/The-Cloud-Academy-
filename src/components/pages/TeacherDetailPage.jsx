@@ -109,10 +109,8 @@ function OverviewTab({ teacher }) {
   }, [slots]);
 
   const uniqueClasses = useMemo(() => {
-    // Assuming slot might have class_name or similar if not we just use what's available
-    // But since the DB might not return class_name directly in timetableSlot unless joined, we can just display subjects for now.
-    // Let's check if class_name exists in slot, if not we skip.
-    const cls = new Set(slots.map(s => s.class_name).filter(Boolean));
+    // The slot contains timetable_name which usually represents the class/section
+    const cls = new Set(slots.map(s => s.timetable_name).filter(Boolean));
     return Array.from(cls);
   }, [slots]);
   
