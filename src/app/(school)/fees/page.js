@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Coins } from 'lucide-react';
+import { Plus, Coins, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { feeService, studentService } from '@/services';
@@ -26,6 +26,16 @@ const FEE_STATUS_OPTIONS = (FEE_STATUS ?? []).map(({ value, label }) => ({ value
 
 const MONTH_OPTIONS = (MONTHS ?? []).map(({ value, label }) => ({ value: String(value), label }));
 
+const getStudentClassLabel = (student) => {
+  if (!student) return '—';
+
+  const className = student.class_name || student.className || student.class?.name || student.class?.class_name || student.grade_name;
+  const sectionName = student.section_name || student.sectionName || student.section?.name || student.section;
+
+  if (className && sectionName) return `${className} - ${sectionName}`;
+  return className || sectionName || '—';
+};
+
 const buildColumns = (onEdit, onDelete, onCollect) => [
   {
     id: 'student', header: 'Student',
@@ -41,6 +51,13 @@ const buildColumns = (onEdit, onDelete, onCollect) => [
           </div>
         </div>
       );
+    },
+  },
+  {
+    id: 'class', header: 'Class',
+    cell: ({ row }) => {
+      const student = row.original.student;
+      return <span className="text-sm text-muted-foreground">{getStudentClassLabel(student)}</span>;
     },
   },
   {

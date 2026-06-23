@@ -137,6 +137,7 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
   
   // Extract student record for deeper resolution
   const studentRaw = data.Student || data.student || {};
+  const studentDetailsRaw = studentRaw.details?.studentDetails || {};
 
   const studentId = pickFirst(
     data.student_id,
@@ -156,6 +157,10 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     studentRaw.className ||
     studentRaw.Class?.name ||
     studentRaw.class?.name ||
+    studentDetailsRaw.class_name ||
+    studentDetailsRaw.className ||
+    studentDetailsRaw.Class?.name ||
+    studentDetailsRaw.class?.name ||
     studentRaw.current_class?.name ||
     studentRaw.currentClass?.name ||
     studentRaw.Class?.class_name ||
@@ -171,6 +176,10 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     studentRaw.sectionName ||
     studentRaw.Section?.name ||
     studentRaw.section?.name ||
+    studentDetailsRaw.section_name ||
+    studentDetailsRaw.sectionName ||
+    studentDetailsRaw.Section?.name ||
+    studentDetailsRaw.section?.name ||
     studentRaw.current_section?.name ||
     studentRaw.currentSection?.name ||
     studentRaw.Section?.section_name ||
@@ -184,6 +193,11 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     studentRaw.Class?.id,
     studentRaw.Class?.class_id,
     studentRaw.class?.id,
+    studentDetailsRaw.class_id,
+    studentDetailsRaw.classId,
+    studentDetailsRaw.Class?.id,
+    studentDetailsRaw.Class?.class_id,
+    studentDetailsRaw.class?.id,
     studentRaw.current_class_id,
     studentRaw.currentClassId,
   );
@@ -196,6 +210,11 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
     studentRaw.Section?.id,
     studentRaw.Section?.section_id,
     studentRaw.section?.id,
+    studentDetailsRaw.section_id,
+    studentDetailsRaw.sectionId,
+    studentDetailsRaw.Section?.id,
+    studentDetailsRaw.Section?.section_id,
+    studentDetailsRaw.section?.id,
     studentRaw.current_section_id,
     studentRaw.currentSectionId,
   );
@@ -206,7 +225,9 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
       let hydratedStudent = studentMetaCache.get(cacheKey);
 
       if (!hydratedStudent) {
-        const studentResponse = await studentService.getById(studentId);
+        const studentResponse = await studentService.getById(studentId, {
+          params: { include: 'class,section' },
+        });
         hydratedStudent = studentResponse?.data?.data || studentResponse?.data || studentResponse || {};
         studentMetaCache.set(cacheKey, hydratedStudent);
       }
@@ -217,6 +238,11 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
         hydratedStudent?.Class?.id,
         hydratedStudent?.Class?.class_id,
         hydratedStudent?.class?.id,
+        hydratedStudent?.details?.studentDetails?.class_id,
+        hydratedStudent?.details?.studentDetails?.classId,
+        hydratedStudent?.details?.studentDetails?.Class?.id,
+        hydratedStudent?.details?.studentDetails?.Class?.class_id,
+        hydratedStudent?.details?.studentDetails?.class?.id,
         hydratedStudent?.current_class_id,
         hydratedStudent?.currentClassId,
       );
@@ -227,6 +253,11 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
         hydratedStudent?.Section?.id,
         hydratedStudent?.Section?.section_id,
         hydratedStudent?.section?.id,
+        hydratedStudent?.details?.studentDetails?.section_id,
+        hydratedStudent?.details?.studentDetails?.sectionId,
+        hydratedStudent?.details?.studentDetails?.Section?.id,
+        hydratedStudent?.details?.studentDetails?.Section?.section_id,
+        hydratedStudent?.details?.studentDetails?.section?.id,
         hydratedStudent?.current_section_id,
         hydratedStudent?.currentSectionId,
       );
@@ -236,6 +267,10 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
         hydratedStudent?.className ||
         hydratedStudent?.Class?.name ||
         hydratedStudent?.class?.name ||
+        hydratedStudent?.details?.studentDetails?.class_name ||
+        hydratedStudent?.details?.studentDetails?.className ||
+        hydratedStudent?.details?.studentDetails?.Class?.name ||
+        hydratedStudent?.details?.studentDetails?.class?.name ||
         hydratedStudent?.current_class?.name ||
         hydratedStudent?.currentClass?.name ||
         null;
@@ -245,6 +280,10 @@ const transformVoucherResponse = async (data, classServiceInstance = null, secti
         hydratedStudent?.sectionName ||
         hydratedStudent?.Section?.name ||
         hydratedStudent?.section?.name ||
+        hydratedStudent?.details?.studentDetails?.section_name ||
+        hydratedStudent?.details?.studentDetails?.sectionName ||
+        hydratedStudent?.details?.studentDetails?.Section?.name ||
+        hydratedStudent?.details?.studentDetails?.section?.name ||
         hydratedStudent?.current_section?.name ||
         hydratedStudent?.currentSection?.name ||
         null;
@@ -1447,4 +1486,4 @@ feeVoucherService.bulkDelete = async (voucherIds) => {
   }
 };
 
-export default feeVoucherService;
+export default feeVoucherService;

@@ -338,7 +338,7 @@ export default function LoginPage() {
 
       {/* Password Dialog for Selection */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-        <DialogContent className="w-[95vw] sm:max-w-sm bg-slate-900 border-white/10 text-white rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8">
+        <DialogContent className="w-[95vw] sm:max-w-sm max-h-[90vh] overflow-y-auto bg-slate-900 border-white/10 text-white rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8">
           <DialogHeader>
             <DialogTitle className="text-xl sm:text-2xl font-black">Verify Identity</DialogTitle>
             <DialogDescription className="text-slate-400 text-[10px] sm:text-xs">Enter password for your {selectedAccount?.display_role} profile</DialogDescription>

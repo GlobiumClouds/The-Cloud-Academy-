@@ -184,7 +184,10 @@ export default function DataTable({
   // Uses length gate to prevent infinite loop when data is empty array reference recreation
   useEffect(() => {
     if (prevDataRef.current !== data) {
-      if ((prevDataRef.current && prevDataRef.current.length > 0) || (data && data.length > 0)) {
+      if (
+        Object.keys(rowSelection).length > 0 &&
+        ((prevDataRef.current && prevDataRef.current.length > 0) || (data && data.length > 0))
+      ) {
         setRowSelection({});
       }
       prevDataRef.current = data;
@@ -589,11 +592,11 @@ export default function DataTable({
                     pagination.onPageSizeChange(Number(v));
                   }}
                 >
-                  <SelectTrigger className="h-7 w-[60px] text-xs px-2">
-                    <SelectValue />
+                  <SelectTrigger className="h-7 min-w-[84px] justify-between px-2 text-xs text-black">
+                    <SelectValue placeholder={String(pagination.pageSize ?? 10)} className="tabular-nums font-medium text-foreground" />
                   </SelectTrigger>
                   <SelectContent>
-                    {[5, 10, 25, 50, 100].map((n) => (
+                    {[5, 10, 20, 25, 50, 100].map((n) => (
                       <SelectItem key={n} value={String(n)} className="text-xs">{n}</SelectItem>
                     ))}
                   </SelectContent>

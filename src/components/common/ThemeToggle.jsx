@@ -7,7 +7,7 @@
 'use client';
 
 import { Sun, Moon, Monitor } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

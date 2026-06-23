@@ -11,6 +11,8 @@
  *   required    boolean
  *   disabled    boolean
  *   className   string
+ *   contentClassName string
+ *   matchTriggerWidth boolean
  *
  * Usage:
  *   <SelectField
@@ -50,6 +52,8 @@ export default function SelectField({
   required,
   disabled,
   className,
+  contentClassName,
+  matchTriggerWidth = true,
   rules,
 }) {
   // Ensure options is always an array, even if it's an object or other type
@@ -87,7 +91,10 @@ export default function SelectField({
               <SelectTrigger id={name} aria-invalid={!!error}>
                 <SelectValue placeholder={placeholder} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                className={contentClassName}
+                matchTriggerWidth={matchTriggerWidth}
+              >
                 {normalizedOptions.length > 0 ? (
                   normalizedOptions.map((opt) => (
                     <SelectItem key={opt.value} value={String(opt.value)}>
@@ -117,7 +124,10 @@ export default function SelectField({
           <SelectTrigger id={name} aria-invalid={!!error}>
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent
+            className={contentClassName}
+            matchTriggerWidth={matchTriggerWidth}
+          >
             {normalizedOptions.length > 0 ? (
               normalizedOptions.map((opt) => (
                 <SelectItem key={opt.value} value={String(opt.value)}>

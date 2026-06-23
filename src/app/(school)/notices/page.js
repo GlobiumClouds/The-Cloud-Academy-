@@ -12,13 +12,12 @@ import { PERMISSIONS, NOTICE_AUDIENCE, NOTICE_PRIORITY } from '@/constants';
 import { formatDate } from '@/lib/utils';
 import {
   PageHeader, DataTable, StatusBadge, TableRowActions,
-  ConfirmDialog, AppModal,
+  ConfirmDialog, AppModal, SearchInput,
 } from '@/components/common';
 import SelectField from '@/components/common/SelectField';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const extractRows  = (d) => d?.data?.rows ?? d?.data ?? [];
 const extractPages = (d) => d?.data?.totalPages ?? 1;
@@ -231,6 +230,7 @@ export default function NoticesPage() {
           isLoading={createMutation.isPending}
           audienceOptions={audienceOptions}
           priorityOptions={priorityOptions}
+          useSearchInput
         />
       </AppModal>
 
@@ -263,7 +263,7 @@ export default function NoticesPage() {
 
 /* ─── Notice form ─────────────────────────────────────────────── */
 /* Notice Form (react-hook-form) */
-function NoticeForm({ defaultValues, audienceOptions, priorityOptions, onSubmit, onCancel, isLoading }) {
+function NoticeForm({ defaultValues, audienceOptions, priorityOptions, onSubmit, onCancel, isLoading, useSearchInput = false }) {
   const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       title:        defaultValues?.title        ?? '',
@@ -280,7 +280,16 @@ function NoticeForm({ defaultValues, audienceOptions, priorityOptions, onSubmit,
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-1">
       <div className="space-y-1.5">
         <Label>Title <span className="text-destructive">*</span></Label>
-        <Input {...register('title', { required: 'Required' })} placeholder="Notice title" />
+        {useSearchInput ? (
+          <SearchInput
+            value={watch('title')}
+            onChange={(value) => setValue('title', value, { shouldValidate: true, shouldDirty: true })}
+            placeholder="Notice title"
+            debounceMs={0}
+          />
+        ) : (
+          <Input {...register('title', { required: 'Required' })} placeholder="Notice title" />
+        )}
         {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
       </div>
       <div className="space-y-1.5">

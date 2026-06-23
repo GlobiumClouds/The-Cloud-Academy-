@@ -322,7 +322,7 @@ export default function InstituteLayoutWrapper({ children }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const getDashPath = useAuthStore((s) => s.dashboardPath);
-  const dashboardPath = getDashPath() || "/";
+  const dashboardPath = mounted ? (getDashPath() || "/") : "/";
   const instituteType = user?.institute?.institute_type;
 
   // Initialize and keep real-time Socket.io active across all school pages
@@ -456,6 +456,14 @@ export default function InstituteLayoutWrapper({ children }) {
     }
   }, [logout, router]);
 
+  if (!mounted) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <span className="text-sm text-muted-foreground">Loading workspace...</span>
+      </div>
+    );
+  }
+
   const sidebarProps = {
     grouped,
     pathname,
@@ -514,7 +522,7 @@ export default function InstituteLayoutWrapper({ children }) {
       </aside>
 
       {/* Main */}
-      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+      <div className="flex flex-1 flex-col min-w-0 ">
         {/* ════════════════════════════════════════
             TOP HEADER
             Left  : [hamburger] [mobile-logo] | [breadcrumb]
@@ -615,7 +623,7 @@ export default function InstituteLayoutWrapper({ children }) {
         <GlobalAnnouncementBanner />
         
         {/* Page content */}
-        <main className="flex-1 overflow-auto z-50">
+        <main className="flex-1 min-h-0 overflow-y-auto z-50">
           {isImpersonating && (
             <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between sticky top-0 z-[60] shadow-md">
               <div className="flex items-center gap-2 text-sm font-bold">
@@ -630,7 +638,7 @@ export default function InstituteLayoutWrapper({ children }) {
               </button>
             </div>
           )}
-          <div className="p-4 md:p-6 h-full">{children}</div>
+          <div className="p-4 md:p-6">{children}</div>
         </main>
       </div>
     </div>

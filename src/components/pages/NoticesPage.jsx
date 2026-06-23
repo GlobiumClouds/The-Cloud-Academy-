@@ -390,18 +390,17 @@ export default function NotificationsPage() {
 
               {watchAudience && watchAudience !== 'all' && recipientOptions.length > 0 && (
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Select Recipient *</label>
-                  <select
+                  <SelectField
+                    label="Select Recipient *"
+                    name="recipient"
                     value={selectedRecipient}
-                    onChange={(e) => setSelectedRecipient(e.target.value)}
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    {recipientOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedRecipient}
+                    options={recipientOptions}
+                    placeholder="Select recipient…"
+                    contentClassName="w-[280px] max-w-[calc(100vw-2rem)]"
+                    matchTriggerWidth={false}
+                    required
+                  />
                   <p className="text-xs text-muted-foreground">
                     {selectedRecipient?.startsWith('all_')
                       ? `📢 Will broadcast to all ${watchAudience}`
