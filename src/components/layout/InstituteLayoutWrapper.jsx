@@ -465,8 +465,9 @@ export default function InstituteLayoutWrapper({ children }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Mobile backdrop */}
+// <div className="flex h-screen overflow-hidden bg-background">
+    // only 1 scrollbar on the page
+    <div className="fixed inset-0 flex overflow-hidden bg-background">      {/* Mobile backdrop */}
       <div
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"
@@ -615,7 +616,7 @@ export default function InstituteLayoutWrapper({ children }) {
         <GlobalAnnouncementBanner />
         
         {/* Page content */}
-        <main className="flex-1 overflow-auto z-50">
+        <main className="flex-1 overflow-auto">
           {isImpersonating && (
             <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between sticky top-0 z-[60] shadow-md">
               <div className="flex items-center gap-2 text-sm font-bold">
